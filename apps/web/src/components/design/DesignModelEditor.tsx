@@ -58,6 +58,9 @@ export function DesignModelEditor({
     setSettings((previous) => ({ ...previous, ...update }));
   const material = details?.materials.find(({ id }) => id === materialId) ?? details?.materials[0];
   const currentAssetId = replacement?.assetId ?? assetId;
+  const cameraName = details?.cameras.find(({ id }) => id === settings.camera)?.name;
+  const animationName = details?.animations.find(({ id }) => id === settings.animation)?.name;
+  const assetName = assets.find(({ assetId }) => assetId === currentAssetId)?.name;
   const hidden = new Set(settings.hiddenLayers);
   const selectModel = (next: DesignAssetMeta) => {
     if (next.assetId === currentAssetId) return;
@@ -99,7 +102,7 @@ export function DesignModelEditor({
             <div className="min-w-0">
               <DialogTitle>{ui("3D scene", "3D-сцена")}</DialogTitle>
               <DialogDescription>
-                <span className="block truncate">{replacement?.name ?? name}</span>
+                <span className="block truncate">{replacement?.name ?? assetName ?? name}</span>
               </DialogDescription>
             </div>
             <Button
@@ -126,9 +129,11 @@ export function DesignModelEditor({
                     interactive
                     onDetails={setDetails}
                   />
-                  <p className="pointer-events-none absolute inset-x-0 bottom-0 px-3 py-2 text-center text-2xs text-muted-foreground">
-                    {ui("Drag to orbit · scroll to zoom", "Вращение мышью · зум колёсиком")}
-                  </p>
+                  {!cameraName ? (
+                    <p className="pointer-events-none absolute inset-x-0 bottom-0 px-3 py-2 text-center text-2xs text-muted-foreground">
+                      {ui("Drag to orbit · scroll to zoom", "Вращение мышью · зум колёсиком")}
+                    </p>
+                  ) : null}
                 </>
               ) : (
                 <p className="grid size-full place-content-center px-6 text-center text-sm text-muted-foreground">
@@ -161,7 +166,9 @@ export function DesignModelEditor({
                       size="sm"
                       aria-label={ui("Model from assets", "Модель из ресурсов")}
                     >
-                      <SelectValue placeholder={ui("Choose from assets", "Выбрать из ресурсов")} />
+                      <SelectValue placeholder={ui("Choose from assets", "Выбрать из ресурсов")}>
+                        {assetName}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectPopup>
                       {assets.map(({ assetId, name }) => (
@@ -181,7 +188,9 @@ export function DesignModelEditor({
                     onValueChange={(value) => patch({ camera: value === "orbit" ? null : value })}
                   >
                     <SelectTrigger size="sm" aria-label={ui("Camera", "Камера")}>
-                      <SelectValue />
+                      <SelectValue>
+                        {cameraName ?? ui("Orbit camera", "Орбитальная камера")}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectPopup>
                       <SelectItem value="orbit">
@@ -234,7 +243,7 @@ export function DesignModelEditor({
                     }
                   >
                     <SelectTrigger size="sm" aria-label={ui("Animation", "Анимация")}>
-                      <SelectValue />
+                      <SelectValue>{animationName ?? ui("Paused", "Пауза")}</SelectValue>
                     </SelectTrigger>
                     <SelectPopup>
                       <SelectItem value="still">{ui("Paused", "Пауза")}</SelectItem>
@@ -252,7 +261,7 @@ export function DesignModelEditor({
                   <h3 className="text-xs font-semibold">{ui("Materials", "Материалы")}</h3>
                   <Select value={material.id} onValueChange={setMaterialId}>
                     <SelectTrigger size="sm" aria-label={ui("Material", "Материал")}>
-                      <SelectValue />
+                      <SelectValue>{material.name}</SelectValue>
                     </SelectTrigger>
                     <SelectPopup>
                       {details?.materials.map(({ id, name }) => (
