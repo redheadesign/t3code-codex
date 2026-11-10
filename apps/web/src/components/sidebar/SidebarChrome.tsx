@@ -28,6 +28,8 @@ import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { UsageIndicatorButton } from "./UsageIndicator";
 import { validateScheduledTasksSearch } from "../settings/scheduledTasksSettings.logic";
 
+export { SidebarActivityButton } from "./SidebarActivity";
+
 export function SidebarBrandWidthProbe({
   isElectron,
   onWidthChange,

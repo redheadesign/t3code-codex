@@ -71,6 +71,7 @@ export function useThreadActionMenu(input: {
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
+  const projectSidebarEnabled = useClientSettings((settings) => settings.boringSidebarEnabled);
   const logicalProjectKeyByPhysicalKey = buildPhysicalToLogicalProjectKeyMap({
     projects,
     settings: projectGroupingSettings,
@@ -126,8 +127,10 @@ export function useThreadActionMenu(input: {
       const now = new Date();
       const configLoaded = readEnvironmentServerConfigLoaded(threadRef.environmentId);
       const supports = {
-        settlement: configLoaded,
-        autoSettleOptOut: readEnvironmentSupportsAutoSettleOptOut(threadRef.environmentId),
+        settlement: !projectSidebarEnabled && configLoaded,
+        autoSettleOptOut:
+          !projectSidebarEnabled &&
+          readEnvironmentSupportsAutoSettleOptOut(threadRef.environmentId),
         snooze: configLoaded,
         pinning: configLoaded,
         titleRegeneration: configLoaded,

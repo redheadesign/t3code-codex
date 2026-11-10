@@ -10,6 +10,7 @@ export function SidebarThreadHeader(props: {
   onArchive: () => void;
   onNewProject: () => void;
   importSessions: ReactNode;
+  activity?: ReactNode;
 }) {
   return (
     <div className="flex items-center gap-1">
@@ -17,6 +18,7 @@ export function SidebarThreadHeader(props: {
         <T3Wordmark aria-label="T3" className="h-3.5 w-auto shrink-0" />
         <span>Code</span>
       </div>
+      {props.activity}
       <SidebarHeaderIconButton label="Add project" onClick={props.onNewProject}>
         <FolderPlusIcon />
       </SidebarHeaderIconButton>

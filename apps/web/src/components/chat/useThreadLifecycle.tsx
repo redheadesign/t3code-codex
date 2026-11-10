@@ -13,6 +13,7 @@ import {
 } from "../ChatView.logic";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { useDeadlinePassed, useNowAfter } from "../../hooks/useDeadline";
+import { useClientSettings } from "../../hooks/useSettings";
 import type { usePendingThreadRequests } from "./usePendingThreadRequests";
 import {
   AuthOrchestrationOperateScope,
@@ -174,6 +175,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   } = input;
   const navigate = useNavigate();
   const router = useRouter();
+  const projectSidebarEnabled = useClientSettings((settings) => settings.boringSidebarEnabled);
   const { settleThread, pinThread, confirmAndUnpinThread } = useThreadActions();
   const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
   const switchGitRef = useAtomCommand(vcsEnvironment.switchRef, { reportFailure: false });
@@ -222,7 +224,9 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     latestRunCompletedAt: activeLatestRun?.completedAt ?? null,
   });
   const activeThreadSettled =
-    serverConfigLoaded && activeThreadShell?.settledOverride === "settled";
+    !projectSidebarEnabled &&
+    serverConfigLoaded &&
+    activeThreadShell?.settledOverride === "settled";
   const unsettleThreadMutation = useOrchestrationCommand(threadEnvironment.unsettle, {
     reportFailure: false,
   });
@@ -649,6 +653,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     };
   const shortcuts = {
     "thread.settle": () => {
+      if (projectSidebarEnabled) return false;
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;
       if (!activeThreadShell || !activeThreadRef || !serverConfigLoaded) return;
       if (activeThreadSettled) {

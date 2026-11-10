@@ -148,16 +148,18 @@ choice.
 While this is on, the active list is ordered by when each thread last came back to you, so you
 cannot drag or move threads within it. Your saved order returns when you turn it off.
 
-### Group threads by project (beta)
+### Find chats by project
 
-The web and desktop sidebar groups active threads under their projects by default. Pinned projects
-come first, and projects with no active threads still have a folder. An archived project's folder
-comes last and shows only while it has active threads. Click a folder to open or
-close it. A closed folder shows how many threads it holds, and a dot when one of them
-needs you. Use the pen button on a folder, or right-click it, to start a thread in that project.
-Pinned threads stay above the folders, and Snoozed and Settled stay below them. In this mode you
-cannot drag threads, and the Working section is off. Change the layout under **Settings → Labs →
-Boring sidebar (group by project)**. Each device keeps its own choice.
+On web and desktop, **Projects** lists each project with its chats underneath. Empty projects stay
+visible. Click a project to collapse or expand it. Use the pen button on a project or its context
+menu to start a chat there. Chats without a project are in **Recent**.
+
+Use **View activity** in the sidebar header to jump to a chat that needs your attention,
+is running, or recently finished.
+
+Use **Archive** to put a chat away. The project layout includes chats previously listed under
+**Settled**. To return to the flat layout with shelves and drag reordering, turn off
+**Settings → Labs → Group chats by project**. Each device keeps its own choice.
 
 ## Settle finished work
 

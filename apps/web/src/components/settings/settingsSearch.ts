@@ -455,7 +455,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "boring-sidebar",
-    title: "Boring sidebar (group by project)",
+    title: "Group chats by project",
     to: "/settings/labs",
     searchTerms: ["beta folders project tree legacy old classic sidebar"],
   },

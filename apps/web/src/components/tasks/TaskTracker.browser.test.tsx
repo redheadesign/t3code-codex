@@ -190,8 +190,10 @@ it("moves a task to another column and opens the same task from its chat link", 
     .element(dialog.getByRole("combobox", { name: "Task status" }))
     .toHaveTextContent("In review");
   const activity = dialog.getByRole("list", { name: "Task activity" }).getByRole("listitem");
-  await expect.element(activity.nth(0)).toHaveTextContent(/Navigation is ready for review\./);
-  await expect.element(activity.nth(1)).toHaveTextContent(/Created task/);
+  await expect
+    .element(activity.nth(0).getByText("Navigation is ready for review.", { exact: true }))
+    .toBeVisible();
+  await expect.element(activity.nth(1).getByText("Created task", { exact: true })).toBeVisible();
 });
 
 it("switches projects from the header and keeps the current view", async () => {
