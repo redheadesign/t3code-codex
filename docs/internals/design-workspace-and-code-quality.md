@@ -126,10 +126,17 @@ Directly copying HTML or JSX into the canvas is not a supported architecture. It
 would bring dependencies, hooks, application state, and non-deterministic runtime
 behavior into the editor.
 
-Uninstrumented or dynamic content is imported as a frozen snapshot and marked with
-`provenance.mode = snapshot`. It must not be presented as a live linked component.
+Uninstrumented or dynamic content is imported as a snapshot and marked with
+`provenance.mode = snapshot`. Portable animation keyframes are data and may play
+in Present. They do not carry scroll listeners or application state. Repeated
+layouts can become local components without claiming a link to the source code.
 Instrumented components can additionally carry a stable component ID, source file,
 source span, and source revision.
+
+Prototype widgets are explicit user-authored assets. They remain inert in the
+editor and in code exports. Present runs them on demand in an opaque iframe.
+The inline runner's document policy blocks external resource loads. Viewing the
+original site uses a separate sandbox and the snapshot's recorded URL.
 
 ## Canvas to code pipeline
 

@@ -230,6 +230,13 @@
   ],
   "packageOverrides": [
     {
+      "name": "gsap",
+      "version": "3.15.1",
+      "license": "GSAP Standard License",
+      "sourceUrl": "https://gsap.com/standard-license/",
+      "noticeFile": "third-party-licenses/gsap.txt"
+    },
+    {
       "name": "entities",
       "version": "8.1.0",
       "license": "BSD-2-Clause",

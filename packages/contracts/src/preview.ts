@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { NonNegativeInt, PositiveInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { BROWSER_PROFILE_MAX_COUNT, BrowserProfile, BrowserProfileId } from "./browserProfile.ts";
+import { DesignMotion } from "./design.ts";
 
 export const PREVIEW_URL_MAX_LENGTH = 2_048;
 export const CONFIGURED_LOCAL_SERVER_URLS_MAX_ITEMS = 32;
@@ -228,6 +229,7 @@ export const PreviewDesignNodeSnapshot = Schema.Struct({
   maxLines: Schema.optional(Schema.Number),
   color: Schema.NullOr(Schema.String),
   opacity: Schema.Number,
+  motion: Schema.optional(DesignMotion),
   mixBlendMode: Schema.optional(Schema.String),
   borderRadius: Schema.Number,
   clipContent: Schema.optional(Schema.Boolean),
@@ -236,6 +238,7 @@ export const PreviewDesignNodeSnapshot = Schema.Struct({
   backdropFilter: Schema.optional(Schema.String),
   designEffects: Schema.optional(Schema.String),
   assetUrl: Schema.optional(Schema.String),
+  assetLoaded: Schema.optional(Schema.Boolean),
   vectorPath: Schema.optional(Schema.String),
   vectorClosed: Schema.optional(Schema.Boolean),
   vectorStrokeWidth: Schema.optional(Schema.Number),
@@ -256,6 +259,15 @@ export const PreviewDesignCapture = Schema.Struct({
   viewportHeight: Schema.Number,
   truncated: Schema.optional(Schema.Boolean),
   nodes: Schema.Array(PreviewDesignNodeSnapshot),
+  inlineAssets: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        url: Schema.String.check(Schema.isMaxLength(8192)),
+        mimeType: Schema.String.check(Schema.isMaxLength(128)),
+        base64: Schema.String.check(Schema.isMaxLength(11_184_812)),
+      }),
+    ).check(Schema.isMaxLength(64)),
+  ),
 });
 export type PreviewDesignCapture = typeof PreviewDesignCapture.Type;
 

@@ -10,6 +10,7 @@ import {
 } from "./designDocument";
 import { designEffectsSvg, designEffectsStyle } from "./designEffects";
 import { readDesignAsset } from "./designAssetStore";
+import { DesignWidgetPreview } from "./DesignWidgetPreview";
 import { designImageStyle, designImageBorderStyle } from "./designImage";
 import { designNodeCssTransform } from "./designGeometry";
 import { designTypographyStyle } from "./designTypography";
@@ -40,6 +41,8 @@ export function DesignSceneNode({
   visibleNodeIds,
   outlines = false,
   canvasZoom = 1,
+  playMotion = false,
+  playWidgets = false,
 }: {
   document: DesignDocument;
   node: DesignNode;
@@ -63,16 +66,48 @@ export function DesignSceneNode({
   visibleNodeIds?: ReadonlySet<string> | undefined;
   outlines?: boolean;
   canvasZoom?: number;
+  playMotion?: boolean;
+  playWidgets?: boolean;
 }) {
   const ui = useUiText();
   const [editing, setEditing] = useState(false);
   const effectId = `design-filter-${useId().replace(/[^a-zA-Z0-9_-]/gu, "")}`;
+  const motion = playMotion && node.visible !== false ? node.motion : undefined;
+  const playLayerMotion = (element: HTMLDivElement | null) => {
+    if (!motion || !element || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let animation: Animation;
+    try {
+      animation = element.animate(
+        motion.keyframes.map(({ offset, easing, opacity, translation, rotation, scale }) => ({
+          offset,
+          ...(easing === undefined ? {} : { easing }),
+          ...(opacity === undefined ? {} : { opacity }),
+          ...(translation === undefined
+            ? {}
+            : { translate: `${translation[0]}px ${translation[1]}px` }),
+          ...(rotation === undefined ? {} : { rotate: `${rotation}deg` }),
+          ...(scale === undefined ? {} : { scale: String(scale) }),
+        })),
+        {
+          duration: motion.durationMs,
+          delay: motion.delayMs,
+          iterations: motion.iterations === "infinite" ? Infinity : motion.iterations,
+          direction: motion.direction,
+          fill: motion.fill,
+          easing: motion.easing,
+        },
+      );
+    } catch {
+      return;
+    }
+    return () => animation.cancel();
+  };
   const cancelEdit = useRef(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [asset, setAsset] = useState<{ id: string; url: string | null } | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- IndexedDB blobs need object URLs owned and released by the mounted scene node.
   useEffect(() => {
-    if (!node.assetId) return;
+    if (node.kind !== "image" || !node.assetId) return;
     let active = true;
     let url: string | undefined;
     void readDesignAsset(node.assetId)
@@ -92,7 +127,7 @@ export function DesignSceneNode({
       active = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [node.assetId]);
+  }, [node.assetId, node.kind]);
   if (node.visible === false || visited.has(node.nodeId)) return null;
   const nextVisited = new Set([...visited, node.nodeId]);
   const navigate = (trigger: string) => {
@@ -463,6 +498,8 @@ export function DesignSceneNode({
               parentLocked={locked}
               outlines={outlines}
               canvasZoom={canvasZoom}
+              playMotion={playMotion}
+              playWidgets={playWidgets}
             />
           ))}
         </div>
@@ -471,6 +508,7 @@ export function DesignSceneNode({
   );
   return (
     <div
+      ref={motion ? playLayerMotion : undefined}
       role={onStart || node.interactions?.length ? "button" : undefined}
       tabIndex={locked || (!onStart && !node.interactions?.length) ? -1 : 0}
       aria-label={node.name}
@@ -538,6 +576,28 @@ export function DesignSceneNode({
       ) : (
         visual
       )}
+      {node.prototypeWidget && !outlines ? (
+        playWidgets ? (
+          <div
+            className="absolute inset-0 overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <DesignWidgetPreview
+              key={node.prototypeWidget.kind === "url" ? node.prototypeWidget.url : node.assetId}
+              title={node.name}
+              assetId={node.assetId}
+              widget={node.prototypeWidget}
+            />
+          </div>
+        ) : (
+          <div className="pointer-events-none absolute inset-0 grid place-content-center overflow-hidden bg-muted p-3 text-center text-sm text-muted-foreground">
+            <span>{node.name}</span>
+            <span className="text-xs">
+              {ui("Widget · Present to run", "Виджет · запуск в показе")}
+            </span>
+          </div>
+        )
+      ) : null}
       {editing ? (
         <textarea
           aria-label={`Edit ${node.name}`}

@@ -1,4 +1,9 @@
-import type { DesignAssetPayload, DesignSyncRequest, DesignSyncResult } from "@t3tools/contracts";
+import {
+  DESIGN_WIDGET_SOURCE_MIME,
+  type DesignAssetPayload,
+  type DesignSyncRequest,
+  type DesignSyncResult,
+} from "@t3tools/contracts";
 
 export interface DesignServerState {
   readonly documentId: string;
@@ -100,6 +105,18 @@ export function applyDesignSyncRequest(
     }
   }
   for (const assetId of request.assetIds) assetIds.add(assetId);
+  const assetPayloads = new Map([
+    ...(state.assetPayloads ?? new Map()),
+    ...(request.assetPayloads ?? []).map((asset) => [asset.assetId, asset] as const),
+  ]);
+  if (snapshot) {
+    const activeAssetIds = new Set(request.assetIds);
+    for (const [assetId, asset] of assetPayloads) {
+      if (asset.mimeType !== DESIGN_WIDGET_SOURCE_MIME || activeAssetIds.has(assetId)) continue;
+      assetIds.delete(assetId);
+      assetPayloads.delete(assetId);
+    }
+  }
   const revision = state.revision + request.operations.length;
   return {
     state: {
@@ -108,10 +125,7 @@ export function applyDesignSyncRequest(
       nodes,
       assetIds,
       ...(request.snapshot === undefined ? {} : { snapshot: request.snapshot }),
-      assetPayloads: new Map([
-        ...(state.assetPayloads ?? new Map()),
-        ...(request.assetPayloads ?? []).map((asset) => [asset.assetId, asset] as const),
-      ]),
+      assetPayloads,
     },
     result: {
       _tag: "accepted",

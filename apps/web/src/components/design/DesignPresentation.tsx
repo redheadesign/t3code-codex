@@ -6,7 +6,9 @@ import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { DesignSceneNode } from "./DesignScene";
 import { DesignPrototypeStage } from "./DesignPrototypeStage";
+import { DesignWidgetPreview } from "./DesignWidgetPreview";
 import { descendants, type DesignDocument, type DesignInteraction } from "./designDocument";
+import { designWidgetUrl } from "./designWidgetSource";
 import "./designPresentation.css";
 
 export function DesignPresentation({
@@ -30,7 +32,11 @@ export function DesignPresentation({
     interaction: DesignInteraction;
   } | null>(null);
   const [transition, setTransition] = useState({ name: "instant", duration: 200 });
+  const [restartCount, setRestartCount] = useState(0);
+  const [originalOpen, setOriginalOpen] = useState(false);
   const current = document.nodes.find((node) => node.nodeId === frames.at(-1));
+  const sourceUrl = designWidgetUrl(current?.provenance?.route ?? "");
+  const originalVisible = Boolean(sourceUrl && originalOpen);
   const settings =
     document.pages.find((page) => page.pageId === document.activePageId)?.prototypeSettings ?? {};
   const dimension = (value: number | undefined, fallback: number) =>
@@ -39,8 +45,16 @@ export function DesignPresentation({
   const viewportHeight = dimension(settings.viewportHeight, current?.height ?? 480);
   const back = () => {
     setHover(null);
+    setOriginalOpen(false);
     if (overlays.length) setOverlays((items) => items.slice(0, -1));
     else setFrames((items) => (items.length > 1 ? items.slice(0, -1) : items));
+  };
+  const restart = () => {
+    setFrames([startId]);
+    setOverlays([]);
+    setHover(null);
+    setOriginalOpen(false);
+    setRestartCount((count) => count + 1);
   };
   const perform = useStableCallback((interaction: DesignInteraction, sourceNodeId?: string) => {
     if (interaction.trigger === "hover") {
@@ -110,7 +124,8 @@ export function DesignPresentation({
   );
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- One cancellable timer owns the earliest transition in the currently presented frame.
   useEffect(() => {
-    if (!visibleId) return;
+    const visibleId = overlays.at(-1)?.nodeId ?? frames.at(-1);
+    if (!visibleId || originalVisible) return;
     const visibleNodes = [
       document.nodes.find((node) => node.nodeId === visibleId)!,
       ...descendants(document, visibleId),
@@ -123,11 +138,12 @@ export function DesignPresentation({
     if (!delayed) return;
     const timer = window.setTimeout(() => perform(delayed), Math.max(0, delayed.delayMs ?? 800));
     return () => window.clearTimeout(timer);
-  }, [document, visibleId, perform]);
+  }, [document, frames, overlays, perform, originalVisible]);
   const hoverFrame = document.nodes.find((node) => node.nodeId === hover?.targetId);
   const sceneNodes = new Map(document.nodes.map((node) => [node.nodeId, node]));
   const handleKey = useStableCallback((event: KeyboardEvent) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (originalVisible) return;
 
     const interaction = visibleNodes
       .flatMap((node) => node.interactions ?? [])
@@ -141,9 +157,7 @@ export function DesignPresentation({
       perform(interaction);
     } else if (event.key.toLowerCase() === "r") {
       event.preventDefault();
-      setFrames([startId]);
-      setOverlays([]);
-      setHover(null);
+      restart();
     } else if (event.key === "ArrowRight") {
       event.preventDefault();
       if (overlays.length) return;
@@ -238,6 +252,8 @@ export function DesignPresentation({
             selected={[]}
             onInteraction={preview ? undefined : perform}
             onHoverEnd={endHover}
+            playMotion
+            playWidgets={!preview && entry === overlays.at(-1)}
           />
         </div>
       </div>
@@ -267,66 +283,90 @@ export function DesignPresentation({
               size="icon-sm"
               variant="ghost"
               aria-label={ui("Restart prototype", "Прототип с начала")}
-              onClick={() => {
-                setFrames([startId]);
-                setOverlays([]);
-                setHover(null);
-              }}
+              onClick={restart}
             >
               <RotateCcwIcon />
             </Button>
-            <span className="text-xs text-muted-foreground">
-              {ui(
-                "Click connected layers to navigate · ← Back",
-                "Клик по слою для перехода · ← Назад",
-              )}
-            </span>
+            {sourceUrl ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                aria-pressed={originalVisible}
+                onClick={() => setOriginalOpen(!originalOpen)}
+              >
+                {originalVisible
+                  ? ui("Back to layers", "К слоям")
+                  : ui("Original site", "Оригинал")}
+              </Button>
+            ) : null}
+            {!originalVisible && !current?.prototypeWidget ? (
+              <span className="text-xs text-muted-foreground">
+                {ui(
+                  "Click connected layers to navigate · ← Back",
+                  "Клик по слою для перехода · ← Назад",
+                )}
+              </span>
+            ) : null}
           </div>
           <DesignPrototypeStage width={viewportWidth} height={viewportHeight} settings={settings}>
-            <div className="absolute inset-0 overflow-auto" inert={overlays.length > 0}>
-              {current ? (
-                <div
-                  key={current.nodeId}
-                  data-design-prototype-frame=""
-                  className="relative"
-                  data-transition={transition.name}
-                  style={
-                    {
-                      width: current.width,
-                      height: current.height,
-                      "--design-transition-duration": `${transition.duration}ms`,
-                    } as CSSProperties
-                  }
-                >
-                  <div style={{ opacity: hover && !hover.overlay ? 0 : 1 }}>
-                    <DesignSceneNode
-                      document={document}
-                      node={{ ...current, x: 0, y: 0 }}
-                      nodeMap={sceneNodes}
-                      selected={[]}
-                      onInteraction={overlays.length ? undefined : perform}
-                      onHoverEnd={endHover}
-                    />
-                  </div>
-                  {hoverFrame && hover && !hover.overlay && !overlays.length ? (
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-                      <DesignSceneNode
-                        document={document}
-                        node={{ ...hoverFrame, x: 0, y: 0 }}
-                        nodeMap={sceneNodes}
-                        selected={[]}
-                      />
+            {sourceUrl && originalVisible ? (
+              <DesignWidgetPreview
+                key={sourceUrl}
+                title={current?.name ?? sourceUrl}
+                assetId={null}
+                widget={{ kind: "url", url: sourceUrl }}
+              />
+            ) : (
+              <>
+                <div className="absolute inset-0 overflow-auto" inert={overlays.length > 0}>
+                  {current ? (
+                    <div
+                      key={`${current.nodeId}:${restartCount}`}
+                      data-design-prototype-frame=""
+                      className="relative"
+                      data-transition={transition.name}
+                      style={
+                        {
+                          width: current.width,
+                          height: current.height,
+                          "--design-transition-duration": `${transition.duration}ms`,
+                        } as CSSProperties
+                      }
+                    >
+                      <div style={{ opacity: hover && !hover.overlay ? 0 : 1 }}>
+                        <DesignSceneNode
+                          document={document}
+                          node={{ ...current, x: 0, y: 0 }}
+                          nodeMap={sceneNodes}
+                          selected={[]}
+                          onInteraction={overlays.length ? undefined : perform}
+                          onHoverEnd={endHover}
+                          playMotion
+                          playWidgets={!overlays.length}
+                        />
+                      </div>
+                      {hoverFrame && hover && !hover.overlay && !overlays.length ? (
+                        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+                          <DesignSceneNode
+                            document={document}
+                            node={{ ...hoverFrame, x: 0, y: 0 }}
+                            nodeMap={sceneNodes}
+                            selected={[]}
+                            playMotion
+                          />
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
+                  ) : (
+                    <p role="status">{ui("This frame is unavailable.", "Фрейм недоступен.")}</p>
+                  )}
                 </div>
-              ) : (
-                <p role="status">{ui("This frame is unavailable.", "Фрейм недоступен.")}</p>
-              )}
-            </div>
-            {overlays.map((entry) => renderOverlay(entry))}
-            {hover?.overlay && !overlays.length
-              ? renderOverlay({ nodeId: hover.targetId, interaction: hover.interaction }, true)
-              : null}
+                {overlays.map((entry) => renderOverlay(entry))}
+                {hover?.overlay && !overlays.length
+                  ? renderOverlay({ nodeId: hover.targetId, interaction: hover.interaction }, true)
+                  : null}
+              </>
+            )}
           </DesignPrototypeStage>
         </div>
       </DialogPopup>

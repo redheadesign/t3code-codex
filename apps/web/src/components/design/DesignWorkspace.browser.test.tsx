@@ -19,6 +19,66 @@ import { DesignWorkspace } from "./DesignWorkspace";
 import { createDesignDocumentFromMarkup } from "./previewToDesign";
 import { serializeDesignFile } from "./designAssetPackage";
 
+it("runs saved widget code only on request inside an opaque iframe", async () => {
+  await resetDesignStorage();
+  await using screen = await render(
+    <div style={{ width: 1280, height: 800 }}>
+      <DesignWorkspace />
+    </div>,
+    { router: "/design" },
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Add widget" }));
+  const editor = page.getByRole("dialog", { name: "Add widget" });
+  await userEvent.click(editor.getByRole("button", { name: "Code", exact: true }));
+  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Motion sample");
+  await editor
+    .getByRole("textbox", { name: "HTML", exact: true })
+    .fill('<div id="box" class="w-[73px]">Box</div>');
+  await editor.getByRole("textbox", { name: "JavaScript", exact: true }).fill(`
+    const box = document.querySelector("#box");
+    gsap.set(box, { x: 24 });
+    const verify = new ResizeObserver(() => {
+      if (box.offsetWidth !== 73) return;
+      verify.disconnect();
+      parent.postMessage({ widgetTest: true, x: gsap.getProperty(box, "x"), trigger: ScrollTrigger.version }, "*");
+    });
+    verify.observe(box);
+  `);
+  await userEvent.click(editor.getByRole("button", { name: "Add", exact: true }));
+  await expect.element(editor).not.toBeInTheDocument();
+  expect(window.document.querySelector('iframe[title="Motion sample"]')).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Present", exact: true }));
+  const presentation = page.getByRole("dialog", { name: "Motion sample" });
+  await expect.element(presentation.getByRole("button", { name: "Run widget" })).toBeVisible();
+  expect(window.document.querySelector('iframe[title="Motion sample"]')).toBeNull();
+  const signal = vi.fn();
+  const messages = new AbortController();
+  window.addEventListener(
+    "message",
+    (event) => {
+      const frame = window.document.querySelector<HTMLIFrameElement>(
+        'iframe[title="Motion sample"]',
+      );
+      if (event.source === frame?.contentWindow && event.data?.widgetTest === true)
+        signal(event.origin, event.data.x, event.data.trigger);
+    },
+    { signal: messages.signal },
+  );
+  try {
+    await userEvent.click(presentation.getByRole("button", { name: "Run widget" }));
+    await vi.waitFor(() =>
+      expect(signal).toHaveBeenCalledExactlyOnceWith("null", 24, expect.any(String)),
+    );
+    expect(
+      window.document.querySelector('iframe[title="Motion sample"]')?.getAttribute("sandbox"),
+    ).toBe("allow-scripts");
+    await userEvent.click(presentation.getByRole("button", { name: "Stop", exact: true }));
+    expect(window.document.querySelector('iframe[title="Motion sample"]')).toBeNull();
+  } finally {
+    messages.abort();
+  }
+});
+
 it("moves an unlinked Design file into a project folder using a stable document path", async () => {
   const project = { environmentId: EnvironmentId.make("design-host"), cwd: "/workspace/Project" };
   const local = { ...createInitialDesignDocument(), documentId: "local", title: "Unlinked file" };
@@ -401,10 +461,12 @@ it("edits mixed properties for every selected layer and undoes the transaction",
     </div>,
     { router: "/design" },
   );
-  await userEvent.click(screen.getByLabelText("Canvas editing surface"), {
-    position: { x: 30, y: 30 },
-  });
+  await userEvent.dblClick(screen.getByRole("heading", { name: "Layers", exact: true }));
+  expect(window.getSelection()?.toString()).toBe("");
+  const fileActions = screen.getByRole("button", { name: "File actions", exact: true });
+  await act(() => (fileActions.element() as HTMLElement).focus());
   await userEvent.keyboard("{Control>}a{/Control}");
+  expect(window.getSelection()?.toString()).toBe("");
   const opacity = screen.getByRole("spinbutton", { name: "Opacity %", exact: true });
   await expect.element(opacity).toHaveValue("Mixed");
   await userEvent.fill(opacity, "50");
@@ -1094,7 +1156,9 @@ it("edits canvas text as one undoable action without consuming typing shortcuts"
   await userEvent.dblClick(heading);
   const editor = screen.getByRole("textbox", { name: "Edit Welcome heading" });
   await expect.element(editor).toBeVisible();
-  await userEvent.clear(editor);
+  await userEvent.keyboard("{Control>}a{/Control}");
+  const textField = editor.element() as HTMLTextAreaElement;
+  expect([textField.selectionStart, textField.selectionEnd]).toEqual([0, textField.value.length]);
   await userEvent.type(editor, "Canvas text");
   await userEvent.click(screen.getByLabelText("Canvas editing surface"), {
     position: { x: 30, y: 30 },

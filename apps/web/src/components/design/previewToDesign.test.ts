@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
+import type { DesignMotion } from "@t3tools/contracts";
 
 import {
   createDesignDocumentFromPreview,
   linkDesignDocument,
   refreshLinkedDesignDocument,
 } from "./previewToDesign";
-import { updateDesignNode } from "./designDocument";
+import { addInstanceNode, updateDesignNode } from "./designDocument";
 
 describe("Preview to Design import", () => {
   it("creates a dependency-free snapshot with provenance", () => {
@@ -27,6 +28,111 @@ describe("Preview to Design import", () => {
       colorScheme: "dark",
     });
     expect(document.nodes.every((node) => node.provenance?.mode === "snapshot")).toBe(true);
+  });
+
+  it("collects a reusable component from repeated website cards without replacing their content", () => {
+    const motion: DesignMotion = {
+      keyframes: [
+        { offset: 0, opacity: 0 },
+        { offset: 1, opacity: 1 },
+      ],
+      durationMs: 200,
+      delayMs: 0,
+      iterations: 1,
+      direction: "normal",
+      fill: "none",
+      easing: "linear",
+    };
+    const card = {
+      kind: "group" as const,
+      name: "article",
+      parentId: null,
+      x: 0,
+      y: 16,
+      width: 160,
+      height: 80,
+      text: null,
+      fill: "rgb(255, 255, 255)",
+      border: null,
+      fontFamily: "Inter",
+      fontSize: 16,
+      fontWeight: 400,
+      lineHeight: 20,
+      letterSpacing: 0,
+      color: "rgb(17, 24, 39)",
+      opacity: 1,
+      borderRadius: 8,
+    };
+    const nodes = ["Starter", "Business", "Enterprise", "Custom"].flatMap((title, index) => {
+      const x = 16 + index * 176;
+      const nodeId = `card-${index}`;
+      return [
+        {
+          ...card,
+          nodeId,
+          x,
+          fill: index === 2 ? "rgb(220, 220, 220)" : card.fill,
+          motion: index === 3 ? { ...motion, durationMs: 300 } : motion,
+        },
+        {
+          ...card,
+          nodeId: `title-${index}`,
+          parentId: nodeId,
+          kind: "text" as const,
+          name: "h2",
+          x: x + 8,
+          y: card.y + 8,
+          width: 144,
+          height: 20,
+          text: title,
+          fill: null,
+        },
+      ];
+    });
+    const capture = {
+      url: "https://example.com/pricing",
+      title: "Pricing",
+      viewportWidth: 800,
+      viewportHeight: 600,
+      nodes,
+    };
+    const input = {
+      url: capture.url,
+      title: capture.title,
+      viewport: { _tag: "freeform" as const, width: 800, height: 600 },
+      colorScheme: "light" as const,
+      sourceRevision: "website-1",
+      capture,
+    };
+    const imported = createDesignDocumentFromPreview({ ...input, website: true });
+
+    expect(imported.nodes.filter(({ kind }) => kind === "component")).toMatchObject([
+      {
+        nodeId: "preview-card-0",
+        componentId: "preview-card-0",
+        childIds: ["preview-title-0"],
+        motion,
+        provenance: { mode: "snapshot" },
+      },
+    ]);
+    expect(imported.nodes.map(({ nodeId }) => nodeId)).toEqual([
+      "frame-preview",
+      ...nodes.map(({ nodeId }) => `preview-${nodeId}`),
+    ]);
+    expect(imported.nodes.filter(({ kind }) => kind === "text").map(({ text }) => text)).toEqual([
+      "Starter",
+      "Business",
+      "Enterprise",
+      "Custom",
+    ]);
+    const withInstance = addInstanceNode(imported, "preview-card-0");
+    expect(withInstance.nodes.filter(({ kind }) => kind === "instance")).toMatchObject([
+      { instanceOfNodeId: "preview-card-0", motion },
+    ]);
+    expect(withInstance.nodes.at(-1)).toMatchObject({ text: "Starter" });
+    expect(
+      createDesignDocumentFromPreview(input).nodes.some(({ kind }) => kind === "component"),
+    ).toBe(false);
   });
 
   it("supports linked provenance and refresh without replacing local layers", () => {
@@ -126,6 +232,18 @@ describe("Preview to Design import", () => {
   });
 
   it("refreshes an unedited linked layer while preserving a local override", () => {
+    const motion = {
+      keyframes: [
+        { offset: 0, opacity: 0 },
+        { offset: 1, opacity: 1 },
+      ],
+      durationMs: 100,
+      delayMs: 0,
+      iterations: 1,
+      direction: "normal",
+      fill: "forwards",
+      easing: "linear",
+    } as const;
     const capture = {
       url: "http://localhost:3000/dashboard",
       title: "Dashboard",
@@ -152,6 +270,7 @@ describe("Preview to Design import", () => {
           color: "rgb(17, 24, 39)",
           opacity: 1,
           borderRadius: 0,
+          motion,
         },
       ],
     };
@@ -166,6 +285,15 @@ describe("Preview to Design import", () => {
       capture,
     });
     const linked = linkDesignDocument(snapshot);
+    expect(linked.nodes.find((node) => node.nodeId === "preview-root")?.motion).toEqual(motion);
+    const withoutMotion = refreshLinkedDesignDocument(linked, {
+      ...linked.provenance!,
+      sourceRevision: "preview-2",
+      capture: { ...capture, nodes: [{ ...capture.nodes[0]!, motion: undefined }] },
+    });
+    expect(
+      withoutMotion.nodes.find((node) => node.nodeId === "preview-root")?.motion,
+    ).toBeUndefined();
     const edited = updateDesignNode(linked, "preview-root", { x: 99 });
     const refreshed = refreshLinkedDesignDocument(edited, {
       ...linked.provenance!,

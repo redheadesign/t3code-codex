@@ -54,7 +54,7 @@ export function DesignWebsiteImport({
         setError("The website did not render any layers to import.");
         return;
       }
-      const assets = await materializePreviewAssets(capture);
+      const assets = await materializePreviewAssets(capture, { website: true });
       await onImport(
         createDesignDocumentFromPreview({
           url: capture.url,
@@ -67,6 +67,7 @@ export function DesignWebsiteImport({
           colorScheme: "system",
           sourceRevision: new Date().toISOString(),
           capture,
+          website: true,
           assetIdsByNodeId: assets.assetIdsByNodeId,
           assetMetadata: assets.assets,
         }),
@@ -76,6 +77,16 @@ export function DesignWebsiteImport({
           type: "warning",
           title: "Website imported partially",
           description: "The first 10,000 layers were imported.",
+        });
+      }
+      if (assets.unembeddedImages > 0) {
+        toastManager.add({
+          type: "warning",
+          title: ui("Some images could not be saved", "Часть изображений не сохранилась"),
+          description: ui(
+            "Linked images load from the original site when available.",
+            "Изображения по ссылкам загрузятся, если доступны на сайте.",
+          ),
         });
       }
       onClose();

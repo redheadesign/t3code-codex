@@ -1,10 +1,42 @@
 import type { CSSProperties } from "react";
+import DOMPurify from "dompurify";
+import { readDataUrlBlob } from "../media/mediaContent";
 import type { DesignAssetMeta, DesignNode, DesignDocument } from "./designDocument";
 import {
   contentAddressedDesignAssetId,
   saveDesignAsset,
   saveDesignAssets,
 } from "./designAssetStore";
+
+const MAX_DESIGN_IMAGE_BYTES = 8 * 1024 * 1024;
+
+export async function readCapturedDesignImage(
+  source: string,
+  inline: { readonly base64: string; readonly mimeType: string } | undefined,
+  website: boolean,
+): Promise<Blob | null> {
+  let blob: Blob;
+  if (inline) {
+    const bytes = Uint8Array.from(atob(inline.base64), (character) => character.charCodeAt(0));
+    blob = new Blob([bytes], { type: inline.mimeType });
+  } else if (/^data:/i.test(source)) {
+    if (source.length > MAX_DESIGN_IMAGE_BYTES * 3 + 1024) throw new Error("Image is too large.");
+    blob = readDataUrlBlob(source);
+  } else {
+    if (website) return null;
+    const response = await fetch(source, { credentials: "include" });
+    if (!response.ok) throw new Error("Image download failed.");
+    blob = await response.blob();
+  }
+  if (blob.size > MAX_DESIGN_IMAGE_BYTES) throw new Error("Image exceeds the 8 MB package limit.");
+  if (website && blob.type === "image/svg+xml") {
+    return new Blob(
+      [DOMPurify.sanitize(await blob.text(), { USE_PROFILES: { svg: true, svgFilters: true } })],
+      { type: blob.type },
+    );
+  }
+  return blob;
+}
 
 export async function materializeDesignDocumentImages(
   document: DesignDocument,

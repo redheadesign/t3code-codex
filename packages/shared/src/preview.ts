@@ -3,6 +3,8 @@ import * as Schema from "effect/Schema";
 
 import { isLocalLoopbackHost } from "./hostClassification.ts";
 
+export { DESIGN_CAPTURE_SCRIPT } from "./previewDesignCapture.ts";
+
 const TAB_ID_PREFIX = "tab_";
 let nextPreviewTabSequence = 0;
 

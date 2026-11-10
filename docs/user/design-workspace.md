@@ -9,7 +9,7 @@ stays in the source code.
 
 Design files save automatically on this device, in the browser profile running
 T3 Code. You can work without a server. Open the menu beside the document name
-and choose **Save a local copy** to download a `.design.json` file with its images;
+and choose **Save a local copy** to download a `.design.json` file with its assets;
 use **Open Design file** on another device to
 open an independent copy. Keep a downloaded copy before clearing browser data.
 
@@ -55,6 +55,21 @@ constraints and auto layout in control of the contents.
 For playback settings, deselect layers and open **Prototype**. A custom viewport
 changes the playback window without resizing your design layers. **Present** runs
 the prototype; Escape closes an open overlay first, then returns to the editor.
+
+Use **Add widget** to place a live prototype on the canvas. Paste an HTTP(S)
+address or an iframe for a hosted preview, or choose **Code** and enter HTML,
+CSS, and JavaScript. The code runner includes Tailwind CSS and exposes `gsap`
+and `ScrollTrigger`. Select the widget and choose **Present**, then **Run widget**
+to click and scroll inside it. To edit the code, return to the editor and select
+**Edit widget**. Code widgets are included in local copies and project sync.
+Use a hosted widget for examples that load external assets or libraries.
+
+**Import website** makes editable layers, keeps supported time-based animation
+keyframes, and adds reusable candidates from repeated layouts to **Assets**.
+If you need the site's own scrolling, scripts, or 3D, choose **Original site**
+in Present. When a site blocks embeds or needs a signed-in session, use **Open
+original**. Images that could not be copied stay linked to their source. Agents can use the synced design file to find captured component
+definitions, or provide HTML, CSS, and JavaScript for a separate code widget.
 
 Right-click a selection and choose **Create component** to reuse it in **Assets**.
 Right-click an instance and choose **Detach instance** to edit it independently.

@@ -1,3 +1,4 @@
+import { DesignMotion } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { reflowDesignLayout } from "./designLayout";
 import { scaleDesignMetrics } from "./designScale";
@@ -219,6 +220,15 @@ export const DesignInteraction = Schema.Struct({
 });
 export type DesignInteraction = typeof DesignInteraction.Type;
 
+const DesignPrototypeWidget = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("url"),
+    url: Schema.String.check(Schema.isMaxLength(8192)),
+  }),
+  Schema.Struct({ kind: Schema.Literal("code") }),
+]);
+export type DesignPrototypeWidget = typeof DesignPrototypeWidget.Type;
+
 export const DesignNode = Schema.Struct({
   nodeId: Schema.String,
   kind: DesignNodeKind,
@@ -235,7 +245,9 @@ export const DesignNode = Schema.Struct({
   fontSize: Schema.NullOr(Schema.Number),
   fontWeight: Schema.NullOr(Schema.Number),
   opacity: Schema.Number,
+  motion: Schema.optional(DesignMotion),
   assetId: Schema.NullOr(Schema.String),
+  prototypeWidget: Schema.optional(DesignPrototypeWidget),
   sourceUrl: Schema.optional(Schema.String),
   image: Schema.optional(
     Schema.Struct({
@@ -1086,7 +1098,7 @@ export function deleteDesignNodes(
       ...descendants(document, node.nodeId).map((child) => child.nodeId),
     ]),
   );
-  return recordOperation(
+  const next = recordOperation(
     {
       ...document,
       pages: document.pages.map((page) => ({
@@ -1099,6 +1111,19 @@ export function deleteDesignNodes(
     },
     { kind: "update-node", nodeId: null, fields: ["delete", ...removed] },
   );
+  return removeDeletedWidgetAssets(next, document.nodes, removed);
+}
+
+function removeDeletedWidgetAssets(
+  document: DesignDocument,
+  previousNodes: readonly DesignNode[],
+  removed: ReadonlySet<string>,
+): DesignDocument {
+  for (const node of previousNodes) {
+    if (node.prototypeWidget?.kind === "code" && node.assetId && removed.has(node.nodeId))
+      document = removeDesignAsset(document, node.assetId);
+  }
+  return document;
 }
 
 export function duplicateDesignNodes(
@@ -2212,7 +2237,7 @@ export function deleteDesignPage(document: DesignDocument, pageId: string): Desi
     page.nodeIds.flatMap((id) => [id, ...descendants(document, id).map((node) => node.nodeId)]),
   );
   const pages = document.pages.filter((item) => item !== page);
-  return recordOperation(
+  const next = recordOperation(
     {
       ...document,
       pages,
@@ -2221,6 +2246,7 @@ export function deleteDesignPage(document: DesignDocument, pageId: string): Desi
     },
     { kind: "update-node", nodeId: null, fields: ["pages", "nodes"] },
   );
+  return removeDeletedWidgetAssets(next, document.nodes, removed);
 }
 
 export function alignDesignNodes(

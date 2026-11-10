@@ -1,6 +1,41 @@
 import * as Schema from "effect/Schema";
 import { NonNegativeInt } from "./baseSchemas.ts";
 
+const DesignMotionEasing = Schema.String.check(Schema.isMaxLength(160));
+const DesignMotionKeyframe = Schema.Struct({
+  offset: Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 })),
+  easing: Schema.optional(DesignMotionEasing),
+  opacity: Schema.optional(Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 }))),
+  translation: Schema.optional(
+    Schema.Tuple([
+      Schema.Number.check(Schema.isBetween({ minimum: -32768, maximum: 32768 })),
+      Schema.Number.check(Schema.isBetween({ minimum: -32768, maximum: 32768 })),
+    ]),
+  ),
+  rotation: Schema.optional(
+    Schema.Number.check(Schema.isBetween({ minimum: -3600, maximum: 3600 })),
+  ),
+  scale: Schema.optional(Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 64 }))),
+});
+
+/** Time-based visual motion. Translation and rotation are relative to the captured layer pose. */
+export const DesignMotion = Schema.Struct({
+  keyframes: Schema.Array(DesignMotionKeyframe).check(
+    Schema.isMinLength(2),
+    Schema.isMaxLength(32),
+  ),
+  durationMs: Schema.Number.check(Schema.isBetween({ minimum: 1, maximum: 120_000 })),
+  delayMs: Schema.Number.check(Schema.isBetween({ minimum: -120_000, maximum: 120_000 })),
+  iterations: Schema.Union([
+    Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1000 })),
+    Schema.Literal("infinite"),
+  ]),
+  direction: Schema.Literals(["normal", "reverse", "alternate", "alternate-reverse"]),
+  fill: Schema.Literals(["none", "forwards", "backwards", "both", "auto"]),
+  easing: DesignMotionEasing,
+});
+export type DesignMotion = typeof DesignMotion.Type;
+
 export class DesignPackageMalformedError extends Schema.TaggedError<DesignPackageMalformedError>()(
   "DesignPackageMalformedError",
   {
@@ -16,6 +51,8 @@ export const DesignAssetPayload = Schema.Struct({
   base64: Schema.String.check(Schema.isMaxLength(12_000_000)),
 });
 export type DesignAssetPayload = typeof DesignAssetPayload.Type;
+
+export const DESIGN_WIDGET_SOURCE_MIME = "application/vnd.t3code.design-widget+json";
 
 /** Portable operation envelope for Design document sync. Payload stays JSON so the server never executes canvas code. */
 export const DesignSyncOperation = Schema.Struct({

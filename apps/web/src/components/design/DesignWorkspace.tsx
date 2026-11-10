@@ -5,6 +5,7 @@ import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
 import {
   CloudUploadIcon,
+  CodeXmlIcon,
   CopyIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -173,6 +174,8 @@ import { DesignPaintPanel } from "./DesignPaintPanel";
 import { DesignEffectsPanel } from "./DesignEffectsPanel";
 import { DesignReactPasteDialog } from "./DesignReactPasteDialog";
 import { DesignPresentation } from "./DesignPresentation";
+import { DesignWidgetDialog, type DesignWidgetDraft } from "./DesignWidgetDialog";
+import { readDesignWidgetSource, type DesignWidgetSource } from "./designWidgetSource";
 import { DesignDocument as DesignDocumentSchema } from "./designDocument";
 import { readDesignAsset } from "./designAssetStore";
 import {
@@ -206,6 +209,8 @@ import {
 import { DesignLayerList, flattenDesignLayers, type DesignLayerEntry } from "./DesignLayerList";
 
 const DESIGN_SIDEBAR_WIDTH = "w-(--design-sidebar-width)";
+const DESIGN_EDITOR_SELECTION =
+  "select-none [&_:is(input,textarea,[contenteditable]:not([contenteditable=false]))]:select-text";
 const decodeDesignDocument = Schema.decodeUnknownSync(DesignDocumentSchema);
 const decodeDesignAssetPayloads = Schema.decodeUnknownSync(Schema.Array(DesignAssetPayload));
 
@@ -1108,6 +1113,15 @@ function isAutoLayoutShortcut(event: KeyboardEvent<HTMLElement>) {
     !event.altKey &&
     !event.ctrlKey &&
     !event.metaKey &&
+    shortcutLetter(event) === "a"
+  );
+}
+
+function isSelectAllShortcut(event: KeyboardEvent<HTMLElement>) {
+  return (
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
     shortcutLetter(event) === "a"
   );
 }
@@ -2734,6 +2748,10 @@ function DesignEditor({
   const [descriptionDraft, setDescriptionDraft] = useState<string | null>(null);
   const cancelDocumentRename = useRef(false);
   const [presenting, setPresenting] = useState<string | null>(null);
+  const [widgetDialog, setWidgetDialog] = useState<{
+    node?: DesignNode;
+    source?: DesignWidgetSource;
+  } | null>(null);
   const documentRef = useRef(document);
   const [history, setHistory] = useState<ReadonlyArray<DesignDocument>>([]);
   const [future, setFuture] = useState<ReadonlyArray<DesignDocument>>([]);
@@ -2752,6 +2770,33 @@ function DesignEditor({
     documentRef.current = next;
     if (referencePageId) setReferencePageId(undefined);
     setDocument(next);
+  };
+  const openWidget = async (node: DesignNode | null) => {
+    if (node?.prototypeWidget?.kind === "code" && node.assetId) {
+      try {
+        const source = await readDesignWidgetSource(node.assetId);
+        setWidgetDialog({ node, source });
+      } catch {
+        setSyncMessage(ui("Widget code is unavailable.", "Код виджета недоступен."));
+      }
+      return;
+    }
+    setWidgetDialog(node?.prototypeWidget ? { node } : {});
+  };
+  const saveWidget = (draft: DesignWidgetDraft) => {
+    const current = documentRef.current;
+    const existing = widgetDialog?.node;
+    const next = existing ? current : addFrameNode(current);
+    const nodeId = existing?.nodeId ?? (next === current ? undefined : next.nodes.at(-1)?.nodeId);
+    if (!nodeId) return;
+    const updated = updateDesignNode(draft.asset ? addAssetMeta(next, draft.asset) : next, nodeId, {
+      name: draft.name,
+      assetId: draft.asset?.assetId ?? null,
+      prototypeWidget: draft.widget,
+    });
+    commitDocument(existing?.assetId ? removeDesignAsset(updated, existing.assetId) : updated);
+    setSelectedNodeIds([nodeId]);
+    setWidgetDialog(null);
   };
   const undo = () => {
     const previous = history.at(-1);
@@ -2986,8 +3031,9 @@ function DesignEditor({
       }
       return;
     }
-    if (modifier && key === "a") {
+    if (isSelectAllShortcut(event)) {
       event.preventDefault();
+      event.stopPropagation();
       setSelectedNodeIds(
         nodeForPage(documentRef.current)
           .filter(
@@ -3677,11 +3723,12 @@ function DesignEditor({
       role="group"
       aria-label={ui("Design file toolbar", "Панель макета")}
       data-design-toolbar=""
-      className={
+      className={cn(
+        DESIGN_EDITOR_SELECTION,
         shellIntegrated
           ? "flex h-full min-w-0 flex-1 items-center gap-2"
-          : "flex h-12 shrink-0 items-center gap-2 border-b border-border/70 px-3"
-      }
+          : "flex h-12 shrink-0 items-center gap-2 border-b border-border/70 px-3",
+      )}
     >
       {shellIntegrated ? (
         <>
@@ -3870,6 +3917,30 @@ function DesignEditor({
               <Button
                 size={shellIntegrated ? "icon-sm" : "xs"}
                 variant={shellIntegrated ? "ghost-muted" : "secondary"}
+                aria-label={
+                  selectedNode?.prototypeWidget
+                    ? ui("Edit widget", "Настроить виджет")
+                    : ui("Add widget", "Добавить виджет")
+                }
+                onClick={() => void openWidget(selectedNode)}
+              >
+                <CodeXmlIcon />
+                {!shellIntegrated ? ui("Widget", "Виджет") : null}
+              </Button>
+            }
+          />
+          <TooltipPopup>
+            {selectedNode?.prototypeWidget
+              ? ui("Edit widget", "Настроить виджет")
+              : ui("Add widget", "Добавить виджет")}
+          </TooltipPopup>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                size={shellIntegrated ? "icon-sm" : "xs"}
+                variant={shellIntegrated ? "ghost-muted" : "secondary"}
                 aria-label={ui("Present", "Показ")}
                 disabled={!nodeForPage(document).some((node) => node.kind === "frame")}
                 onClick={() => {
@@ -3879,12 +3950,13 @@ function DesignEditor({
                   const startNodeId = document.pages.find(
                     (page) => page.pageId === document.activePageId,
                   )?.prototypeStartNodeId;
-                  const frame =
-                    document.nodes.find(
-                      (node) => node.nodeId === startNodeId && node.kind === "frame",
-                    ) ??
-                    selectedFrame ??
-                    nodeForPage(document).find((node) => node.kind === "frame");
+                  const frame = selectedFrame?.prototypeWidget
+                    ? selectedFrame
+                    : (document.nodes.find(
+                        (node) => node.nodeId === startNodeId && node.kind === "frame",
+                      ) ??
+                      selectedFrame ??
+                      nodeForPage(document).find((node) => node.kind === "frame"));
                   if (frame) setPresenting(frame.nodeId);
                 }}
               >
@@ -3981,7 +4053,7 @@ function DesignEditor({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-col bg-background"
+      className={cn("flex h-full min-h-0 w-full flex-col bg-background", DESIGN_EDITOR_SELECTION)}
       data-design-workspace=""
       onKeyDown={(event) => {
         if (
@@ -3996,6 +4068,7 @@ function DesignEditor({
           flipShortcutAxis(event) ||
           clipboardShortcut(event) ||
           isAutoLayoutShortcut(event) ||
+          isSelectAllShortcut(event) ||
           isBoldShortcut(event)
         )
           onCanvasKeyDown(event);
@@ -4019,6 +4092,21 @@ function DesignEditor({
           document={document}
           startId={presenting}
           onClose={() => setPresenting(null)}
+        />
+      ) : null}
+      {widgetDialog ? (
+        <DesignWidgetDialog
+          initial={
+            widgetDialog.node?.prototypeWidget
+              ? {
+                  name: widgetDialog.node.name,
+                  widget: widgetDialog.node.prototypeWidget,
+                  ...(widgetDialog.source ? { source: widgetDialog.source } : {}),
+                }
+              : null
+          }
+          onSave={saveWidget}
+          onClose={() => setWidgetDialog(null)}
         />
       ) : null}
       {syncMessage ? (

@@ -6,6 +6,7 @@ import type {
 } from "@t3tools/contracts";
 
 import { captureDesignDomWithMetadata } from "./designDomCapture";
+import { collectReusableDesignComponents } from "./importedDesignComponents";
 import { designTextAppearance } from "./designTypography";
 import {
   designNodeMatrix,
@@ -162,6 +163,7 @@ export function createDesignDocumentFromPreview(input: {
   readonly capture?: DesktopPreviewDesignCapture;
   readonly assetIdsByNodeId?: ReadonlyMap<string, string>;
   readonly assetMetadata?: ReadonlyArray<DesignAssetMeta>;
+  readonly website?: boolean;
 }): DesignDocument {
   const document = createInitialDesignDocument();
   const size = viewportSize(input.viewport);
@@ -194,8 +196,24 @@ export function createDesignDocumentFromPreview(input: {
 
   const capturedGeometry = captureGeometryById(input.capture.nodes);
   const frameId = "frame-preview";
+  const childIdsByParent = new Map<string | null, string[]>();
+  for (const captured of input.capture.nodes) {
+    const childIds = childIdsByParent.get(captured.parentId) ?? [];
+    childIds.push(`preview-${captured.nodeId}`);
+    childIdsByParent.set(captured.parentId, childIds);
+  }
   const nodes = input.capture.nodes.map((captured) => {
     const geometry = capturedGeometry.get(captured.nodeId)!;
+    const source = captured.assetUrl;
+    const websiteSource = input.website && source ? URL.parse(source) : null;
+    const sourceUrl =
+      !input.website ||
+      (websiteSource &&
+        /^https?:$/.test(websiteSource.protocol) &&
+        !websiteSource.username &&
+        !websiteSource.password)
+        ? source
+        : undefined;
     const kind: DesignNode["kind"] =
       captured.kind === "text"
         ? "text"
@@ -209,9 +227,7 @@ export function createDesignDocumentFromPreview(input: {
       kind,
       name: captured.name,
       parentId: captured.parentId === null ? frameId : `preview-${captured.parentId}`,
-      childIds: input
-        .capture!.nodes.filter((candidate) => candidate.parentId === captured.nodeId)
-        .map((candidate) => `preview-${candidate.nodeId}`),
+      childIds: childIdsByParent.get(captured.nodeId) ?? [],
       x: geometry.x,
       y: geometry.y,
       width: captured.width,
@@ -223,6 +239,7 @@ export function createDesignDocumentFromPreview(input: {
       fontWeight: captured.fontWeight,
       opacity: captured.opacity,
       clipContent: captured.clipContent,
+      ...(captured.motion === undefined ? {} : { motion: captured.motion }),
       ...(captured.rotation === undefined ? {} : { rotation: captured.rotation }),
       ...(captured.flipX === undefined ? {} : { flipX: captured.flipX }),
       ...(captured.flipY === undefined ? {} : { flipY: captured.flipY }),
@@ -237,7 +254,7 @@ export function createDesignDocumentFromPreview(input: {
           }
         : {}),
       assetId: input.assetIdsByNodeId?.get(captured.nodeId) ?? null,
-      ...(captured.assetUrl === undefined ? {} : { sourceUrl: captured.assetUrl }),
+      ...(sourceUrl === undefined ? {} : { sourceUrl }),
       provenance,
       ...(captured.rotation === undefined ? {} : { rotation: captured.rotation }),
       ...(captured.flipX === undefined ? {} : { flipX: captured.flipX }),
@@ -284,9 +301,7 @@ export function createDesignDocumentFromPreview(input: {
     name: "Preview frame",
     width: input.capture.viewportWidth,
     height: input.capture.viewportHeight,
-    childIds: input.capture.nodes
-      .filter((node) => node.parentId === null)
-      .map((node) => `preview-${node.nodeId}`),
+    childIds: childIdsByParent.get(null) ?? [],
     provenance,
     layoutModel: {
       kind: "absolute" as const,
@@ -294,35 +309,58 @@ export function createDesignDocumentFromPreview(input: {
       resolvedHeight: input.capture.viewportHeight,
     },
   };
+  const capturedNodes = [frame, ...nodes];
   return {
     ...base,
     title: input.capture.title || base.title,
     pages: [{ ...base.pages[0]!, nodeIds: [frameId] }],
-    nodes: [frame, ...nodes],
+    nodes:
+      input.website && !input.capture.truncated
+        ? collectReusableDesignComponents(capturedNodes, frameId)
+        : capturedNodes,
   };
 }
 
-export async function materializePreviewAssets(capture: DesktopPreviewDesignCapture): Promise<{
+export async function materializePreviewAssets(
+  capture: DesktopPreviewDesignCapture,
+  { website = false } = {},
+): Promise<{
   readonly assetIdsByNodeId: ReadonlyMap<string, string>;
   readonly assets: ReadonlyArray<DesignAssetMeta>;
+  readonly unembeddedImages: number;
 }> {
-  const { prepareDesignImage } = await import("./designImage");
+  const { prepareDesignImage, readCapturedDesignImage } = await import("./designImage");
   const assetIds = new Map<string, string>();
-  const assets: DesignAssetMeta[] = [];
+  const assets = new Map<string, DesignAssetMeta>();
+  const cached = new Map<string, DesignAssetMeta | null>();
+  const inlineAssets = new Map(capture.inlineAssets?.map((asset) => [asset.url, asset]));
+  let unembeddedImages = 0;
   for (const node of capture.nodes) {
     if (node.kind !== "image") continue;
-    if (node.assetUrl === undefined)
-      throw new Error(`The captured image “${node.name}” has no source.`);
-    const response = await fetch(node.assetUrl, { credentials: "include" });
-    if (!response.ok) throw new Error(`Could not download the captured image “${node.name}”.`);
-    const blob = await response.blob();
-    if (blob.size > 8 * 1024 * 1024)
-      throw new Error(`The image “${node.name}” exceeds the 8 MB package limit.`);
-    const asset = await prepareDesignImage(new File([blob], node.name, { type: blob.type }));
-    assetIds.set(node.nodeId, asset.assetId);
-    if (!assets.some((item) => item.assetId === asset.assetId)) assets.push(asset);
+    const source = node.assetUrl;
+    let asset: DesignAssetMeta | null = null;
+    try {
+      if (source === undefined) throw new Error("Image has no source.");
+      asset = cached.get(source) ?? null;
+      if (!cached.has(source)) {
+        const blob = await readCapturedDesignImage(source, inlineAssets.get(source), website);
+        if (blob) {
+          asset = await prepareDesignImage(new File([blob], node.name, { type: blob.type }));
+        }
+        cached.set(source, asset);
+      }
+    } catch (cause) {
+      if (!website) throw new Error(`Could not import the image “${node.name}”.`, { cause });
+      if (source !== undefined) cached.set(source, null);
+    }
+    if (asset) {
+      assetIds.set(node.nodeId, asset.assetId);
+      if (!assets.has(asset.assetId)) assets.set(asset.assetId, asset);
+    } else {
+      unembeddedImages++;
+    }
   }
-  return { assetIdsByNodeId: assetIds, assets };
+  return { assetIdsByNodeId: assetIds, assets: [...assets.values()], unembeddedImages };
 }
 
 export function linkDesignDocument(document: DesignDocument): DesignDocument {
@@ -438,6 +476,7 @@ export function refreshLinkedDesignDocument(
       fontWeight: captured.fontWeight,
       opacity: captured.opacity,
       clipContent: captured.clipContent,
+      ...(captured.motion === undefined ? {} : { motion: captured.motion }),
       ...(captured.rotation === undefined ? {} : { rotation: captured.rotation }),
       ...(captured.flipX === undefined ? {} : { flipX: captured.flipX }),
       ...(captured.flipY === undefined ? {} : { flipY: captured.flipY }),
@@ -499,7 +538,13 @@ export function refreshLinkedDesignDocument(
       const captured = sourceNodes.get(node.nodeId);
       if (!captured || pendingNodes.has(node.nodeId)) return { ...node, provenance };
       const refreshed = nodeFromCapture(captured);
-      const merged = { ...node, ...refreshed, nodeId: node.nodeId, provenance };
+      const merged = {
+        ...node,
+        ...refreshed,
+        motion: captured.motion,
+        nodeId: node.nodeId,
+        provenance,
+      };
       for (const field of Object.keys(node.overrides ?? {})) {
         if (field in node) {
           (merged as unknown as Record<string, unknown>)[field] = (

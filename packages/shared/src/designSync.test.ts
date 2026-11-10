@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import type { DesignSyncRequest } from "@t3tools/contracts";
+import { DESIGN_WIDGET_SOURCE_MIME, type DesignSyncRequest } from "@t3tools/contracts";
 import { applyDesignSyncRequest } from "./designSync.js";
 
 const request: DesignSyncRequest = {
@@ -67,6 +67,32 @@ describe("Design sync algorithm", () => {
     expect(result.result._tag === "conflict" && result.result.conflicts[0]?.serverValue).toEqual({
       x: 24,
     });
+  });
+
+  it("drops superseded widget source when a replacement snapshot is accepted", () => {
+    const oldSource = { assetId: "old", mimeType: DESIGN_WIDGET_SOURCE_MIME, base64: "eA==" };
+    const newSource = { ...oldSource, assetId: "new", base64: "eQ==" };
+    const image = { assetId: "image", mimeType: "image/png", base64: "eA==" };
+    const state = {
+      documentId: "doc-1",
+      revision: 0,
+      nodes: new Map(),
+      assetIds: new Set([oldSource.assetId, image.assetId]),
+      assetPayloads: new Map([oldSource, image].map((asset) => [asset.assetId, asset])),
+    };
+    const updated = applyDesignSyncRequest(state, {
+      ...request,
+      assetIds: [newSource.assetId],
+      assetPayloads: [newSource],
+      snapshot: JSON.stringify({ documentId: "doc-1", nodes: [] }),
+    });
+    expect(updated.state.assetIds).toEqual(new Set([image.assetId, newSource.assetId]));
+    expect(updated.state.assetPayloads).toEqual(
+      new Map([
+        [image.assetId, image],
+        [newSource.assetId, newSource],
+      ]),
+    );
   });
 
   it("returns the server snapshot for a stale document-level operation", () => {

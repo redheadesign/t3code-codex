@@ -23,7 +23,7 @@ import type {
 } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { matchesKeybindingShortcut } from "@t3tools/shared/keybindings";
-import { normalizePreviewUrl } from "@t3tools/shared/preview";
+import { DESIGN_CAPTURE_SCRIPT, normalizePreviewUrl } from "@t3tools/shared/preview";
 import {
   BrowserWindow,
   ClipboardItem,
@@ -79,6 +79,7 @@ import {
 import { isPreviewAnnotationPayload } from "./PickedElementPayload.ts";
 import { captureFavicon, safeHttpOrigin, selectFaviconCandidates } from "./FaviconCapture.ts";
 import { DEFAULT_RECORDING_INPUT_OPTIONS, type RecordingInputOptions } from "./RecordingInput.ts";
+import { captureWebsiteDesignAssets } from "./WebsiteDesignAssets.ts";
 
 export type PreviewNavStatus =
   | { kind: "Idle" }
@@ -129,103 +130,8 @@ const PICTURE_IN_PICTURE_MIN_WIDTH = 240;
 const PICTURE_IN_PICTURE_MIN_HEIGHT = 160;
 const PICTURE_IN_PICTURE_ASPECT_RATIO_EPSILON = 0.002;
 const MAX_ARTIFACT_SITE_SLUG_LENGTH = 80;
-const DESIGN_CAPTURE_SCRIPT = `(() => {
-  const root = document.body;
-  if (!root) return { url: location.href, title: document.title, browserEngine: 'chromium', sourceRevision: document.documentElement.getAttribute('data-t3-source-revision') || undefined, stateFixture: location.href, viewportWidth: innerWidth, viewportHeight: innerHeight, nodes: [] };
-  const rootRect = root.getBoundingClientRect();
-  const nodes = [];
-  let truncated = false;
-  let nextId = 0;
-  const visit = (element, parentId) => {
-    if (nodes.length >= 10000) { truncated = true; return; }
-    if (element === root || element.hasAttribute('data-t3-design-effect-defs') || ['script','style','link','meta','template','noscript','defs','filter','mask','clippath','symbol'].includes(element.tagName.toLowerCase())) return;
-    const style = getComputedStyle(element);
-    const rect = element.getBoundingClientRect();
-    const matrix = new DOMMatrixReadOnly(style.transform === 'none' ? undefined : style.transform);
-    const determinant = matrix.a * matrix.d - matrix.b * matrix.c;
-    const rotation = Math.round((Math.atan2(matrix.b, matrix.a) * 180 / Math.PI) * 1e6) / 1e6;
-    const sourceWidth = Number.parseFloat(style.width) || rect.width;
-    const sourceHeight = Number.parseFloat(style.height) || rect.height;
-    const nodeId = String(nextId++);
-    const children = Array.from(element.children);
-    const text = children.length === 0 ? (element.textContent || '').trim().slice(0, 10000) : null;
-    const tag = element.tagName.toLowerCase();
-    const vectorPath = (() => {
-      if (tag === 'path') return element.getAttribute('d') || undefined;
-      if (tag === 'line') {
-        const x1 = element.getAttribute('x1') || '0', y1 = element.getAttribute('y1') || '0';
-        const x2 = element.getAttribute('x2') || '0', y2 = element.getAttribute('y2') || '0';
-        return 'M ' + x1 + ' ' + y1 + ' L ' + x2 + ' ' + y2;
-      }
-      if (tag === 'rect') {
-        const x = element.getAttribute('x') || '0', y = element.getAttribute('y') || '0';
-        const width = element.getAttribute('width') || '0', height = element.getAttribute('height') || '0';
-        return 'M ' + x + ' ' + y + ' H ' + (Number(x) + Number(width)) + ' V ' + (Number(y) + Number(height)) + ' H ' + x + ' Z';
-      }
-      if (tag === 'circle' || tag === 'ellipse') {
-        const cx = element.getAttribute('cx') || '0', cy = element.getAttribute('cy') || '0';
-        const rx = tag === 'circle' ? (element.getAttribute('r') || '0') : (element.getAttribute('rx') || '0');
-        const ry = tag === 'circle' ? rx : (element.getAttribute('ry') || '0');
-        return 'M ' + (Number(cx) - Number(rx)) + ' ' + cy + ' A ' + rx + ' ' + ry + ' 0 1 0 ' + (Number(cx) + Number(rx)) + ' ' + cy + ' A ' + rx + ' ' + ry + ' 0 1 0 ' + (Number(cx) - Number(rx)) + ' ' + cy + ' Z';
-      }
-      if (tag === 'polygon' || tag === 'polyline') {
-        const values = (element.getAttribute('points') || '').trim().split(/[ ,]+/u).filter(Boolean);
-        if (values.length < 4) return undefined;
-        const path = values.reduce((result, value, index) => result + (index % 2 === 0 ? (index === 0 ? 'M ' : ' L ') : '') + value + (index % 2 === 0 ? ' ' : ''), '');
-        return path + (tag === 'polygon' ? ' Z' : '');
-      }
-      return undefined;
-    })();
-    nodes.push({
-      nodeId,
-      parentId,
-      kind: tag === 'img' || tag === 'picture' ? 'image' : vectorPath ? 'vector' : text ? 'text' : 'group',
-      name: element.getAttribute('aria-label') || tag,
-      text: text || null,
-      x: rect.left - rootRect.left + (rect.width - sourceWidth) / 2,
-      y: rect.top - rootRect.top + (rect.height - sourceHeight) / 2,
-      width: Math.max(1, sourceWidth),
-      height: Math.max(1, sourceHeight),
-      rotation: rotation || undefined,
-      flipX: (determinant < 0 && matrix.a < 0) || undefined,
-      flipY: (determinant < 0 && matrix.d < 0) || undefined,
-      fill: vectorPath ? (style.fill && style.fill !== 'none' ? style.fill : null) : (style.backgroundColor === 'rgba(0, 0, 0, 0)' ? null : style.backgroundColor),
-      backgroundImage: style.backgroundImage && style.backgroundImage !== 'none' ? style.backgroundImage : undefined,
-      border: vectorPath ? (style.stroke && style.stroke !== 'none' ? style.stroke : null) : (style.borderColor || null),
-      fontFamily: style.fontFamily || null,
-      fontSize: Number.parseFloat(style.fontSize) || null,
-      fontWeight: Number.parseInt(style.fontWeight, 10) || null,
-      fontStyle: style.fontStyle,
-      lineHeight: Number.parseFloat(style.lineHeight) || null,
-      letterSpacing: Number.parseFloat(style.letterSpacing) || null,
-      textDecorationLine: style.textDecorationLine,
-      textTransform: style.textTransform,
-      fontVariantCaps: style.fontVariantCaps,
-      fontFeatureSettings: style.fontFeatureSettings || undefined,
-      fontVariationSettings: style.fontVariationSettings || undefined,
-      textWrapStyle: (style as CSSStyleDeclaration & { textWrap?: string }).textWrap,
-      textAlign: style.textAlign,
-      textIndent: Number.parseFloat(style.textIndent) || undefined,
-      textOverflow: style.textOverflow || undefined,
-      maxLines: Number.parseInt((style as CSSStyleDeclaration & { webkitLineClamp?: string }).webkitLineClamp || '', 10) || undefined,
-      color: style.color || null,
-      opacity: Number.parseFloat(style.opacity) || 1,
-      mixBlendMode: style.mixBlendMode || undefined,
-      borderRadius: Number.parseFloat(style.borderTopLeftRadius) || 0,
-      clipContent: style.overflowX !== 'visible' || style.overflowY !== 'visible',
-      boxShadow: style.boxShadow,
-      filter: style.filter,
-      backdropFilter: style.backdropFilter,
-      designEffects: element.getAttribute('data-t3-design-effects') || undefined,
-      ...(tag === 'img' || tag === 'picture' ? { assetUrl: element.currentSrc || element.src || undefined } : {}),
-      ...(vectorPath ? { vectorPath, vectorClosed: /z\\s*$/iu.test(vectorPath), vectorStrokeWidth: Number.parseFloat(style.strokeWidth) || undefined, vectorFillOpacity: Number.parseFloat(style.fillOpacity) || undefined, vectorStrokeOpacity: Number.parseFloat(style.strokeOpacity) || undefined, vectorStrokeCap: style.strokeLinecap || undefined, vectorStrokeJoin: style.strokeLinejoin || undefined } : {}),
-    });
-    for (const child of children) visit(child, nodeId);
-  };
-  for (const child of Array.from(root.children)) visit(child, null);
-  return { url: location.href, title: document.title, browserEngine: 'chromium', sourceRevision: document.documentElement.getAttribute('data-t3-source-revision') || undefined, stateFixture: location.href, viewportWidth: innerWidth, viewportHeight: innerHeight, truncated: truncated || undefined, nodes };
-})()`;
 const decodeDesignCapture = Schema.decodeUnknownEffect(DesktopPreviewDesignCaptureSchema);
+const DESIGN_WEBSITE_CAPTURE_WORLD_ID = 1002;
 
 function isWebsiteCaptureUrl(value: string): boolean {
   if (!URL.canParse(value)) return false;
@@ -2605,15 +2511,25 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
               await window.loadURL(url);
               if (!isWebsiteCaptureUrl(contents.getURL()))
                 throw new Error("Unsupported website URL");
-              return contents.executeJavaScript(
-                `Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 1000))]).then(() => ${DESIGN_CAPTURE_SCRIPT})`,
-              );
-            });
-            return yield* decodeDesignCapture(capture);
-          }).pipe(
-            Effect.timeout("25 seconds"),
-            Effect.mapError((cause) => new PreviewOperationError({ ...context, cause })),
-          ),
+              return contents.executeJavaScriptInIsolatedWorld(DESIGN_WEBSITE_CAPTURE_WORLD_ID, [
+                {
+                  code: `Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 1000))]).then(() => ${DESIGN_CAPTURE_SCRIPT})`,
+                },
+              ]);
+            }).pipe(Effect.timeout("25 seconds"));
+            const snapshot = yield* decodeDesignCapture(capture);
+            const inlineAssets = yield* attemptPromise(context, () =>
+              captureWebsiteDesignAssets(
+                snapshot.nodes,
+                window.webContents.session,
+                AbortSignal.timeout(4_000),
+              ),
+            ).pipe(
+              Effect.timeout("5 seconds"),
+              Effect.orElseSucceed(() => []),
+            );
+            return { ...snapshot, inlineAssets };
+          }).pipe(Effect.mapError((cause) => new PreviewOperationError({ ...context, cause }))),
         (window) =>
           Effect.sync(() => {
             if (!window.isDestroyed()) window.destroy();
