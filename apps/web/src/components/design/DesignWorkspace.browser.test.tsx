@@ -1088,7 +1088,10 @@ it("edits canvas text as one undoable action without consuming typing shortcuts"
     { router: "/design" },
   );
   const canvas = screen.getByRole("region", { name: "Design canvas" });
-  await userEvent.dblClick(canvas.getByRole("button", { name: "Welcome heading", exact: true }));
+  const heading = canvas.getByRole("button", { name: "Welcome heading", exact: true });
+  await userEvent.dblClick(heading);
+  await expect.element(heading).toHaveAttribute("aria-pressed", "true");
+  await userEvent.dblClick(heading);
   const editor = screen.getByRole("textbox", { name: "Edit Welcome heading" });
   await expect.element(editor).toBeVisible();
   await userEvent.clear(editor);
