@@ -304,7 +304,7 @@ describe("resolveSidebarThreadStatus", () => {
         ...idle,
         runtime: { ...runtime, status: "idle" as const, lastError: "persisted" },
       }),
-    ).toBe("waiting");
+    ).toBe("ready");
   });
 });
 
@@ -1638,10 +1638,10 @@ describe("resolveSidebarFolderDot", () => {
     };
 
     expect(resolveSidebarFolderDot([idle])).toBeNull();
-    // A waiting thread stays quiet even with an unread completion, like its row.
     expect(
       resolveSidebarFolderDot([{ ...unread, runtime: { ...runtime, status: "idle" as const } }]),
-    ).toBeNull();
+    ).toBe("unread");
+    expect(resolveSidebarFolderDot([{ ...unread, runtime, blockedOnThreadWait: true }])).toBeNull();
     expect(resolveSidebarFolderDot([idle, working])).toBe("working");
     expect(resolveSidebarFolderDot([working, unread])).toBe("unread");
     expect(resolveSidebarFolderDot([unread, limited])).toBe("attention");

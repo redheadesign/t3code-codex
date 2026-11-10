@@ -1657,6 +1657,7 @@ export function reparentDesignNode(
   nodeId: string,
   parentId: string | null,
   beforeId?: string,
+  gridStep?: number,
 ): DesignDocument {
   const node = document.nodes.find((candidate) => candidate.nodeId === nodeId);
   const parent = document.nodes.find((candidate) => candidate.nodeId === parentId);
@@ -1675,6 +1676,10 @@ export function reparentDesignNode(
     ? multiplyDesignMatrices(invertDesignMatrix(designWorldMatrix(nodesById, parent.nodeId)), world)
     : world;
   const pose = designMatrixPose(local, node);
+  if (gridStep && node.parentId !== parentId) {
+    pose.x = Math.round(pose.x / gridStep) * gridStep;
+    pose.y = Math.round(pose.y / gridStep) * gridStep;
+  }
   const insert = (ids: readonly string[]) => {
     const filtered = ids.filter((id) => id !== nodeId);
     const index = beforeId === undefined ? filtered.length : filtered.indexOf(beforeId);

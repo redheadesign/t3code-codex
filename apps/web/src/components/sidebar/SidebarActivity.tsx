@@ -29,7 +29,7 @@ type ActivityKind = "attention" | "unread" | "running" | "completed";
 const ACTIVITY_PAGE_SIZE = 10;
 const activityKinds = {
   attention: { rank: 0, icon: CircleAlertIcon, tone: "text-warning-foreground" },
-  unread: { rank: 1, icon: CircleCheckIcon, tone: "text-success-foreground" },
+  unread: { rank: 1, icon: CircleCheckIcon, tone: "text-info-foreground" },
   running: { rank: 2, icon: CirclePlayIcon, tone: "text-info-foreground" },
   completed: { rank: 3, icon: CircleCheckIcon, tone: "text-muted-foreground" },
 } as const;
@@ -43,8 +43,11 @@ const statusByPill = {
   Completed: { kind: "unread", label: ["Completed · unread", "Готово · не прочитано"] },
   Working: { kind: "running", label: ["Running", "В работе"] },
   Connecting: { kind: "running", label: ["Starting", "Запускается"] },
-  Waiting: { kind: "running", label: ["Waiting", "Ожидает"] },
-} as const satisfies Record<string, { kind: ActivityKind; label: readonly [string, string] }>;
+  Waiting: null,
+} as const satisfies Record<
+  string,
+  { kind: ActivityKind; label: readonly [string, string] } | null
+>;
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   dateStyle: "short",

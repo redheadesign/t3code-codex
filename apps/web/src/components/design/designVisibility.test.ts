@@ -1,6 +1,45 @@
 import { expect, it } from "vite-plus/test";
 import { createInitialDesignDocument } from "./designDocument";
-import { designCanvasGeometry, designPageGeometry, designViewportNodes } from "./designVisibility";
+import {
+  designCanvasGeometry,
+  designCanvasLayer,
+  designPageGeometry,
+  designViewportNodes,
+  designWheelZoom,
+} from "./designVisibility";
+
+it("enters one nested level and selects siblings inside the current frame", () => {
+  const [frame, text] = createInitialDesignDocument().nodes;
+  const nodes = new Map(
+    [
+      frame!,
+      { ...frame!, nodeId: "nested", parentId: frame!.nodeId },
+      { ...text!, nodeId: "a", parentId: "nested" },
+      { ...text!, nodeId: "b", parentId: "nested" },
+      { ...text!, nodeId: "outside", parentId: frame!.nodeId },
+    ].map((node) => [node.nodeId, node]),
+  );
+
+  expect(designCanvasLayer(nodes, "a", null)).toBe(frame!.nodeId);
+  expect(designCanvasLayer(nodes, "a", frame!.nodeId)).toBe(frame!.nodeId);
+  expect(designCanvasLayer(nodes, "a", frame!.nodeId, true)).toBe("nested");
+  expect(designCanvasLayer(nodes, "a", "nested", true)).toBe("a");
+  expect(designCanvasLayer(nodes, "b", "a")).toBe("b");
+  expect(designCanvasLayer(nodes, "outside", "a")).toBe("outside");
+});
+
+it("bounds accelerated wheel input and anchors the cursor in document space", () => {
+  const cursor = { x: 360, y: 160 };
+  const camera = { zoom: 1, pan: { x: 60, y: 60 } };
+  const standard = designWheelZoom(camera, cursor, -120, 0);
+  const accelerated = designWheelZoom(camera, cursor, -1600, 0);
+  expect(standard.zoom).toBeGreaterThan(1);
+  expect(accelerated).toEqual(standard);
+  expect((cursor.x - standard.pan.x) / standard.zoom).toBeCloseTo(300);
+  expect((cursor.y - standard.pan.y) / standard.zoom).toBeCloseTo(100);
+  expect(designWheelZoom(camera, cursor, -3, 1).zoom).toBeGreaterThan(1);
+  expect(designWheelZoom(camera, cursor, 120, 0).zoom).toBeLessThan(1);
+});
 
 it("retains an offscreen ancestor of visible content and honors clipping, visibility and pinned editing", () => {
   const base = createInitialDesignDocument();

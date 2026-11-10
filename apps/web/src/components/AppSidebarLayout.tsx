@@ -10,10 +10,9 @@ import {
 } from "react";
 import { useLocation, useNavigate, useRouter, type AnyRouter } from "@tanstack/react-router";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { SearchIcon } from "lucide-react";
 
 import { moveWorkspaceFocus, workspaceAreaProps } from "../lib/workspaceFocus";
-import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
+import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { isElectron } from "../env";
 import {
   releaseThreadUndoShortcut,
@@ -50,7 +49,6 @@ import {
 } from "./sidebar/mainAppLocation";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
 import type { SidebarRouteReveal } from "./sidebar/routeReveal";
-import { Button } from "./ui/button";
 import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
 import { useProject, useQuietThreadProjection, useQuietThreadShell } from "../state/entities";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
@@ -123,24 +121,11 @@ function WorkspaceGlobalChrome() {
       }}
       data-workspace-global-chrome=""
     >
-      <div className="flex min-w-0 shrink-0 items-center gap-2">
-        {automationsPage || designPage || tasksPage ? (
-          <span aria-hidden className="size-7" />
-        ) : (
-          <SidebarTrigger
-            aria-label={ui("Toggle main sidebar", "Открыть или скрыть панель")}
-            className="size-7"
-          />
-        )}
-        <Button
-          variant="ghost-muted"
-          size="icon-sm"
-          aria-label={ui("Global search", "Поиск")}
-          onClick={() => openCommandPalette()}
-        >
-          <SearchIcon aria-hidden className="size-4" />
-        </Button>
-      </div>
+      {automationsPage || designPage || tasksPage ? null : (
+        <div className="fixed start-(--workspace-controls-left) top-0 flex h-(--workspace-chrome-height) items-center">
+          <SidebarTrigger aria-label={ui("Toggle main sidebar", "Открыть или скрыть панель")} />
+        </div>
+      )}
       <div
         className={cn(
           "absolute inset-y-0 flex min-w-0 items-center gap-2.5 ps-2 pe-32 text-sm",

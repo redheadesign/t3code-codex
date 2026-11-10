@@ -208,7 +208,33 @@ describe("TaskBoardService", () => {
           archivedAt: timestamp,
           title: "Design screen",
         });
-        yield* command(done.revision, { _tag: "updateProjectWiki", content: "## Visual design" });
+        const wiki = yield* command(done.revision, {
+          _tag: "updateProjectWiki",
+          content: "## Visual design",
+        });
+        const savedPage = yield* command(wiki.revision, {
+          _tag: "saveProjectWikiPage",
+          pageId: "design-notes",
+          title: "Design notes",
+          content: "# Layout",
+        });
+        const archivedPage = yield* command(savedPage.revision, {
+          _tag: "setProjectWikiPageArchived",
+          pageId: "design-notes",
+          archived: true,
+        });
+        expect(archivedPage.wiki.pages?.[0]?.archivedAt).toBe(
+          DateTime.formatIso(yield* DateTime.now),
+        );
+        const restoredPage = yield* command(archivedPage.revision, {
+          _tag: "setProjectWikiPageArchived",
+          pageId: "design-notes",
+          archived: false,
+        });
+        yield* command(restoredPage.revision, {
+          _tag: "updateProjectWiki",
+          content: "## Visual design",
+        });
         const restarted = yield* reload();
         const board = yield* restarted.read(projectId);
         expect(board.tasks.find(({ id }) => id === task.id)).toMatchObject({
@@ -216,7 +242,12 @@ describe("TaskBoardService", () => {
           threadId,
         });
         expect(board.wiki.content).toBe("## Visual design");
-        expect((yield* restarted.read(otherProject)).tasks).toEqual([]);
+        expect(board.wiki.pages).toMatchObject([
+          { id: "design-notes", title: "Design notes", content: "# Layout", archivedAt: null },
+        ]);
+        const otherBoard = yield* restarted.read(otherProject);
+        expect(otherBoard.tasks).toEqual([]);
+        expect(otherBoard.wiki.pages).toBeUndefined();
         const reopened = yield* command(board.revision, {
           _tag: "updateLocalTask",
           taskId: task.id,

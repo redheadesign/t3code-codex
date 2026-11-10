@@ -5,7 +5,7 @@ import type {
   TaskWorkspaceCommand,
 } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
-import { Link2Icon, MessageSquareIcon, PencilIcon, XIcon } from "lucide-react";
+import { Link2Icon, MessageSquareIcon, PencilIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { useUiText } from "~/i18n";
 
@@ -23,6 +23,7 @@ import {
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Textarea } from "../ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { BOARD_COLUMNS, taskStatusLabel } from "./TaskBoard";
 import { TaskFeedback } from "./TaskFeedback";
 import { TaskHistory, TaskTimestamp } from "./TaskHistory";
@@ -114,6 +115,7 @@ export function LocalTaskDetails({
   onCommand: (command: TaskWorkspaceCommand) => Promise<boolean>;
 }) {
   const text = useUiText();
+  const [view, setView] = useState<"overview" | "activity">("overview");
   const [edit, setEdit] = useState<{
     title: string;
     description: string;
@@ -137,6 +139,7 @@ export function LocalTaskDetails({
   );
   const isBlocked = blockers.some((candidate) => candidate.status !== "done");
   const canAssign = !disabled && !isBlocked && task.status !== "done";
+  const StatusIcon = BOARD_COLUMNS.find(({ status }) => status === task.status)?.icon;
   const editStale =
     edit !== null && (edit.baseTitle !== task.title || edit.baseDescription !== task.description);
   const updateDependencies = (blockedBy: ReadonlyArray<string>) =>
@@ -151,55 +154,72 @@ export function LocalTaskDetails({
     >
       <DialogPopup className="sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>
-            <span className="block pe-6">{task.title}</span>
-          </DialogTitle>
-          <DialogDescription>
-            {text("Created", "Создана")} <TaskTimestamp value={task.createdAt} />
-            {task.threadId === null
-              ? task.status === "done"
-                ? text(
-                    " · Reopen the task to start its chat",
-                    " · Откройте задачу снова, чтобы запустить чат",
-                  )
-                : text(
-                    " · Start a chat when you’re ready to work on this task",
-                    " · Чат можно открыть, когда начнёте работу",
-                  )
-              : task.status === "done"
-                ? text(" · Chat archived", " · Чат в архиве")
-                : null}
-          </DialogDescription>
-          <div className="flex flex-wrap items-center gap-2">
-            {task.threadId !== null ? (
+          <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3 pe-7">
+            <div className="min-w-0 flex-1 basis-52 space-y-2">
+              <DialogTitle>{task.title}</DialogTitle>
+              <DialogDescription>
+                {text("Created", "Создана")} <TaskTimestamp value={task.createdAt} />
+                {isBlocked && task.status !== "done"
+                  ? ` · ${text("Blocked", "Заблокирована")}`
+                  : null}
+              </DialogDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {task.threadId !== null ? (
+                <Button
+                  size="sm"
+                  render={
+                    <Link
+                      to="/$environmentId/$threadId"
+                      params={{ environmentId, threadId: task.threadId }}
+                    />
+                  }
+                >
+                  <MessageSquareIcon />
+                  {task.status === "done"
+                    ? text("Archived chat", "Чат в архиве")
+                    : text("Open chat", "Открыть чат")}
+                </Button>
+              ) : task.status === "done" ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={disabled}
+                  onClick={() =>
+                    void onCommand({ _tag: "updateLocalTask", taskId: task.id, status: "todo" })
+                  }
+                >
+                  <RotateCcwIcon />
+                  {text("Reopen task", "Вернуть в работу")}
+                </Button>
+              ) : (
+                <Button size="sm" disabled={disabled} onClick={() => onOpenChat(task.id)}>
+                  <MessageSquareIcon />
+                  {text("Start chat", "Запустить чат")}
+                </Button>
+              )}
               <Button
-                size="sm"
-                render={
-                  <Link
-                    to="/$environmentId/$threadId"
-                    params={{ environmentId, threadId: task.threadId }}
-                  />
-                }
+                size="icon-sm"
+                variant="ghost-muted"
+                aria-label={text("Copy task link", "Скопировать ссылку")}
+                title={text("Copy task link", "Скопировать ссылку")}
+                onClick={onCopyLink}
               >
-                <MessageSquareIcon />
-                {task.status === "done"
-                  ? text("View archived chat", "Открыть чат из архива")
-                  : text("Open chat", "Открыть чат")}
+                <Link2Icon />
               </Button>
-            ) : (
-              <Button
-                size="sm"
-                disabled={disabled || task.status === "done"}
-                onClick={() => onOpenChat(task.id)}
-              >
-                <MessageSquareIcon />
-                {text("Start chat", "Запустить чат")}
-              </Button>
-            )}
-            <Button size="sm" variant="ghost-muted" onClick={onCopyLink}>
-              <Link2Icon />
-              {text("Copy task link", "Скопировать ссылку")}
-            </Button>
+            </div>
+          </div>
+          <div className="mt-2">
+            <ToggleGroup
+              aria-label={text("Task sections", "Разделы задачи")}
+              value={[view]}
+              onValueChange={([next]) => {
+                if (next === "overview" || next === "activity") setView(next);
+              }}
+            >
+              <ToggleGroupItem value="overview">{text("Overview", "Обзор")}</ToggleGroupItem>
+              <ToggleGroupItem value="activity">{text("Activity", "Активность")}</ToggleGroupItem>
+            </ToggleGroup>
           </div>
         </DialogHeader>
         <DialogPanel>
@@ -208,8 +228,8 @@ export function LocalTaskDetails({
               {error}
             </p>
           ) : null}
-          <div className="grid gap-5 border-t border-border pt-4 md:grid-cols-[minmax(0,1fr)_minmax(14rem,0.55fr)]">
-            <section className="min-w-0 space-y-3 md:col-start-1 md:row-start-1">
+          <div className="grid items-start gap-6 border-t border-border pt-4 md:grid-cols-[minmax(0,1fr)_14rem]">
+            <section hidden={view !== "overview"} className="min-w-0 space-y-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold">{text("Description", "Описание")}</h2>
                 {edit === null ? (
@@ -227,7 +247,7 @@ export function LocalTaskDetails({
                     }
                   >
                     <PencilIcon />
-                    {text("Edit task", "Редактировать задачу")}
+                    {text("Edit task", "Редактировать")}
                   </Button>
                 ) : null}
               </div>
@@ -313,15 +333,25 @@ export function LocalTaskDetails({
                 disabled={disabled}
                 onCommand={onCommand}
               />
+            </section>
+            <div hidden={view !== "activity"} className="min-w-0 space-y-5">
+              <TaskFeedback
+                task={task}
+                environmentId={environmentId}
+                workspaceRoot={workspaceRoot}
+                disabled={disabled}
+                chatTitles={chatTitles}
+                onCommand={onCommand}
+              />
               <TaskHistory
                 task={task}
                 environmentId={environmentId}
                 workspaceRoot={workspaceRoot}
               />
-            </section>
+            </div>
             <aside
               aria-label={text("Task properties", "Свойства задачи")}
-              className="min-w-0 space-y-4 border-t border-border pt-4 md:col-start-2 md:row-span-2 md:row-start-1 md:border-s md:border-t-0 md:ps-5 md:pt-0"
+              className="min-w-0 space-y-4 border-t border-border pt-4 md:border-s md:border-t-0 md:ps-4 md:pt-0"
             >
               <h2 className="text-sm font-semibold">{text("Properties", "Свойства")}</h2>
               <div className="space-y-1.5">
@@ -341,6 +371,7 @@ export function LocalTaskDetails({
                     width="fluid"
                     aria-label={text("Task status", "Статус задачи")}
                   >
+                    {StatusIcon ? <StatusIcon aria-hidden /> : null}
                     <SelectValue>{(status) => taskStatusLabel(status, text)}</SelectValue>
                   </SelectTrigger>
                   <SelectPopup>
@@ -398,8 +429,8 @@ export function LocalTaskDetails({
                     {isBlocked && task.status !== "done" ? (
                       <p className="text-xs text-muted-foreground">
                         {text(
-                          "Resolve the blockers to assign this task.",
-                          "Устраните блокирующие задачи, чтобы назначить исполнителя.",
+                          "Resolve the blockers to assign the task.",
+                          "Сначала завершите блокирующие задачи.",
                         )}
                       </p>
                     ) : null}
@@ -430,18 +461,11 @@ export function LocalTaskDetails({
                 )}
               </div>
               <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-xs font-medium text-muted-foreground">
-                    {text("Dependencies", "Зависимости")}
-                  </h3>
-                  {isBlocked ? (
-                    <Badge size="sm" variant="warning">
-                      {text("Blocked", "Заблокирована")}
-                    </Badge>
-                  ) : null}
-                </div>
+                <h3 className="text-xs font-medium text-muted-foreground">
+                  {text("Dependencies", "Зависимости")}
+                </h3>
                 <TaskLinks
-                  label={text("Blocked by", "Заблокирована задачами")}
+                  label={text("Blocked by", "Блокируют")}
                   tasks={blockers}
                   disabled={disabled}
                   onOpen={onSelect}
@@ -450,7 +474,7 @@ export function LocalTaskDetails({
                   }
                 />
                 <TaskLinks
-                  label={text("Blocking", "Блокирует задачи")}
+                  label={text("Blocking", "Блокирует")}
                   tasks={blocks}
                   disabled={disabled}
                   onOpen={onSelect}
@@ -472,9 +496,9 @@ export function LocalTaskDetails({
                   <SelectTrigger
                     size="sm"
                     width="fluid"
-                    aria-label={text("Add blocker", "Добавить блокирующую задачу")}
+                    aria-label={text("Add blocker", "Добавить зависимость")}
                   >
-                    <SelectValue placeholder={text("Add blocker", "Добавить блокирующую задачу")} />
+                    <SelectValue placeholder={text("Add blocker", "Добавить зависимость")} />
                   </SelectTrigger>
                   <SelectPopup>
                     {availableDependencies.map((candidate) => (
@@ -486,14 +510,6 @@ export function LocalTaskDetails({
                 </Select>
               </div>
             </aside>
-            <TaskFeedback
-              task={task}
-              environmentId={environmentId}
-              workspaceRoot={workspaceRoot}
-              disabled={disabled}
-              chatTitles={chatTitles}
-              onCommand={onCommand}
-            />
           </div>
         </DialogPanel>
       </DialogPopup>

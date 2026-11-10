@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { expect, it, vi } from "vite-plus/test";
-import { userEvent } from "vite-plus/test/browser";
+import { page, userEvent } from "vite-plus/test/browser";
 import "~/index.css";
 import { act, render } from "../../../test/render";
 import { DesignCanvas, type DesignTool } from "./DesignCanvas";
@@ -98,7 +98,7 @@ it("changes ruler and pixel views without changing the design or consuming text 
     .element(screen.getByLabelText("Drag down to create a horizontal guide"))
     .toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Zoom and view options", exact: true }));
-  const zoom = screen.getByRole("textbox", { name: "Canvas zoom", exact: true });
+  const zoom = page.getByRole("textbox", { name: "Canvas zoom", exact: true });
   await userEvent.fill(zoom, "400%");
   await userEvent.keyboard("{Enter}");
   await vi.waitFor(() =>
@@ -113,8 +113,8 @@ it("changes ruler and pixel views without changing the design or consuming text 
     expect(screen.container.querySelector("[data-design-pixel-grid]")).toBeNull(),
   );
   await userEvent.click(screen.getByRole("button", { name: "Zoom and view options", exact: true }));
-  await userEvent.click(screen.getByRole("menuitem", { name: /^Pixel preview/u }));
-  await userEvent.click(screen.getByRole("menuitemradio", { name: "1x", exact: true }));
+  await userEvent.click(page.getByRole("menuitem", { name: /^Pixel preview/u }));
+  await userEvent.click(page.getByRole("menuitemradio", { name: "1x", exact: true }));
   await vi.waitFor(() => {
     const raster = screen.container.querySelector<HTMLCanvasElement>(
       '[data-design-pixel-preview="1"]',
@@ -126,8 +126,8 @@ it("changes ruler and pixel views without changing the design or consuming text 
     );
   });
   await userEvent.click(screen.getByRole("button", { name: "Zoom and view options", exact: true }));
-  await userEvent.click(screen.getByRole("menuitem", { name: /^Pixel preview/u }));
-  await userEvent.click(screen.getByRole("menuitemradio", { name: "2x", exact: true }));
+  await userEvent.click(page.getByRole("menuitem", { name: /^Pixel preview/u }));
+  await userEvent.click(page.getByRole("menuitemradio", { name: "2x", exact: true }));
   await vi.waitFor(() => {
     const raster = screen.container.querySelector<HTMLCanvasElement>(
       '[data-design-pixel-preview="2"]',
@@ -325,8 +325,8 @@ it.each(["Resize", "Scale"] as const)(
     if (kind === "Resize") expect(next.nodes[0]).toMatchObject({ width: 680, height: 480 });
     else {
       const factor = 1 + (40 * 640 + 60 * 420) / (640 ** 2 + 420 ** 2);
-      expect(next.nodes[0]!.width).toBeCloseTo(640 * factor);
-      expect(next.nodes[0]!.height).toBeCloseTo(420 * factor);
+      expect(next.nodes[0]!.width).toBe(Math.round(640 * factor));
+      expect(next.nodes[0]!.height).toBe(Math.round(420 * factor));
       expect(next.nodes[1]!.fontSize).toBeCloseTo(36 * factor);
     }
   },
@@ -349,6 +349,8 @@ it.each([false, true])(
     });
     const node = screen.getByRole("button", { name: "Welcome heading", exact: true });
     await userEvent.click(node);
+    await expect.element(node).toHaveAttribute("aria-pressed", "false");
+    await userEvent.dblClick(node);
     await expect.element(node).toHaveAttribute("aria-pressed", "true");
     const surface = screen.getByLabelText("Canvas editing surface").element();
     await act(() =>
@@ -741,7 +743,7 @@ it.each(
     } else if (kind.startsWith("resize")) {
       expect(changed.width).toBeCloseTo(120, 4);
       expect(changed.height).toBeCloseTo(kind === "resize locked" ? 60 : 40, 4);
-      expect(changed.x).toBeCloseTo((parentFlipped ? -1 : 1) * 10 * Math.sqrt(3), 4);
+      expect(changed.x).toBe(Math.round((parentFlipped ? -1 : 1) * 10 * Math.sqrt(3)));
       expect(changed.y).toBeCloseTo(
         (kind === "resize locked" ? 10 : 20) - (parentFlipped ? 20 : 0),
         4,

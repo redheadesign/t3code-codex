@@ -298,7 +298,7 @@ describe("Design document IR", () => {
       ),
     ).toBe(document);
   });
-  it("snaps moves and resizes to individual pixels instead of an eight pixel grid", () => {
+  it("snaps moves and resizes to the configured grid, including fractional layer positions", () => {
     const document = createInitialDesignDocument();
     const transform = {
       document,
@@ -306,7 +306,7 @@ describe("Design document IR", () => {
       handle: "se",
       start: { x: 0, y: 0 },
       point: { x: 3.2, y: 2.7 },
-      snap: true,
+      gridStep: 1,
     };
     expect(previewDesignTransform({ ...transform, kind: "move" }).nodes[0]).toMatchObject({
       x: 123,
@@ -316,6 +316,18 @@ describe("Design document IR", () => {
       width: 643,
       height: 423,
     });
+    const fractional = updateDesignNode(document, "frame-home", { x: 120.4, y: 96.2 });
+    expect(
+      previewDesignTransform({
+        ...transform,
+        document: fractional,
+        kind: "move",
+        gridStep: 4,
+      }).nodes[0],
+    ).toMatchObject({ x: 124, y: 100 });
+    expect(
+      previewDesignTransform({ ...transform, kind: "resize", gridStep: 4 }).nodes[0],
+    ).toMatchObject({ width: 644, height: 424 });
   });
   it("scales a rotated subtree around its anchor without applying child constraints", () => {
     const base = createInitialDesignDocument();

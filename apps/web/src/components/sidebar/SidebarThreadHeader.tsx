@@ -3,7 +3,7 @@ import { type ComponentProps, type ReactNode } from "react";
 
 import { useUiText } from "~/i18n";
 import { cn } from "~/lib/utils";
-import { T3Wordmark } from "../T3Wordmark";
+import { SidebarBrandMark } from "./SidebarBrandMark";
 import { SidebarMenuButton } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -17,8 +17,7 @@ export function SidebarThreadHeader(props: {
   return (
     <div className="flex items-center gap-1">
       <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-sm font-medium text-sidebar-foreground">
-        <T3Wordmark aria-label="T3" className="h-3.5 w-auto shrink-0" />
-        <span>Code</span>
+        <SidebarBrandMark />
       </div>
       {props.activity}
       <SidebarHeaderIconButton

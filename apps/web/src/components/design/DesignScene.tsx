@@ -508,7 +508,7 @@ export function DesignSceneNode({
       onPointerEnter={() => navigate("hover")}
       onPointerLeave={() => onHoverEnd?.(node.nodeId)}
       onDoubleClick={(event) => {
-        if (!locked && node.kind === "text" && onTextChange) {
+        if (!locked && node.kind === "text" && onTextChange && selected[0] === node.nodeId) {
           event.stopPropagation();
           cancelEdit.current = false;
           setEditing(true);

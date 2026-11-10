@@ -16,7 +16,6 @@ import {
   Columns3Icon,
   ListTodoIcon,
   LoaderCircleIcon,
-  PencilIcon,
   PlusIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -29,7 +28,6 @@ import { useProjects } from "../../state/entities";
 import { useEnvironmentQuery } from "../../state/query";
 import { taskWorkspaceCommand, taskWorkspaceRead } from "../../state/taskWorkspace";
 import { useAtomCommand } from "../../state/use-atom-command";
-import ChatMarkdown from "../ChatMarkdown";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { ProjectPicker } from "../ProjectPicker";
 import { Button } from "../ui/button";
@@ -49,6 +47,7 @@ import { toastManager } from "../ui/toast";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { LocalTaskDetails, TASK_TEXT_LIMIT, TASK_TITLE_LIMIT } from "./LocalTaskDetails";
 import { BOARD_COLUMNS, TaskBoard, taskStatusLabel } from "./TaskBoard";
+import { ProjectWiki } from "./ProjectWiki";
 import { TaskIdeaComposer } from "./TaskIdeaComposer";
 import { TaskMobileNavigation, TasksWorkspace } from "./TasksWorkspace";
 
@@ -67,6 +66,7 @@ export type TasksSearch = {
   readonly taskId?: string;
   readonly localTaskId?: string;
   readonly threadId?: ThreadId;
+  readonly wikiPageId?: string;
   readonly view?: TaskView;
 };
 
@@ -396,28 +396,17 @@ function LocalTaskTracker({
     <div className="flex min-h-0 flex-1 flex-col pb-14 md:pb-0">
       {view === "wiki" ? (
         <ProjectWiki
-          content={board.wiki.content}
+          wiki={board.wiki}
           environmentId={environmentId}
+          projectId={projectId}
+          pageId={target.wikiPageId}
           workspaceRoot={workspaceRoot}
           disabled={disabled}
           error={error}
-          onSave={async (content) =>
-            (await runCommand({ _tag: "updateProjectWiki", content })) !== null
-          }
+          onCommand={async (command) => (await runCommand(command)) !== null}
         />
       ) : (
         <>
-          {view === "board" ? (
-            <TaskIdeaComposer
-              environmentId={environmentId}
-              projectId={projectId}
-              threadId={board.intakeThreadId}
-              disabled={disabled}
-              onSend={async (submission) =>
-                (await runCommand({ _tag: "submitLocalTaskIdeas", ...submission })) !== null
-              }
-            />
-          ) : null}
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 pt-4 md:px-6">
             <h2 className="text-sm font-medium">
               {view === "archive"
@@ -461,6 +450,17 @@ function LocalTaskTracker({
               void runCommand({ _tag: "updateLocalTask", taskId, status })
             }
           />
+          {view === "board" ? (
+            <TaskIdeaComposer
+              environmentId={environmentId}
+              projectId={projectId}
+              threadId={board.intakeThreadId}
+              disabled={disabled}
+              onSend={async (submission) =>
+                (await runCommand({ _tag: "submitLocalTaskIdeas", ...submission })) !== null
+              }
+            />
+          ) : null}
         </>
       )}
       {selectedTask ? (
@@ -630,107 +630,5 @@ function NewTaskDialog({
         </DialogFooter>
       </DialogPopup>
     </Dialog>
-  );
-}
-
-function ProjectWiki({
-  content,
-  workspaceRoot,
-  environmentId,
-  disabled,
-  error,
-  onSave,
-}: {
-  content: string;
-  workspaceRoot: string;
-  environmentId: EnvironmentId;
-  disabled: boolean;
-  error: string | null;
-  onSave: (content: string) => Promise<boolean>;
-}) {
-  const text = useUiText();
-  const [edit, setEdit] = useState<{ base: string; draft: string } | null>(null);
-  const changedElsewhere = edit !== null && edit.base !== content;
-  return (
-    <div className="min-h-0 flex-1 overflow-auto p-4 md:px-6">
-      <section className="max-w-3xl space-y-4">
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold">{text("Project wiki", "Вики проекта")}</h2>
-          {edit === null ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={disabled}
-              onClick={() => setEdit({ base: content, draft: content })}
-            >
-              <PencilIcon />
-              {text("Edit wiki", "Редактировать")}
-            </Button>
-          ) : null}
-        </header>
-        {error ? (
-          <p role="alert" className="text-sm text-destructive-foreground">
-            {error}
-          </p>
-        ) : null}
-        {edit !== null ? (
-          <form
-            className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!disabled && !changedElsewhere)
-                void onSave(edit.draft).then((saved) => {
-                  if (saved) setEdit(null);
-                });
-            }}
-          >
-            <label className="grid gap-1 text-sm">
-              {text("Wiki content", "Содержимое вики")}
-              <Textarea
-                size="lg"
-                value={edit.draft}
-                maxLength={TASK_TEXT_LIMIT}
-                disabled={disabled}
-                onChange={(event) => setEdit({ ...edit, draft: event.target.value })}
-              />
-            </label>
-            {changedElsewhere ? (
-              <p role="alert" className="text-sm text-warning-foreground">
-                {text(
-                  "The wiki changed while you were editing. Copy your draft before reopening the latest version.",
-                  "Вики обновилась. Скопируйте свой черновик, прежде чем открыть свежую версию.",
-                )}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                type="submit"
-                disabled={disabled || changedElsewhere || edit.draft === content}
-              >
-                {text("Save wiki", "Сохранить")}
-              </Button>
-              <Button size="sm" variant="ghost-muted" onClick={() => setEdit(null)}>
-                {text("Cancel", "Отмена")}
-              </Button>
-            </div>
-          </form>
-        ) : content ? (
-          <ChatMarkdown
-            text={content}
-            cwd={workspaceRoot}
-            environmentId={environmentId}
-            headingLevelOffset={2}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {text(
-              "Add project context, decisions, and handoff notes for people and agents.",
-              "Добавляйте контекст проекта, решения и заметки для передачи работы.",
-            )}
-          </p>
-        )}
-      </section>
-    </div>
   );
 }

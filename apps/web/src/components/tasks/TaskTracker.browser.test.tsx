@@ -9,13 +9,21 @@ import {
   type TaskWorkspaceCommandInput,
   type TaskWorkspaceSnapshot,
 } from "@t3tools/contracts";
-import { DEFAULT_CLIENT_SETTINGS, DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts/settings";
-import { AsyncResult } from "effect/reactivity";
+import { createModelCapabilities } from "@t3tools/shared/model";
+import { AsyncResult, Atom } from "effect/reactivity";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import "~/index.css";
 import { act, render } from "../../../test/render";
+import {
+  useEnvironmentProviders,
+  useEnvironments,
+  usePrimaryEnvironmentId,
+  usePullRequestsSupported,
+} from "../../state/environments";
+import { useProjects } from "../../state/entities";
+import { SidebarUpdatePill } from "../sidebar/SidebarUpdatePill";
 import { TaskTracker } from "./TaskTracker";
 
 const environmentId = EnvironmentId.make("laptop");
@@ -26,6 +34,7 @@ const threadId = ThreadId.make("thread");
 const ideasThreadId = ThreadId.make("ideas-thread");
 const timestamp = "2026-11-10T08:00:00.000Z";
 const scope = { environmentId, projectId };
+const operateTasks = Atom.make(true);
 const modelSelection = { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" };
 const provider: ServerProvider = {
   instanceId: modelSelection.instanceId,
@@ -36,7 +45,27 @@ const provider: ServerProvider = {
   status: "ready",
   auth: { status: "authenticated" },
   checkedAt: timestamp,
-  models: [{ slug: modelSelection.model, name: "GPT-5.4", isCustom: false, capabilities: null }],
+  models: [
+    {
+      slug: modelSelection.model,
+      name: "GPT-5.4",
+      isCustom: false,
+      capabilities: createModelCapabilities({
+        optionDescriptors: [
+          {
+            id: "reasoningEffort",
+            label: "Reasoning",
+            type: "select",
+            currentValue: "medium",
+            options: [
+              { id: "medium", label: "Medium", isDefault: true },
+              { id: "high", label: "High" },
+            ],
+          },
+        ],
+      }),
+    },
+  ],
   slashCommands: [],
   skills: [],
 };
@@ -97,14 +126,52 @@ const snapshot: TaskWorkspaceSnapshot = {
 const fixture = vi.hoisted(() => ({
   navigate: vi.fn(),
   command: vi.fn(),
-  refresh: vi.fn(),
-  data: null as TaskWorkspaceSnapshot | null,
+  snapshotAtom: null as Atom.Atom<AsyncResult.AsyncResult<TaskWorkspaceSnapshot, never>> | null,
 }));
 
 function setup(data = snapshot) {
-  fixture.data = data;
+  fixture.snapshotAtom = Atom.make(AsyncResult.success(data));
+  vi.mocked(SidebarUpdatePill).mockReturnValue(<span aria-hidden />);
+  vi.mocked(useEnvironments).mockReturnValue({
+    environments: [
+      { environmentId, label: "Laptop", connection: { phase: "connected" }, serverConfig: {} },
+      {
+        environmentId: remoteEnvironmentId,
+        label: "Build host",
+        connection: { phase: "connected" },
+        serverConfig: {},
+      },
+    ],
+  } as ReturnType<typeof useEnvironments>);
+  vi.mocked(usePrimaryEnvironmentId).mockReturnValue(environmentId);
+  vi.mocked(usePullRequestsSupported).mockReturnValue(false);
+  vi.mocked(useEnvironmentProviders).mockReturnValue(new Map([[environmentId, [provider]]]));
+  const projectFields = {
+    repositoryIdentity: null,
+    defaultModelSelection: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    scripts: [],
+  };
+  vi.mocked(useProjects).mockReturnValue([
+    {
+      ...projectFields,
+      environmentId,
+      id: projectId,
+      title: "Workspaces",
+      workspaceRoot: "/workspace/project",
+      projectIcon: { kind: "emoji", emoji: "📁" },
+    },
+    {
+      ...projectFields,
+      environmentId: remoteEnvironmentId,
+      id: remoteProjectId,
+      title: "Mobile app",
+      workspaceRoot: "/workspace/mobile",
+      projectIcon: { kind: "emoji", emoji: "📱" },
+    },
+  ]);
   fixture.navigate.mockReset();
-  fixture.refresh.mockReset();
   fixture.command
     .mockReset()
     .mockImplementation(async ({ input }: { input: TaskWorkspaceCommandInput }) => {
@@ -144,69 +211,16 @@ vi.mock(import("@tanstack/react-router"), async (original) => ({
   ...(await original()),
   useNavigate: () => fixture.navigate,
 }));
-vi.mock(import("@effect/atom-react"), async (original) => ({
-  ...(await original()),
-  useAtomValue: () => true,
-}));
-vi.mock("../../state/environments", () => ({
-  useEnvironments: () => ({
-    environments: [
-      { environmentId, label: "Laptop", connection: { phase: "connected" }, serverConfig: {} },
-      {
-        environmentId: remoteEnvironmentId,
-        label: "Build host",
-        connection: { phase: "connected" },
-        serverConfig: {},
-      },
-    ],
-  }),
-  usePrimaryEnvironmentId: () => environmentId,
-  usePullRequestsSupported: () => false,
-  useEnvironmentProviders: () => new Map([[environmentId, [provider]]]),
-}));
-vi.mock(import("../../hooks/useSettings"), async (original) => ({
-  ...(await original()),
-  useEnvironmentSettings: (() => ({
-    ...DEFAULT_CLIENT_SETTINGS,
-    ...DEFAULT_SERVER_SETTINGS,
-  })) as never,
-}));
-vi.mock("../../state/entities", () => ({
-  useProjects: () => [
-    {
-      environmentId,
-      id: projectId,
-      title: "Workspaces",
-      workspaceRoot: "/workspace/project",
-      projectIcon: { kind: "emoji", emoji: "📁" },
-    },
-    {
-      environmentId: remoteEnvironmentId,
-      id: remoteProjectId,
-      title: "Mobile app",
-      workspaceRoot: "/workspace/mobile",
-      projectIcon: { kind: "emoji", emoji: "📱" },
-    },
-  ],
-}));
-vi.mock("../../state/query", () => ({
-  useEnvironmentQuery: () => ({
-    data: fixture.data,
-    error: null,
-    isPending: false,
-    refresh: fixture.refresh,
-  }),
-}));
+vi.mock("../../state/environments", { spy: true });
+vi.mock("../../state/entities", { spy: true });
 vi.mock("../../state/taskWorkspace", () => ({
-  taskWorkspaceRead: () => null,
-  taskWorkspaceCommand: { permissionAtom: () => "task-workspace-permission" },
+  taskWorkspaceRead: () => fixture.snapshotAtom,
+  taskWorkspaceCommand: { permissionAtom: () => operateTasks },
 }));
 vi.mock("../../state/use-atom-command", () => ({
   useAtomCommand: () => fixture.command,
 }));
-vi.mock(import("../sidebar/SidebarUpdatePill"), () => ({
-  SidebarUpdatePill: () => <span aria-hidden />,
-}));
+vi.mock("../sidebar/SidebarUpdatePill", { spy: true });
 vi.mock("../ChatMarkdown", () => ({
   default: ({ text }: { text: string }) => <p>{text}</p>,
 }));
@@ -242,6 +256,7 @@ it("moves a task to another column and opens the same task from its chat link", 
   await expect
     .element(dialog.getByRole("combobox", { name: "Task status" }))
     .toHaveTextContent("In review");
+  await userEvent.click(dialog.getByRole("button", { name: "Activity", exact: true }));
   const activity = dialog.getByRole("list", { name: "Task activity" }).getByRole("listitem");
   await expect
     .element(activity.nth(0).getByText("Navigation is ready for review.", { exact: true }))
@@ -263,11 +278,18 @@ it("switches projects from the header and keeps the current view", async () => {
   });
 });
 
-it("sends the board idea with the selected agent and exposes the real chat link", async () => {
+it("sends the board idea with the selected model and effort and exposes its chat link", async () => {
   setup();
   await using screen = await render(<TaskTracker target={scope} />);
   const send = screen.getByRole("button", { name: "Send idea" });
   await expect.element(send).toBeDisabled();
+  await userEvent.click(screen.getByRole("button", { name: /^Choose an agent/ }));
+  const reasoning = page.getByRole("slider", { name: "Reasoning" });
+  await expect.element(reasoning).toHaveAttribute("aria-valuetext", "Medium");
+  await userEvent.click(reasoning);
+  await userEvent.keyboard("{End}");
+  await expect.element(reasoning).toHaveAttribute("aria-valuetext", "High");
+  await userEvent.keyboard("{Escape}");
   await userEvent.fill(
     screen.getByRole("textbox", { name: "Project idea" }),
     "Make the navigation keyboard friendly.",
@@ -283,7 +305,7 @@ it("sends the board idea with the selected agent and exposes the real chat link"
         _tag: "submitLocalTaskIdeas",
         submissionId: expect.any(String),
         prompt: "Make the navigation keyboard friendly.",
-        modelSelection,
+        modelSelection: { ...modelSelection, options: [{ id: "reasoningEffort", value: "high" }] },
       },
     },
   });
@@ -345,6 +367,7 @@ it("only sends pending feedback when asked and records that it was sent", async 
   await expect
     .element(dialog.getByRole("link", { name: "Mobile mockup" }))
     .toHaveAttribute("href", "/design?documentId=design-document");
+  await userEvent.click(dialog.getByRole("button", { name: "Activity", exact: true }));
   await expect
     .element(
       dialog

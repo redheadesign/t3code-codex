@@ -23,6 +23,10 @@ import {
 type Point = { x: number; y: number };
 type Frame = Point & { width: number; height: number; rotation: number };
 
+export function snapDesignValue(value: number, gridStep: number) {
+  return gridStep > 0 ? Math.round(value / gridStep) * gridStep : value;
+}
+
 export function designSelectionFrame(
   document: DesignDocument,
   ids: readonly string[],
@@ -274,6 +278,7 @@ export function scaleDesignSelection(
   factor: number,
   anchor: Point = { x: 0, y: 0 },
   preview = false,
+  gridStep = 0,
 ): DesignDocument {
   if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return document;
   const roots = designScalableRoots(document, ids);
@@ -301,9 +306,24 @@ export function scaleDesignSelection(
       : null;
     const local =
       center && node.parentId ? designWorldToLocal(document, node.parentId, center, nodes) : center;
+    const size = gridStep
+      ? {
+          width: Math.max(1, snapDesignValue(scaled.width, root ? gridStep : 1)),
+          height: Math.max(1, snapDesignValue(scaled.height, root ? gridStep : 1)),
+        }
+      : scaled;
     changes.set(node.nodeId, {
       ...scaled,
-      ...(local ? { x: local.x - scaled.width / 2, y: local.y - scaled.height / 2 } : {}),
+      width: size.width,
+      height: size.height,
+      x: snapDesignValue(
+        local ? local.x - size.width / 2 : scaled.x,
+        root ? gridStep : Number(gridStep > 0),
+      ),
+      y: snapDesignValue(
+        local ? local.y - size.height / 2 : scaled.y,
+        root ? gridStep : Number(gridStep > 0),
+      ),
       ...(root && node.layoutSizing
         ? { layoutSizing: { ...scaled.layoutSizing!, width: "fixed", height: "fixed" } }
         : {}),
@@ -343,7 +363,7 @@ export function previewDesignTransform({
   shift = false,
   alt = false,
   control = false,
-  snap = false,
+  gridStep = 0,
   origin,
 }: {
   document: DesignDocument;
@@ -355,7 +375,7 @@ export function previewDesignTransform({
   shift?: boolean;
   alt?: boolean;
   control?: boolean;
-  snap?: boolean;
+  gridStep?: number;
   origin?: Point;
 }): DesignDocument {
   if (![start.x, start.y, point.x, point.y].every(Number.isFinite)) return document;
@@ -373,16 +393,21 @@ export function previewDesignTransform({
     const local = node.parentId
       ? designWorldToLocal(document, node.parentId, center, nodes)
       : center;
+    const localStep = roots.length === 1 ? gridStep : Number(gridStep > 0);
+    const snapSize = (value: number, original: number) =>
+      kind === "resize" && gridStep > 0
+        ? Math.max(1, snapDesignValue(value, value === original ? 1 : localStep))
+        : precise(value);
     return {
-      x: precise(local.x - width / 2),
-      y: precise(local.y - height / 2),
-      width: precise(width),
-      height: precise(height),
+      x: precise(snapDesignValue(local.x - width / 2, localStep)),
+      y: precise(snapDesignValue(local.y - height / 2, localStep)),
+      width: snapSize(width, node.width),
+      height: snapSize(height, node.height),
     };
   };
   const dx = point.x - start.x,
     dy = point.y - start.y;
-  const round = (value: number) => (snap ? Math.round(value) : value);
+  const round = (value: number) => snapDesignValue(value, gridStep);
   if (kind === "scale") {
     const horizontal = handle.includes("w") ? -1 : handle.includes("e") ? 1 : 0;
     const vertical = handle.includes("n") ? -1 : handle.includes("s") ? 1 : 0;
@@ -393,7 +418,7 @@ export function previewDesignTransform({
     );
     const length = extent.x ** 2 + extent.y ** 2;
     const factor = length ? Math.max(0.000001, 1 + (dx * extent.x + dy * extent.y) / length) : 1;
-    return scaleDesignSelection(document, ids, factor, anchor, true);
+    return scaleDesignSelection(document, ids, factor, anchor, true, gridStep);
   }
   if (kind === "move") {
     const delta = {

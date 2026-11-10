@@ -13,6 +13,7 @@ export const Route = createFileRoute("/_chat/tasks")({
     const projectId = parseOptionalString(raw.projectId);
     const taskId = parseOptionalString(raw.taskId);
     const localTaskId = parseOptionalString(raw.localTaskId);
+    const wikiPageId = parseOptionalString(raw.wikiPageId);
     const threadId = parseOptionalString(raw.threadId);
     const view = raw.view;
     return {
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/_chat/tasks")({
       ...(projectId === undefined ? {} : { projectId: projectId as ProjectId }),
       ...(taskId === undefined ? {} : { taskId }),
       ...(localTaskId === undefined ? {} : { localTaskId }),
+      ...(wikiPageId === undefined ? {} : { wikiPageId }),
       ...(threadId === undefined ? {} : { threadId: threadId as ThreadId }),
       ...(view === "board" || view === "archive" || view === "wiki" || view === "jira"
         ? { view }

@@ -1,5 +1,6 @@
 import { useUiText } from "~/i18n";
 import { DesignAssetPayload, ThreadId } from "@t3tools/contracts";
+import { normalizeProjectPathForComparison } from "@t3tools/shared/path";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
 import {
@@ -9,6 +10,7 @@ import {
   ChevronRightIcon,
   EyeIcon,
   EyeOffIcon,
+  FolderCodeIcon,
   ChevronsUpIcon,
   BlendIcon,
   Grid2X2Icon,
@@ -48,6 +50,7 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { useEnvironments } from "../../state/environments";
 import { useProjects } from "../../state/entities";
 import { previewBridge } from "../preview/previewBridge";
+import { ProjectFavicon } from "../ProjectFavicon";
 import { Button } from "../ui/button";
 import {
   Menu,
@@ -2639,6 +2642,20 @@ function DesignEditor({
       ? { ...storedDocument, activePageId: referencePageId }
       : storedDocument;
   const projects = useProjects();
+  const linkedProject = syncTarget
+    ? projects.find(
+        (project) =>
+          project.environmentId === syncTarget.environmentId &&
+          normalizeProjectPathForComparison(project.workspaceRoot) ===
+            normalizeProjectPathForComparison(syncTarget.cwd),
+      )
+    : undefined;
+  const linkedProjectTitle =
+    linkedProject?.title ??
+    syncTarget?.cwd
+      .split(/[\\/]+/)
+      .filter(Boolean)
+      .at(-1);
   const { environments } = useEnvironments();
   const [designChromeActions, setDesignChromeActions] = useState<HTMLElement | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- The external app shell mounts the Design action slot beside this workspace.
@@ -3675,6 +3692,28 @@ function DesignEditor({
           >
             {ui("Design", "Дизайн")}
           </Link>
+          <span aria-hidden="true" className="shrink-0 text-muted-foreground/50">
+            /
+          </span>
+        </>
+      ) : null}
+      {linkedProjectTitle ? (
+        <>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span className="flex min-w-0 max-w-40 items-center gap-1.5 text-muted-foreground" />
+              }
+            >
+              {linkedProject ? (
+                <ProjectFavicon project={linkedProject} />
+              ) : (
+                <FolderCodeIcon aria-hidden="true" className="size-3.5 shrink-0" />
+              )}
+              <span className="truncate">{linkedProjectTitle}</span>
+            </TooltipTrigger>
+            <TooltipPopup>{linkedProjectTitle}</TooltipPopup>
+          </Tooltip>
           <span aria-hidden="true" className="shrink-0 text-muted-foreground/50">
             /
           </span>

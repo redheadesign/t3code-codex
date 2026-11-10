@@ -14,7 +14,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 const FOLDER_DOT_CLASS_NAME = {
   attention: "bg-warning",
   failed: "bg-error",
-  unread: "bg-success",
+  unread: "bg-info",
   working: "bg-info",
 } as const;
 

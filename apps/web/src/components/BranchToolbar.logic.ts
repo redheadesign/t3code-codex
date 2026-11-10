@@ -68,11 +68,11 @@ export function shouldShowComposerContextStrip(input: {
   isGitRepo: boolean;
   showEnvironmentIndicator: boolean;
 }): boolean {
-  // A new thread always shows the strip, since it names the permissions the first send uses.
   return (
+    !input.isDraftHeroState &&
     input.hasActiveProject &&
-    (input.isDraftHeroState ||
-      (input.persistInActiveThreads && (input.isGitRepo || input.showEnvironmentIndicator)))
+    input.persistInActiveThreads &&
+    (input.isGitRepo || input.showEnvironmentIndicator)
   );
 }
 

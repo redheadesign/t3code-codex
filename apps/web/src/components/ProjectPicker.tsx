@@ -115,7 +115,7 @@ export function ProjectPicker<Item extends ProjectPickerItem>({
             if (highlighted.current) onHighlightedKeyDown?.(event, highlighted.current);
           }}
         />
-        <ComboboxEmpty>No matching projects.</ComboboxEmpty>
+        <ComboboxEmpty>{ui("No matching projects.", "Проекты не найдены")}</ComboboxEmpty>
         <ComboboxList>
           {(item: Item) => (
             <ComboboxItem key={item.value} value={item}>

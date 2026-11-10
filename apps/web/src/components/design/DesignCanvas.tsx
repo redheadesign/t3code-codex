@@ -1,4 +1,5 @@
 import { useUiText } from "~/i18n";
+import * as Schema from "effect/Schema";
 import {
   CircleIcon,
   ChevronDownIcon,
@@ -32,7 +33,7 @@ import {
   type ReactNode,
   type KeyboardEventHandler,
 } from "react";
-import { DesignCanvasViewMenu } from "./DesignCanvasViewMenu";
+import { DesignCanvasViewMenu, DESIGN_GRID_STEPS } from "./DesignCanvasViewMenu";
 import { DesignPixelPreview, type DesignPixelPreviewMode } from "./DesignPixelPreview";
 import { Button } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
@@ -41,7 +42,15 @@ import { toastManager } from "../ui/toast";
 import { cn, isMacPlatform } from "../../lib/utils";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { observeResize } from "../../lib/observeResize";
-import { designCanvasGeometry, designViewportNodes } from "./designVisibility";
+import {
+  designCanvasGeometry,
+  designCanvasLayer,
+  designViewportNodes,
+  designWheelZoom,
+  designZoomAt,
+  type DesignCamera,
+} from "./designVisibility";
+import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
 import {
   absoluteNodePosition,
@@ -72,6 +81,7 @@ import {
   designScalableRoots,
   designSelectionFrame,
   previewDesignTransform,
+  snapDesignValue,
 } from "./designTransform";
 import { DesignSceneNode } from "./DesignScene";
 import { DesignRotationOriginHandle } from "./DesignRotationOriginHandle";
@@ -103,6 +113,14 @@ type GuideLines = { x: { id: string; value: number }[]; y: { id: string; value: 
 type Point = { x: number; y: number };
 type PenPoint = DesignVectorPoint & { id: number };
 type Box = Point & { width: number; height: number };
+const DesignGridStep = Schema.Literals(DESIGN_GRID_STEPS);
+type CameraMotion = {
+  frame: number;
+  current: DesignCamera;
+  target: DesignCamera;
+  lastFrame: number | null;
+  remainingMs: number;
+};
 type Gesture = {
   kind:
     | "move"
@@ -192,9 +210,11 @@ function fittedCamera(target: Box, viewport: { width: number; height: number }, 
   };
 }
 
-function previewGesture(gesture: Gesture, zoom: number, snap: boolean): DesignDocument {
+function previewGesture(gesture: Gesture, zoom: number, gridStep: number): DesignDocument {
   const kind = gesture.kind;
   if (kind !== "move" && kind !== "resize" && kind !== "rotate" && kind !== "scale")
+    return gesture.base;
+  if (gesture.start.x === gesture.point.x && gesture.start.y === gesture.point.y)
     return gesture.base;
   const divisor = kind === "rotate" ? 1 : zoom;
   return previewDesignTransform({
@@ -208,7 +228,7 @@ function previewGesture(gesture: Gesture, zoom: number, snap: boolean): DesignDo
     shift: gesture.shift ?? false,
     alt: gesture.alt ?? false,
     control: gesture.control ?? false,
-    snap,
+    gridStep,
   });
 }
 
@@ -359,9 +379,10 @@ export function DesignCanvas({
   const pointerTarget = useRef<Element | null>(null);
   const [deepHoverId, setDeepHoverId] = useState<string | null>(null);
   const guideSequence = useRef(0);
-  const [zoom, setZoom] = useState(1);
+  const [camera, setCamera] = useState<DesignCamera>({ zoom: 1, pan: { x: 56, y: 56 } });
+  const { zoom, pan } = camera;
+  const cameraMotion = useRef<CameraMotion | null>(null);
   const [editingCommentId, setEditingCommentId] = useState(initialCommentId ?? null);
-  const [pan, setPan] = useState({ x: 56, y: 56 });
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [initialTarget] = useState(() => {
     const comment = comments.find((item) => item.commentId === initialCommentId);
@@ -378,9 +399,7 @@ export function DesignCanvas({
     const viewport = element.getBoundingClientRect();
     setViewportSize({ width: viewport.width, height: viewport.height });
     if (initialTarget && viewport.width && viewport.height) {
-      const camera = fittedCamera(initialTarget, viewport, 1);
-      setZoom(camera.zoom);
-      setPan(camera.pan);
+      setCamera(fittedCamera(initialTarget, viewport, 1));
     }
     return observeResize(element, ([entry]) => {
       if (entry)
@@ -398,7 +417,7 @@ export function DesignCanvas({
     if (placementAssetId) surface.current?.focus({ preventScroll: true });
   }, [placementAssetId]);
   const [space, setSpace] = useState(false);
-  const [snap, setSnap] = useState(false);
+  const [gridStep, setGridStep] = useLocalStorage("t3code:design-grid-step", 1, DesignGridStep);
   const [showRulers, setShowRulers] = useState(false);
   const [showPixelGrid, setShowPixelGrid] = useState(true);
   const [pixelPreview, setPixelPreview] = useState<DesignPixelPreviewMode>({ density: 0 });
@@ -478,7 +497,7 @@ export function DesignCanvas({
     : gradientDrag
       ? updateGradientAngle(gradientDrag.base, gradientDrag, gradientDrag.point)
       : gesture && ["move", "resize", "rotate", "scale"].includes(gesture.kind)
-        ? previewGesture(gesture, zoom, snap)
+        ? previewGesture(gesture, zoom, gridStep)
         : document;
   const box = designSelectionFrame(
     shown,
@@ -525,6 +544,13 @@ export function DesignCanvas({
     x: (point.x - pan.x) / zoom,
     y: (point.y - pan.y) / zoom,
   });
+  const snapValue = (value: number) => snapDesignValue(value, gridStep);
+  const snapBox = (box: Box): Box => ({
+    x: snapValue(box.x),
+    y: snapValue(box.y),
+    width: Math.max(1, snapValue(box.width)),
+    height: Math.max(1, snapValue(box.height)),
+  });
   const localPoint = (event: PointerEvent): Point => {
     const rect = surface.current!.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -568,6 +594,7 @@ export function DesignCanvas({
     if (event.button !== 0 && event.button !== 1) return;
     event.preventDefault();
     event.stopPropagation();
+    stopCameraMotion();
     surface.current?.focus({ preventScroll: true });
     if (kind === "move") event.currentTarget.setPointerCapture(event.pointerId);
     else surface.current?.setPointerCapture(event.pointerId);
@@ -612,7 +639,7 @@ export function DesignCanvas({
   };
   const placeInsideFrame = (next: DesignDocument, nodeId: string, point: Point) => {
     const parent = frameAtPoint(point);
-    return parent ? reparentDesignNode(next, nodeId, parent.nodeId) : next;
+    return parent ? reparentDesignNode(next, nodeId, parent.nodeId, undefined, gridStep) : next;
   };
   const imageTarget = (point: Point): DesignImageTarget => ({
     worldX: point.x,
@@ -637,6 +664,8 @@ export function DesignCanvas({
       surface.current?.focus({ preventScroll: true });
       return;
     }
+    if (activeTool === "select")
+      nodeId = designCanvasLayer(sceneNodes, nodeId, selected.length === 1 ? selected[0]! : null);
     if (event.shiftKey) {
       onSelect(
         selected.includes(nodeId) ? selected.filter((id) => id !== nodeId) : [...selected, nodeId],
@@ -711,9 +740,12 @@ export function DesignCanvas({
       control: event.ctrlKey,
     };
     if (gesture.kind === "pan")
-      setPan({
-        x: gesture.pan.x + point.x - gesture.start.x,
-        y: gesture.pan.y + point.y - gesture.start.y,
+      setCamera({
+        zoom,
+        pan: {
+          x: gesture.pan.x + point.x - gesture.start.x,
+          y: gesture.pan.y + point.y - gesture.start.y,
+        },
       });
     if (gesture.guide) {
       const coordinate = worldPoint(point)[gesture.guide.axis];
@@ -786,7 +818,7 @@ export function DesignCanvas({
       control: event.ctrlKey,
     };
     if (gesture.kind === "origin") {
-      onRotationOriginChange(originDragPoint(latest, zoom, snap), gesture.ids);
+      onRotationOriginChange(originDragPoint(latest, zoom, true), gesture.ids);
       surface.current
         ?.querySelector<HTMLButtonElement>("[data-design-rotation-origin]")
         ?.focus({ preventScroll: true });
@@ -801,7 +833,7 @@ export function DesignCanvas({
         event.shiftKey,
       );
       let next = addImageNode(document, imagePlacement.assetId, null, {
-        ...size,
+        ...snapBox(size),
         name: imagePlacement.name,
       });
       const nodeId = next.nodes.at(-1)!.nodeId;
@@ -815,7 +847,7 @@ export function DesignCanvas({
       ["move", "resize", "rotate"].includes(gesture.kind) &&
       (point.x !== gesture.start.x || point.y !== gesture.start.y)
     ) {
-      const preview = previewGesture(latest, zoom, snap);
+      const preview = previewGesture(latest, zoom, gridStep);
       let next = document;
       for (const node of selectionRoots(preview, gesture.ids)) {
         if (isDesignNodeLocked(next, node.nodeId)) continue;
@@ -837,14 +869,14 @@ export function DesignCanvas({
         if (parent) {
           for (const node of selectionRoots(next, gesture.ids)) {
             if (node.parentId !== parent.nodeId)
-              next = reparentDesignNode(next, node.nodeId, parent.nodeId);
+              next = reparentDesignNode(next, node.nodeId, parent.nodeId, undefined, gridStep);
           }
         }
       }
       if (next !== document) onCommit(next);
     }
     if (gesture.kind === "scale") {
-      const next = commitDesignNodeTransforms(document, previewGesture(latest, zoom, false));
+      const next = commitDesignNodeTransforms(document, previewGesture(latest, zoom, gridStep));
       if (next !== document) onCommit(next);
     }
     if (gesture.kind === "marquee") {
@@ -918,10 +950,12 @@ export function DesignCanvas({
               next.nodes.find((item) => item.nodeId === node.parentId)!,
             );
       next = updateDesignNode(next, node.nodeId, {
-        x: Math.min(a.x, b.x) - parent.x,
-        y: Math.min(a.y, b.y) - parent.y,
-        width: Math.abs(a.x - b.x) > 3 ? Math.abs(a.x - b.x) : node.width,
-        height: Math.abs(a.y - b.y) > 3 ? Math.abs(a.y - b.y) : node.height,
+        ...snapBox({
+          x: Math.min(a.x, b.x) - parent.x,
+          y: Math.min(a.y, b.y) - parent.y,
+          width: Math.abs(a.x - b.x) > 3 ? Math.abs(a.x - b.x) : node.width,
+          height: Math.abs(a.y - b.y) > 3 ? Math.abs(a.y - b.y) : node.height,
+        }),
         ...(tool === "ellipse" ? { name: "Ellipse", paint: { ...node.paint, radius: 9999 } } : {}),
         ...(tool === "section" ? { name: "Section", clipContent: false, section: true } : {}),
         ...(tool === "slice" ? { name: "Slice", clipContent: false, slice: true } : {}),
@@ -967,21 +1001,65 @@ export function DesignCanvas({
     setPenPoints([]);
     surface.current?.focus({ preventScroll: true });
   };
+  const stopCameraMotion = () => {
+    const motion = cameraMotion.current;
+    if (!motion) return;
+    cancelAnimationFrame(motion.frame);
+    cameraMotion.current = null;
+  };
+  const animateCamera = (target: DesignCamera) => {
+    const currentMotion = cameraMotion.current;
+    if (currentMotion) {
+      currentMotion.target = target;
+      currentMotion.remainingMs = 130;
+      return;
+    }
+    if (target.zoom === zoom && target.pan.x === pan.x && target.pan.y === pan.y) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setCamera(target);
+      return;
+    }
+    const motion: CameraMotion = {
+      frame: 0,
+      current: camera,
+      target,
+      lastFrame: null,
+      remainingMs: 130,
+    };
+    const tick = (time: number) => {
+      const elapsed = motion.lastFrame === null ? 16 : Math.max(0, time - motion.lastFrame);
+      motion.remainingMs -= elapsed;
+      if (motion.remainingMs <= 0) {
+        cameraMotion.current = null;
+        setCamera(motion.target);
+        return;
+      }
+      const weight = 1 - Math.exp(-elapsed / 27);
+      const approach = (value: number, goal: number) => value + (goal - value) * weight;
+      motion.current = {
+        zoom: approach(motion.current.zoom, motion.target.zoom),
+        pan: {
+          x: approach(motion.current.pan.x, motion.target.pan.x),
+          y: approach(motion.current.pan.y, motion.target.pan.y),
+        },
+      };
+      motion.lastFrame = time;
+      setCamera(motion.current);
+      motion.frame = requestAnimationFrame(tick);
+    };
+    cameraMotion.current = motion;
+    motion.frame = requestAnimationFrame(tick);
+  };
   const fit = (ids: readonly string[]) => {
     const target = bounds(document, ids);
     const rect = surface.current?.getBoundingClientRect();
     if (!target || !rect) return;
-    const camera = fittedCamera(target, rect, 4);
-    setZoom(camera.zoom);
-    setPan(camera.pan);
+    stopCameraMotion();
+    setCamera(fittedCamera(target, rect, 4));
   };
   const changeZoom = (value: number) => {
-    const next = Math.min(256, Math.max(0.01, value));
-    setPan({
-      x: viewportSize.width / 2 - ((viewportSize.width / 2 - pan.x) * next) / zoom,
-      y: viewportSize.height / 2 - ((viewportSize.height / 2 - pan.y) * next) / zoom,
-    });
-    setZoom(next);
+    const anchor = { x: viewportSize.width / 2, y: viewportSize.height / 2 };
+    animateCamera(designZoomAt(cameraMotion.current?.target ?? camera, anchor, value));
   };
 
   const handleToolKey = useStableCallback((event: KeyboardEvent) => {
@@ -1027,11 +1105,10 @@ export function DesignCanvas({
       onImport();
       return;
     }
-    if (event.code === "Quote" && (event.shiftKey || event.metaKey || event.ctrlKey)) {
+    if (event.code === "Quote" && event.shiftKey !== (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       event.stopPropagation();
-      if (event.shiftKey && (event.metaKey || event.ctrlKey)) setSnap((value) => !value);
-      else setShowPixelGrid((value) => !value);
+      setShowPixelGrid((value) => !value);
       return;
     }
     if (event.shiftKey && event.code === "KeyR" && !event.metaKey && !event.ctrlKey) {
@@ -1049,7 +1126,9 @@ export function DesignCanvas({
     if (event.shiftKey && (event.code === "Equal" || event.code === "Minus")) {
       event.preventDefault();
       event.stopPropagation();
-      changeZoom(zoom * (event.code === "Equal" ? 1.2 : 1 / 1.2));
+      changeZoom(
+        (cameraMotion.current?.target.zoom ?? zoom) * (event.code === "Equal" ? 1.2 : 1 / 1.2),
+      );
       return;
     }
     if (event.metaKey || event.ctrlKey) return;
@@ -1113,26 +1192,41 @@ export function DesignCanvas({
     element.addEventListener("keydown", handleToolKey);
     return () => element.removeEventListener("keydown", handleToolKey);
   }, [handleToolKey]);
+  const handleWheel = useStableCallback((event: WheelEvent) => {
+    const element = surface.current;
+    if (!element) return;
+    event.preventDefault();
+    if (gesture || vectorDrag || gradientDrag || penDrag) return;
+    if (event.ctrlKey || event.metaKey) {
+      const rect = element.getBoundingClientRect();
+      const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      animateCamera(
+        designWheelZoom(
+          cameraMotion.current?.target ?? camera,
+          point,
+          event.deltaY,
+          event.deltaMode,
+        ),
+      );
+    } else {
+      stopCameraMotion();
+      setCamera((current) => ({
+        zoom: current.zoom,
+        pan: { x: current.pan.x - event.deltaX, y: current.pan.y - event.deltaY },
+      }));
+    }
+  });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- non-passive wheel input prevents browser page zoom while the canvas handles it.
   useEffect(() => {
     const element = surface.current;
     if (!element) return;
-    const listener = (event: WheelEvent) => {
-      event.preventDefault();
-      if (event.ctrlKey || event.metaKey) {
-        const rect = element.getBoundingClientRect();
-        const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-        const next = Math.min(256, Math.max(0.01, zoom * Math.exp(-event.deltaY * 0.01)));
-        setPan({
-          x: point.x - ((point.x - pan.x) * next) / zoom,
-          y: point.y - ((point.y - pan.y) * next) / zoom,
-        });
-        setZoom(next);
-      } else setPan({ x: pan.x - event.deltaX, y: pan.y - event.deltaY });
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      element.removeEventListener("wheel", handleWheel);
+      if (cameraMotion.current) cancelAnimationFrame(cameraMotion.current.frame);
+      cameraMotion.current = null;
     };
-    element.addEventListener("wheel", listener, { passive: false });
-    return () => element.removeEventListener("wheel", listener);
-  }, [pan.x, pan.y, zoom, surface]);
+  }, [cameraMotion, handleWheel, surface]);
   const transientBox =
     gesture && (gesture.kind === "marquee" || gesture.kind === "create")
       ? {
@@ -1210,8 +1304,8 @@ export function DesignCanvas({
       onPixelGrid={setShowPixelGrid}
       pixelPreview={pixelPreview.density}
       onPixelPreview={changePixelPreview}
-      snap={snap}
-      onSnap={setSnap}
+      gridStep={gridStep}
+      onGridStep={setGridStep}
       guides={showGuides}
       onGuides={setShowGuides}
       outlines={outlines}
@@ -1316,6 +1410,30 @@ export function DesignCanvas({
             finishPen();
             return;
           }
+          if (
+            event.key === "Enter" &&
+            event.target === event.currentTarget &&
+            activeTool === "select" &&
+            selected.length === 1 &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.altKey
+          ) {
+            const node = sceneNodes.get(selected[0]!);
+            const nextId = event.shiftKey
+              ? node?.parentId
+              : node?.childIds.find(
+                  (id) =>
+                    isDesignNodeVisible(document, id, sceneNodes) &&
+                    !isDesignNodeLocked(document, id, sceneNodes),
+                );
+            if (nextId) {
+              event.preventDefault();
+              event.stopPropagation();
+              onSelect([nextId]);
+              return;
+            }
+          }
           onKeyDown(event);
         }}
         onKeyUp={(event) => {
@@ -1354,8 +1472,22 @@ export function DesignCanvas({
           } else if (activeTool === "select" || activeTool === "scale") start(event, "marquee", []);
           else start(event, "create", []);
         }}
-        onDoubleClick={() => {
-          if (tool === "pen") finishPen();
+        onDoubleClick={(event) => {
+          if (tool === "pen") {
+            finishPen();
+            return;
+          }
+          if (activeTool !== "select" || event.ctrlKey || event.metaKey || event.shiftKey) return;
+          const hitId = deepTargetId(event.target);
+          if (hitId)
+            onSelect([
+              designCanvasLayer(
+                sceneNodes,
+                hitId,
+                selected.length === 1 ? selected[0]! : null,
+                true,
+              ),
+            ]);
         }}
         onPointerMove={move}
         onPointerLeave={() => {
@@ -1659,7 +1791,7 @@ export function DesignCanvas({
                   width="100%"
                   height="100%"
                   fill="none"
-                  stroke="var(--primary)"
+                  stroke="var(--info)"
                   strokeWidth={1 / zoom}
                 />
               </svg>
@@ -1689,7 +1821,7 @@ export function DesignCanvas({
                     >
                       <span
                         aria-hidden="true"
-                        className="pointer-events-none size-2 shrink-0 border border-primary bg-background"
+                        className="pointer-events-none size-2 shrink-0 border border-info bg-background"
                         style={{ transform: `scale(${1 / zoom})` }}
                       />
                     </button>
@@ -1722,7 +1854,7 @@ export function DesignCanvas({
           {rotationOriginVisible && originPoint && rotationBox && activeTool === "select" ? (
             <DesignRotationOriginHandle
               point={
-                gesture?.kind === "origin" ? originDragPoint(gesture, zoom, snap) : originPoint
+                gesture?.kind === "origin" ? originDragPoint(gesture, zoom, true) : originPoint
               }
               zoom={zoom}
               disabled={!canMoveOrigin}
@@ -1784,7 +1916,7 @@ export function DesignCanvas({
           ) : null}
         </div>
       </div>
-      {showPixelGrid && zoom >= 4 ? (
+      {showPixelGrid && zoom * gridStep >= 4 ? (
         <div
           data-design-pixel-grid=""
           aria-hidden="true"
@@ -1792,7 +1924,7 @@ export function DesignCanvas({
           style={{
             backgroundImage:
               "linear-gradient(to right, color-mix(in srgb, var(--foreground) 12%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--foreground) 12%, transparent) 1px, transparent 1px)",
-            backgroundSize: `${zoom}px ${zoom}px`,
+            backgroundSize: `${zoom * gridStep}px ${zoom * gridStep}px`,
             backgroundPosition: `${pan.x}px ${pan.y}px`,
           }}
         />

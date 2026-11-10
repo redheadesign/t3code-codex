@@ -703,12 +703,13 @@ export function ThreadRowLeadingStatus({ thread }: { thread: SidebarThreadSummar
     pr,
     linkedPullRequest?.sourceControlProvider ?? resolveDisplayedThreadPrProvider(displayedPrInput),
   );
-  const threadStatus = resolveThreadStatusPill({
+  const status = resolveThreadStatusPill({
     thread: {
       ...thread,
       lastVisitedAt,
     },
   });
+  const threadStatus = status?.label === "Waiting" ? null : status;
 
   const supportsMultiplePullRequests = useSupportsMultiplePullRequests(thread.environmentId);
   const pendingLink =
@@ -746,7 +747,9 @@ export function ThreadRowLeadingStatus({ thread }: { thread: SidebarThreadSummar
           aria-label={`${changeRequestTerminologyForUrl(pendingLink.url).shortLabel} #${pendingLink.number}, status pending`}
         />
       ) : null}
-      {threadStatus ? <ThreadStatusLabel status={threadStatus} /> : null}
+      {threadStatus ? (
+        <ThreadStatusLabel status={threadStatus} compact={threadStatus.label === "Completed"} />
+      ) : null}
     </span>
   );
 }

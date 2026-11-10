@@ -6,6 +6,7 @@ import {
   TaskWorkspaceBoardAgentCommand,
   TaskWorkspaceBoardTask,
   TaskWorkspaceProjectWiki,
+  TaskWorkspaceWikiPageSummary,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { Tool, Toolkit } from "effect/ai";
@@ -39,12 +40,13 @@ const taskSummary = Schema.Struct({
 const TaskBoardTool = Tool.make("t3_task_board", {
   ...shared,
   description:
-    "Read a project's task board and wiki. Omit projectId inside a T3 chat. Pass taskId for the brief, feedback, artifact links and chat history. Use nextOffset and wikiNextOffset to continue.",
+    "Read a project's task board and wiki. Omit projectId inside a T3 chat. Pass taskId for the brief, feedback, artifact links and chat history, or wikiPageId to read a page from wikiPages. Use nextOffset and wikiNextOffset to continue.",
   parameters: Schema.Struct({
     projectId: Schema.optional(ProjectId),
     taskId: Schema.optional(TaskWorkspaceBoardTask.fields.id),
     offset: Schema.optional(NonNegativeInt),
     wikiOffset: Schema.optional(NonNegativeInt),
+    wikiPageId: Schema.optional(TaskWorkspaceWikiPageSummary.fields.id),
     status: Schema.optional(TaskWorkspaceBoardTask.fields.status),
   }),
   success: Schema.Struct({
@@ -54,7 +56,11 @@ const TaskBoardTool = Tool.make("t3_task_board", {
     task: Schema.NullOr(TaskWorkspaceBoardTask),
     currentTaskId: Schema.NullOr(TaskWorkspaceBoardTask.fields.id),
     nextOffset: Schema.NullOr(NonNegativeInt),
-    wiki: TaskWorkspaceProjectWiki,
+    wiki: Schema.Struct({
+      content: TaskWorkspaceProjectWiki.fields.content,
+      updatedAt: TaskWorkspaceProjectWiki.fields.updatedAt,
+    }),
+    wikiPages: Schema.optional(Schema.Array(TaskWorkspaceWikiPageSummary)),
     wikiNextOffset: Schema.NullOr(NonNegativeInt),
   }),
 }).annotate(Tool.Readonly, true);

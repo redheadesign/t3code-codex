@@ -620,6 +620,11 @@ export default function ChatView(props: ChatViewProps) {
   const composerFilesRef = useRef<ComposerFileAttachment[]>([]);
   const composerTerminalContextsRef = useRef<TerminalContextDraft[]>([]);
   const branchToolbarRef = useRef<BranchToolbarHandle>(null);
+  const draftBranchToolbarRef = useRef<BranchToolbarHandle>(null);
+  const pendingDraftBranchShortcut = useRef<{
+    threadKey: string;
+    action: keyof BranchToolbarHandle;
+  } | null>(null);
   const citeAssistantText = (
     citation: AssistantCitation,
     sourceAnchor: AssistantCitationSourceAnchor,
@@ -2455,6 +2460,24 @@ export default function ChatView(props: ChatViewProps) {
     onDiffPanelOpen,
     closeRightPanelSurface,
   });
+  const draftDetailsBranchRef = useStableCallback((toolbar: BranchToolbarHandle | null) => {
+    draftBranchToolbarRef.current = toolbar;
+    const pending = pendingDraftBranchShortcut.current;
+    if (!toolbar || pending?.threadKey !== activeThreadKey) return;
+    pendingDraftBranchShortcut.current = null;
+    toolbar[pending.action]();
+  });
+  const runDraftBranchShortcut = (action: keyof BranchToolbarHandle, event: KeyboardEvent) => {
+    if (!activeThreadKey || !isGitRepo) return false;
+    if (event.repeat) return;
+    const toolbar = draftBranchToolbarRef.current;
+    if (toolbar) {
+      toolbar[action]();
+    } else if (!threadPanelOpen) {
+      pendingDraftBranchShortcut.current = { threadKey: activeThreadKey, action };
+      toggleThreadPanelStable();
+    }
+  };
   const pullRequestSurfaceAvailable = supportsPullRequests && pullRequestPanelTarget !== null;
   const {
     acknowledgeActiveThreadWoke,
@@ -2773,6 +2796,13 @@ export default function ChatView(props: ChatViewProps) {
       ...terminalShortcuts,
       ...rightPanelShortcuts,
       ...threadLifecycleShortcuts,
+      ...(isDraftHeroState
+        ? {
+            "composer.branch": ({ event }) => runDraftBranchShortcut("openBranchPicker", event),
+            "composer.previousWorktree": ({ event }) =>
+              runDraftBranchShortcut("usePreviousWorktree", event),
+          }
+        : {}),
       "thread.copyReference": ({ event }) => {
         if (!event.repeat) copyActiveThreadReference();
       },
@@ -3912,6 +3942,7 @@ export default function ChatView(props: ChatViewProps) {
                 <ThreadDetailsPanel
                   anchor={threadPanelPopoverAnchorRef}
                   handle={threadPanelPopoverHandle}
+                  {...(isDraftHeroState ? { branchToolbarRef: draftDetailsBranchRef } : {})}
                   forceNewWorktree={multipleModelSelections !== null}
                   environmentId={activeThread.environmentId}
                   threadId={activeThread.id}

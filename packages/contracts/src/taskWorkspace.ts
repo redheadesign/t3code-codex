@@ -20,6 +20,8 @@ export const TASK_WORKSPACE_FEEDBACK_MAX_COMMENTS = 100;
 export const TASK_WORKSPACE_FEEDBACK_MAX_CHARS = 190_000;
 export const TASK_WORKSPACE_FEEDBACK_COMMENT_MAX_CHARS =
   TASK_WORKSPACE_FEEDBACK_MAX_CHARS - ID_LIMIT;
+export const TASK_WORKSPACE_WIKI_MAX_PAGES = 64;
+export const TASK_WORKSPACE_WIKI_PAGE_MAX_CHARS = 64_000;
 
 export const TaskWorkspaceTaskStatus = Schema.Struct({
   name: TrimmedNonEmptyString,
@@ -293,10 +295,25 @@ export const TaskWorkspaceBoardTask = Schema.Struct({
 });
 export type TaskWorkspaceBoardTask = typeof TaskWorkspaceBoardTask.Type;
 
+export const TaskWorkspaceWikiPageSummary = Schema.Struct({
+  id: Id,
+  title: Id,
+  updatedAt: IsoDateTime,
+  archivedAt: Schema.NullOr(IsoDateTime),
+});
+const TaskWorkspaceWikiPage = Schema.Struct({
+  ...TaskWorkspaceWikiPageSummary.fields,
+  content: Schema.String.check(Schema.isMaxLength(TASK_WORKSPACE_WIKI_PAGE_MAX_CHARS)),
+});
+
 export const TaskWorkspaceProjectWiki = Schema.Struct({
   content: LongText,
   updatedAt: Schema.NullOr(IsoDateTime),
+  pages: Schema.optional(
+    Schema.Array(TaskWorkspaceWikiPage).check(Schema.isMaxLength(TASK_WORKSPACE_WIKI_MAX_PAGES)),
+  ),
 });
+export type TaskWorkspaceProjectWiki = typeof TaskWorkspaceProjectWiki.Type;
 
 export const TaskWorkspaceBoard = Schema.Struct({
   revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
@@ -390,6 +407,12 @@ export const TaskWorkspaceBoardAgentCommand = Schema.Union([
   Schema.TaggedStruct("claimLocalTask", { taskId: Id, owner: Id }),
   Schema.TaggedStruct("releaseLocalTask", { taskId: Id }),
   Schema.TaggedStruct("updateProjectWiki", { content: LongText }),
+  Schema.TaggedStruct("saveProjectWikiPage", {
+    pageId: Id,
+    title: TaskWorkspaceWikiPage.fields.title,
+    content: TaskWorkspaceWikiPage.fields.content,
+  }),
+  Schema.TaggedStruct("setProjectWikiPageArchived", { pageId: Id, archived: Schema.Boolean }),
 ]);
 export const TaskWorkspaceBoardCommand = Schema.Union([
   TaskWorkspaceBoardAgentCommand,

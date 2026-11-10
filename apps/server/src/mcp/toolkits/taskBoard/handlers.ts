@@ -78,6 +78,15 @@ export const layer = McpToolAccess.toLayer(TaskBoardToolkit, {
           message: "Task not found in this project.",
         });
       }
+      const wikiPages = board.wiki.pages ?? [];
+      const selectedWikiPage = wikiPages.find(({ id }) => id === input.wikiPageId);
+      if (input.wikiPageId !== undefined && selectedWikiPage === undefined) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message: "Wiki page not found in this project.",
+        });
+      }
+      const wiki = selectedWikiPage ?? board.wiki;
       const offset = input.offset ?? 0;
       const wikiOffset = input.wikiOffset ?? 0;
       const tasks = board.tasks.filter(
@@ -110,13 +119,21 @@ export const layer = McpToolAccess.toLayer(TaskBoardToolkit, {
         currentTaskId: currentTask?.id ?? null,
         nextOffset: offset + PAGE_SIZE < tasks.length ? offset + PAGE_SIZE : null,
         wiki: {
-          ...board.wiki,
-          content: board.wiki.content.slice(wikiOffset, wikiOffset + WIKI_PAGE_SIZE),
+          updatedAt: wiki.updatedAt,
+          content: wiki.content.slice(wikiOffset, wikiOffset + WIKI_PAGE_SIZE),
         },
+        ...(wikiPages.length === 0
+          ? {}
+          : {
+              wikiPages: wikiPages.map(({ id, title, updatedAt, archivedAt }) => ({
+                id,
+                title,
+                updatedAt,
+                archivedAt,
+              })),
+            }),
         wikiNextOffset:
-          wikiOffset + WIKI_PAGE_SIZE < board.wiki.content.length
-            ? wikiOffset + WIKI_PAGE_SIZE
-            : null,
+          wikiOffset + WIKI_PAGE_SIZE < wiki.content.length ? wikiOffset + WIKI_PAGE_SIZE : null,
       };
     }),
   ),

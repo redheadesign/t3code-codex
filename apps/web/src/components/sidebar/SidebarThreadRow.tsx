@@ -36,7 +36,6 @@ import {
   CircleAlertIcon,
   CircleCheckIcon,
   CircleDashedIcon,
-  CircleDotDashedIcon,
   ClockIcon,
   GitBranchIcon,
   MessageCircleQuestionIcon,
@@ -512,12 +511,10 @@ const dropVerbBadge: Record<SidebarDropVerb, ReactNode> = {
 
 const TOP_STATUS_ICONS = {
   working: CircleDashedIcon,
-  waiting: CircleDotDashedIcon,
   input: MessageCircleQuestionIcon,
   request: UserRoundIcon,
   approval: ShieldQuestionIcon,
   failed: CircleAlertIcon,
-  done: CircleCheckIcon,
   woke: AlarmClockIcon,
 } as const;
 
@@ -720,56 +717,48 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           icon: "working" as const,
           className: "text-info-foreground",
         }
-      : status === "waiting"
+      : status === "approval"
         ? {
-            label: text("Waiting", "Ожидает"),
-            icon: "waiting" as const,
-            className: "text-muted-foreground",
+            label: text("Approval", "Нужно подтверждение"),
+            icon: "approval" as const,
+            className: "text-warning-foreground",
           }
-        : status === "approval"
+        : status === "input"
           ? {
-              label: text("Approval", "Нужно подтверждение"),
-              icon: "approval" as const,
-              className: "text-warning-foreground",
+              label: text("Input", "Ждёт ответа"),
+              icon: "input" as const,
+              className: "text-indigo-600 dark:text-indigo-300",
             }
-          : status === "input"
+          : status === "request"
             ? {
-                label: text("Input", "Ждёт ответа"),
-                icon: "input" as const,
-                className: "text-indigo-600 dark:text-indigo-300",
+                label: text("Request", "Запрос гостя"),
+                icon: "request" as const,
+                className: "text-guest-foreground",
               }
-            : status === "request"
+            : status === "limited"
               ? {
-                  label: text("Request", "Запрос гостя"),
-                  icon: "request" as const,
-                  className: "text-guest-foreground",
+                  label: text("Limited", "Лимит"),
+                  icon: "failed" as const,
+                  className: "text-warning-foreground",
                 }
-              : status === "limited"
+              : status === "failed"
                 ? {
-                    label: text("Limited", "Лимит"),
+                    label: text("Failed", "Ошибка"),
                     icon: "failed" as const,
-                    className: "text-warning-foreground",
+                    className: "text-error-foreground",
                   }
-                : status === "failed"
+                : isWoke
                   ? {
-                      label: text("Failed", "Ошибка"),
-                      icon: "failed" as const,
-                      className: "text-error-foreground",
+                      label: text("Woke", "Снова в списке"),
+                      icon: "woke" as const,
+                      className: "text-warning-foreground",
                     }
-                  : isWoke
-                    ? {
-                        label: text("Woke", "Снова в списке"),
-                        icon: "woke" as const,
-                        className: "text-warning-foreground",
-                      }
-                    : isUnread
-                      ? {
-                          label: text("Done", "Готово"),
-                          icon: "done" as const,
-                          className: "text-success-foreground",
-                        }
-                      : null;
+                  : null;
   const isWokeStatus = topStatus?.icon === "woke";
+  const hasNewReply = status === "ready" && isUnread;
+  const newReplyDot = hasNewReply ? (
+    <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-info" />
+  ) : null;
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
     effectiveEnvMode: thread.worktreePath === null ? "local" : "worktree",
@@ -980,7 +969,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
 
   const accessibility = resolveSidebarRowAccessibility({
     title: thread.title,
-    statusLabel: topStatus?.label ?? null,
+    statusLabel: topStatus?.label ?? (hasNewReply ? text("New reply", "Новый ответ") : null),
     projectDisplayName: props.projectDisplayName,
     isActive: props.isActive,
   });
@@ -1217,6 +1206,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               {hasPullRequest ? branchIndicator : null}
               {draftIndicator}
               {title}
+              {newReplyDot}
               {multiline ? titleLineIcons : null}
               {pinIndicator}
               {multiline ? null : terminalStatusIcon}
@@ -1397,6 +1387,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           >
             <div className="flex h-5 min-w-0 items-center gap-1.5">
               {draftIndicator}
+              {newReplyDot}
               {props.project ? (
                 <ProjectFavicon project={props.project} className="size-4 shrink-0" />
               ) : null}
@@ -1467,10 +1458,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                           {status === "working" ? (
                             <span aria-hidden>
                               <WorkingDuration startedAt={resolveWorkingStartedAt(thread)} />
-                            </span>
-                          ) : status === "waiting" ? (
-                            <span aria-hidden>
-                              <WorkingDuration startedAt={thread.latestRun?.completedAt ?? null} />
                             </span>
                           ) : null}
                         </span>

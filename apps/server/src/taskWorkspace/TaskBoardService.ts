@@ -24,6 +24,7 @@ import {
   type RuntimeMode,
   TASK_WORKSPACE_FEEDBACK_COMMENT_MAX_CHARS,
   TASK_WORKSPACE_FEEDBACK_MAX_CHARS,
+  TASK_WORKSPACE_WIKI_MAX_PAGES,
   TaskWorkspaceBoard,
   TaskWorkspaceBoardCommand,
   TaskWorkspaceError,
@@ -159,6 +160,54 @@ const statusLabels = {
 
 const boardError = (operation: string, message: string, cause?: unknown) =>
   new TaskWorkspaceError({ operation, message, ...(cause === undefined ? {} : { cause }) });
+
+const updateWiki = Effect.fn("TaskBoardService.updateWiki")(function* (
+  wiki: TaskWorkspaceBoard["wiki"],
+  command: Extract<
+    TaskWorkspaceBoardCommand,
+    { _tag: "updateProjectWiki" | "saveProjectWikiPage" | "setProjectWikiPageArchived" }
+  >,
+  timestamp: string,
+) {
+  if (command._tag === "updateProjectWiki") {
+    return { ...wiki, content: command.content, updatedAt: timestamp };
+  }
+
+  const pages = wiki.pages ?? [];
+  const existing = pages.find(({ id }) => id === command.pageId);
+  if (command._tag === "setProjectWikiPageArchived") {
+    if (existing === undefined) return yield* boardError("wiki", "Wiki page not found.");
+    if ((existing.archivedAt !== null) === command.archived) return wiki;
+    const page = {
+      ...existing,
+      archivedAt: command.archived ? timestamp : null,
+      updatedAt: timestamp,
+    };
+    return { ...wiki, pages: pages.map((entry) => (entry.id === page.id ? page : entry)) };
+  }
+
+  if (existing?.archivedAt != null) {
+    return yield* boardError("wiki", "Restore the wiki page before editing it.");
+  }
+  if (existing === undefined && pages.length >= TASK_WORKSPACE_WIKI_MAX_PAGES) {
+    return yield* boardError("wiki", "The project wiki has reached its page limit.");
+  }
+  const page = {
+    id: command.pageId,
+    title: command.title,
+    content: command.content,
+    updatedAt: timestamp,
+    archivedAt: null,
+  };
+  const nextPages =
+    existing === undefined
+      ? [...pages, page]
+      : pages.map((entry) => (entry.id === page.id ? page : entry));
+  if (nextPages.reduce((total, entry) => total + entry.content.length, 0) > 200_000) {
+    return yield* boardError("wiki", "The project wiki has reached its content limit.");
+  }
+  return { ...wiki, pages: nextPages };
+});
 
 function taskIdForThread(threadId: ThreadId): string {
   return `chat-${NodeCrypto.createHash("sha256").update(threadId).digest("hex")}`;
@@ -353,16 +402,15 @@ export const makeTaskBoardService = Effect.fn("TaskBoardService.make")(function*
       return yield* read(projectId);
     }
 
-    if (command._tag === "updateProjectWiki") {
-      yield* persist(projectId, stored.revision, {
-        ...next,
-        wiki: { content: command.content, updatedAt: timestamp },
-      });
-      return {
-        ...current,
-        revision: next.revision,
-        wiki: { content: command.content, updatedAt: timestamp },
-      };
+    if (
+      command._tag === "updateProjectWiki" ||
+      command._tag === "saveProjectWikiPage" ||
+      command._tag === "setProjectWikiPageArchived"
+    ) {
+      const wiki = yield* updateWiki(stored.wiki, command, timestamp);
+      if (wiki === stored.wiki) return current;
+      yield* persist(projectId, stored.revision, { ...next, wiki });
+      return { ...current, revision: next.revision, wiki };
     }
 
     const entryId = yield* random.uuidV4();

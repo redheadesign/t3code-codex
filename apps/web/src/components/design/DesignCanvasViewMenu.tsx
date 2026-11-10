@@ -20,6 +20,9 @@ import {
 } from "../ui/menu";
 import { isMacPlatform } from "../../lib/utils";
 
+export const DESIGN_GRID_STEPS = [1, 2, 4, 8, 16] as const;
+type GridStep = (typeof DESIGN_GRID_STEPS)[number];
+
 export function DesignCanvasViewMenu({
   zoom,
   onZoom,
@@ -30,8 +33,8 @@ export function DesignCanvasViewMenu({
   onPixelGrid,
   pixelPreview,
   onPixelPreview,
-  snap,
-  onSnap,
+  gridStep,
+  onGridStep,
   guides,
   onGuides,
   outlines,
@@ -48,8 +51,8 @@ export function DesignCanvasViewMenu({
   onPixelGrid: (value: boolean) => void;
   pixelPreview: 0 | 1 | 2;
   onPixelPreview: (value: 0 | 1 | 2) => void;
-  snap: boolean;
-  onSnap: (value: boolean) => void;
+  gridStep: GridStep;
+  onGridStep: (value: GridStep) => void;
   guides: boolean;
   onGuides: (value: boolean) => void;
   outlines: boolean;
@@ -142,12 +145,29 @@ export function DesignCanvasViewMenu({
             <MenuShortcut>⇧ '</MenuShortcut>
           </span>
         </MenuCheckboxItem>
-        <MenuCheckboxItem checked={snap} onCheckedChange={onSnap}>
-          <span className="flex w-full items-center justify-between gap-6">
-            <span>{ui("Snap to pixel grid", "Привязка к пикселям")}</span>
-            <MenuShortcut>⇧ ⌘ '</MenuShortcut>
-          </span>
-        </MenuCheckboxItem>
+        <MenuSub>
+          <MenuSubTrigger>
+            <span className="flex flex-1 items-center justify-between gap-6">
+              {ui("Grid step", "Шаг сетки")}
+              <MenuShortcut>{ui(`${gridStep} px`, `${gridStep} пкс`)}</MenuShortcut>
+            </span>
+          </MenuSubTrigger>
+          <MenuSubPopup>
+            <MenuRadioGroup
+              value={gridStep}
+              onValueChange={(value) => onGridStep(value as GridStep)}
+            >
+              {DESIGN_GRID_STEPS.map((step) => (
+                <MenuRadioItem key={step} value={step} closeOnClick>
+                  <span className="flex items-center justify-between gap-8">
+                    {ui(`${step} px`, `${step} пкс`)}
+                    <MenuRadioItemIndicator />
+                  </span>
+                </MenuRadioItem>
+              ))}
+            </MenuRadioGroup>
+          </MenuSubPopup>
+        </MenuSub>
         <MenuCheckboxItem checked={guides} onCheckedChange={onGuides}>
           {ui("Guides", "Направляющие")}
         </MenuCheckboxItem>

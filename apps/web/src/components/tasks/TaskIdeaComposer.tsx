@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import {
   PROVIDER_SEND_TURN_MAX_INPUT_CHARS,
   type EnvironmentId,
@@ -5,12 +6,15 @@ import {
   type ProjectId,
   type ThreadId,
 } from "@t3tools/contracts";
+import { createModelSelection } from "@t3tools/shared/model";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpIcon, MessageSquareIcon } from "lucide-react";
+import { MessageSquareIcon } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { composerSubmissionIntentForKey } from "~/composer-logic";
 import { useEnvironmentSettings } from "~/hooks/useSettings";
+import { useSoftwareKeyboardOpen } from "~/hooks/useSoftwareKeyboardOpen";
 import { useUiText } from "~/i18n";
 import { randomUUID } from "~/lib/utils";
 import { getAppModelOptionsForInstance } from "~/modelSelection";
@@ -21,15 +25,23 @@ import {
   resolveProjectDefaultProviderModelSelection,
 } from "~/providerInstances";
 import { useEnvironmentProviders } from "~/state/environments";
+import { primaryServerKeybindingsAtom } from "~/state/server";
 import {
   ComposerPromptEditorTiptap,
   type ComposerPromptEditorHandle,
 } from "../ComposerPromptEditorTiptap";
+import {
+  ComposerEffortColumn,
+  ComposerPickerFooter,
+  describeComposerEffort,
+} from "../chat/ComposerModelEffort";
+import { getComposerProviderState } from "../chat/composerProviderState";
+import { ComposerSubmitButton } from "../chat/ComposerSubmitButton";
 import { ComposerSurface } from "../chat/ComposerSurface";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
+import { readPromptUltrathink, type TraitsSelectionInput } from "../chat/TraitsPicker";
 import type { ComposerDraftContextRecords } from "../composerContextPresentation";
 import { Button } from "../ui/button";
-import { Spinner } from "../ui/spinner";
 
 const EMPTY_CONTEXT: ComposerDraftContextRecords = new Map();
 const EMPTY_SKILLS = [] as const;
@@ -53,6 +65,8 @@ export function TaskIdeaComposer({
 }) {
   const text = useUiText();
   const settings = useEnvironmentSettings(environmentId);
+  const isSoftwareKeyboardOpen = useSoftwareKeyboardOpen();
+  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const providers = useEnvironmentProviders().get(environmentId) ?? [];
   const providerEntries = providerInstanceEntriesFor(providers, settings, projectId);
   const [choice, setChoice] = useState<ModelSelection | null>(null);
@@ -65,12 +79,43 @@ export function TaskIdeaComposer({
   const defaultChoice =
     projectDefault ?? resolveProjectDefaultProviderModelSelection(providers, settings, projectId);
   const selection = choice ?? defaultChoice ?? NO_PROVIDER_MODEL_SELECTION;
-  const ready = providerEntries.some(
-    (entry) => entry.instanceId === selection.instanceId && isProviderInstancePickerReady(entry),
-  );
+  const activeEntry = providerEntries.find((entry) => entry.instanceId === selection.instanceId);
+  const ready = activeEntry !== undefined && isProviderInstancePickerReady(activeEntry);
   const prompt = draft.value.trim();
   const tooLong = prompt.length > PROVIDER_SEND_TURN_MAX_INPUT_CHARS;
   const canSend = ready && !disabled && !sending && !tooLong && prompt.length > 0;
+  const status = tooLong
+    ? text("This idea exceeds the message limit.", "Идея превышает допустимую длину сообщения.")
+    : !ready
+      ? text("Choose an available agent to send ideas.", "Выберите доступного агента.")
+      : null;
+  const traits: TraitsSelectionInput | null = activeEntry
+    ? {
+        provider: activeEntry.driverKind,
+        instanceId: selection.instanceId,
+        model: selection.model,
+        models: activeEntry.models,
+        modelOptions: selection.options,
+        planModeEnabled: false,
+        promptUltrathink: readPromptUltrathink(draft.value),
+        onPromptEdit: (edit) => {
+          setDraft((previous) => {
+            const value = edit(previous.value);
+            return {
+              value,
+              cursor: Math.max(0, previous.cursor + value.length - previous.value.length),
+            };
+          });
+        },
+        onModelOptionsChange: (options) => {
+          setChoice(createModelSelection(selection.instanceId, selection.model, options));
+        },
+      }
+    : null;
+  const effort = describeComposerEffort(traits, settings.effortDisplay, "sm");
+  const useSubscriptionPicker = providerEntries.every(
+    (entry) => !entry.enabled || entry.driverKind === "codex" || entry.driverKind === "claudeAgent",
+  );
   const modelOptionsByInstance = new Map(
     providerEntries.map((entry) => [
       entry.instanceId,
@@ -82,13 +127,25 @@ export function TaskIdeaComposer({
     ]),
   );
   const send = async () => {
-    if (!canSend) return;
-    const key = JSON.stringify([prompt, selection]);
+    if (!canSend || !activeEntry) return;
+    const { modelOptionsForDispatch } = getComposerProviderState({
+      provider: activeEntry.driverKind,
+      model: selection.model,
+      models: activeEntry.models,
+      modelOptions: selection.options,
+      planModeEnabled: false,
+    });
+    const modelSelection = createModelSelection(
+      selection.instanceId,
+      selection.model,
+      modelOptionsForDispatch,
+    );
+    const key = JSON.stringify([prompt, modelSelection]);
     const submissionId = submission.current?.key === key ? submission.current.id : randomUUID();
     submission.current = { key, id: submissionId };
     setSending(true);
     setSent(false);
-    const accepted = await onSend({ submissionId, prompt, modelSelection: selection });
+    const accepted = await onSend({ submissionId, prompt, modelSelection });
     setSending(false);
     if (!accepted) return;
     submission.current = null;
@@ -98,7 +155,7 @@ export function TaskIdeaComposer({
 
   return (
     <form
-      className="px-4 pt-4 md:px-6"
+      className="shrink-0 px-4 pt-2 pb-3 md:px-6"
       onSubmit={(event) => {
         event.preventDefault();
         void send();
@@ -106,7 +163,12 @@ export function TaskIdeaComposer({
     >
       <ComposerSurface.Shell>
         <ComposerSurface.Host>
-          <div className="max-h-32 overflow-auto px-3 pt-2">
+          <div className="px-3 pt-2.5">
+            {status ? (
+              <p className="mb-1.5 text-xs text-muted-foreground" role="status">
+                {status}
+              </p>
+            ) : null}
             <ComposerPromptEditorTiptap
               ariaLabel={text("Project idea", "Идея для проекта")}
               placeholder={text("Share your ideas here", "Предложите свои идеи здесь")}
@@ -116,29 +178,51 @@ export function TaskIdeaComposer({
               contextRecords={EMPTY_CONTEXT}
               skills={EMPTY_SKILLS}
               editorRef={editor}
+              className="max-h-[min(13rem,30dvh)] overscroll-contain"
               disabled={sending || disabled}
-              onChange={(value, cursor) => setDraft({ value, cursor })}
+              onChange={(value, cursor) => {
+                setDraft({ value, cursor });
+                setSent(false);
+              }}
               onPaste={() => {}}
-              onCommandKeyDown={(key, event) => {
-                if (key !== "Enter" || (!event.ctrlKey && !event.metaKey) || event.isComposing)
-                  return false;
+              onCommandKeyDown={(_, event) => {
+                const intent = composerSubmissionIntentForKey({
+                  event,
+                  keybindings,
+                  isSoftwareKeyboardOpen,
+                  isDraftThread: false,
+                  sendShortcut: settings.sendShortcut,
+                  prompt: draft.value,
+                });
+                if (intent === null) return false;
                 event.preventDefault();
                 void send();
                 return true;
               }}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2 px-2 pb-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1 px-2 pb-2">
             <ProviderModelPicker
               environmentId={environmentId}
               activeInstanceId={selection.instanceId}
               model={selection.model}
               modelOptionsByInstance={modelOptionsByInstance}
               instanceEntries={providerEntries}
+              keybindings={keybindings}
               lockedProvider={null}
+              isComposerOwned={useSubscriptionPicker}
               disabled={sending || disabled}
               triggerAriaLabel={text("Choose an agent", "Выбрать агента")}
-              onInstanceModelChange={(instanceId, model) => setChoice({ instanceId, model })}
+              triggerClassName="group/model-trigger"
+              triggerSuffix={effort.suffix}
+              triggerDetail={effort.detail}
+              effortColumn={<ComposerEffortColumn traits={traits} />}
+              footer={<ComposerPickerFooter traits={traits} />}
+              onInstanceModelChange={(instanceId, model) => {
+                if (instanceId !== selection.instanceId || model !== selection.model) {
+                  setChoice(createModelSelection(instanceId, model));
+                }
+              }}
             />
             {threadId ? (
               <Button
@@ -153,36 +237,18 @@ export function TaskIdeaComposer({
               </Button>
             ) : null}
             <div className="ms-auto">
-              <Button
-                type="submit"
-                size="icon-sm"
+              <ComposerSubmitButton
+                busy={sending}
                 aria-label={text("Send idea", "Отправить идею")}
                 disabled={!canSend}
-              >
-                {sending ? <Spinner /> : <ArrowUpIcon />}
-              </Button>
+              />
             </div>
           </div>
         </ComposerSurface.Host>
-        <p className="mt-1.5 px-2 text-xs text-muted-foreground" role="status">
-          {tooLong
-            ? text(
-                "This idea exceeds the message limit.",
-                "Идея превышает допустимую длину сообщения.",
-              )
-            : sent
-              ? text("Sent to the ideas chat.", "Идея отправлена в чат.")
-              : !ready
-                ? text(
-                    "Choose an available agent to send ideas.",
-                    "Выберите доступного агента, чтобы отправить идею.",
-                  )
-                : text(
-                    "Type or use system dictation.",
-                    "Можно напечатать текст или продиктовать его.",
-                  )}
-        </p>
       </ComposerSurface.Shell>
+      <p className="sr-only" role="status">
+        {sent ? text("Sent to the ideas chat.", "Идея отправлена в чат.") : null}
+      </p>
     </form>
   );
 }

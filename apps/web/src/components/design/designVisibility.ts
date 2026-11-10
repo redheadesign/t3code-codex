@@ -1,5 +1,6 @@
 import {
   designWorldBounds,
+  nodeAncestry,
   nodeForPage,
   type DesignDocument,
   type DesignNode,
@@ -8,6 +9,51 @@ import { designEffectOutset } from "./designEffects";
 
 type Box = { x: number; y: number; width: number; height: number };
 type Entry = { node: DesignNode; bounds: Box | null };
+type Point = Pick<Box, "x" | "y">;
+export type DesignCamera = { zoom: number; pan: Point };
+
+export function designZoomAt(camera: DesignCamera, point: Point, value: number): DesignCamera {
+  const zoom = Math.min(256, Math.max(0.01, value));
+  const factor = zoom / camera.zoom;
+  return {
+    zoom,
+    pan: {
+      x: point.x - (point.x - camera.pan.x) * factor,
+      y: point.y - (point.y - camera.pan.y) * factor,
+    },
+  };
+}
+
+export function designWheelZoom(
+  camera: DesignCamera,
+  point: Point,
+  deltaY: number,
+  deltaMode: number,
+) {
+  const pixels = deltaY * (deltaMode === 1 ? 16 : deltaMode === 2 ? 120 : 1);
+  const delta = Math.min(120, Math.max(-120, pixels));
+  return designZoomAt(camera, point, camera.zoom * Math.exp(-delta * 0.00125));
+}
+
+export function designCanvasLayer(
+  nodes: ReadonlyMap<string, DesignNode>,
+  hitId: string,
+  activeId: string | null,
+  descend = false,
+) {
+  const hit = nodeAncestry(nodes, hitId);
+  if (!activeId) return hit.at(-1)?.nodeId ?? hitId;
+  const activeIndex = hit.findIndex((node) => node.nodeId === activeId);
+  if (activeIndex >= 0) return hit[descend ? Math.max(0, activeIndex - 1) : activeIndex]!.nodeId;
+
+  const scope = new Set(
+    nodeAncestry(nodes, activeId)
+      .slice(1)
+      .map((node) => node.nodeId),
+  );
+  const scopeIndex = hit.findIndex((node) => scope.has(node.nodeId));
+  return scopeIndex >= 0 ? hit[Math.max(0, scopeIndex - 1)]!.nodeId : (hit.at(-1)?.nodeId ?? hitId);
+}
 
 function intersection(a: Box, b: Box): Box | null {
   const x = Math.max(a.x, b.x),
