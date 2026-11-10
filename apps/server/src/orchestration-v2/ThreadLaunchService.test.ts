@@ -512,10 +512,12 @@ it.effect("retains automation and sender attribution while a message waits in th
       text: "Run the audit",
       attachments: [],
       mode: "queue",
+      freshContext: true,
       createdBy: "agent",
       creationSource: "mcp",
     });
     assert.equal(queued.delivery, "queued");
+    assert.isTrue(queued.run.freshContext);
     const projection = yield* threads.getThreadProjection(launched.threadId);
     const message = projection.messages.find((item) => item.id === queued.message.id);
     assert.equal(message?.scheduledTaskId, scheduledTaskId);

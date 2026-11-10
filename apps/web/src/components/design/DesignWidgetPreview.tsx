@@ -30,11 +30,11 @@ export function DesignWidgetPreview({
     }
     setLoading(true);
     try {
-      const [source, runtime] = await Promise.all([
+      const [source, designWidgetSrcDoc] = await Promise.all([
         readDesignWidgetSource(assetId),
-        import("./designWidgetRuntime"),
+        import("./designWidgetRuntime").then(({ designWidgetSrcDoc }) => designWidgetSrcDoc),
       ]);
-      setPreview({ srcDoc: runtime.designWidgetSrcDoc(source) });
+      setPreview({ srcDoc: designWidgetSrcDoc(source) });
     } catch {
       setFailed(true);
     } finally {

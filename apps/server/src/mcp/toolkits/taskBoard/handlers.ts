@@ -12,6 +12,7 @@ import {
   DispatchModeLimit,
   type DispatchModeRefusal,
 } from "../../../orchestration-v2/DispatchModeLimit.ts";
+import { ManagedProjectFolders } from "../../../project/ManagedProjectFolders.ts";
 import * as Projects from "../../../project/ProjectService.ts";
 import { TaskBoardService } from "../../../taskWorkspace/TaskBoardService.ts";
 import { assertSameLink } from "../../linkOrigin.ts";
@@ -55,6 +56,14 @@ const target = Effect.fn("mcp.resolveTaskBoard")(function* (
     return yield* new OrchestratorMcpFailure({
       code: "invalid_request",
       message: "Project not found.",
+    });
+  }
+  const folders = yield* ManagedProjectFolders;
+  if (yield* folders.isScratchProject(projectId)) {
+    return yield* new OrchestratorMcpFailure({
+      code: "target_required",
+      message:
+        "Choose a project with t3_project_list and pass its projectId. Chats without a project have no board or wiki.",
     });
   }
   return { context, projectId, service: yield* TaskBoardService };
@@ -141,6 +150,12 @@ export const layer = McpToolAccess.toLayer(TaskBoardToolkit, {
     Effect.fn("mcp.updateTaskBoard")(function* (input) {
       const { context, projectId, service } = yield* target(input.projectId);
       const { caller, scope, limits, threads } = context;
+      if (limits.interactionMode === "plan") {
+        return yield* new OrchestratorMcpFailure({
+          code: "capability_denied",
+          message: "Plan mode can read the board and wiki. Leave Plan mode to make changes.",
+        });
+      }
       const { command } = input;
       const closing = command._tag === "updateLocalTask" && command.status === "done";
       const refused = yield* Ref.make<DispatchModeRefusal | undefined>(undefined);

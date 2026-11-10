@@ -1,6 +1,9 @@
 import * as NodeAssert from "node:assert/strict";
 
-import { T3_CODE_DEVICE_TOOL_INSTRUCTIONS } from "@t3tools/provider-core/server/orchestrationInstructions";
+import {
+  T3_CODE_DEVICE_TOOL_INSTRUCTIONS,
+  T3_CODE_PROJECT_TOOL_INSTRUCTIONS,
+} from "@t3tools/provider-core/server/orchestrationInstructions";
 import { describe, it } from "vite-plus/test";
 
 import {
@@ -57,6 +60,19 @@ describe("Codex runtime context", () => {
 });
 
 describe("Codex orchestration context", () => {
+  it("includes project guidance only with project tools available", () => {
+    const runtime = { model: "gpt-6.1-sol" };
+    const tools = { browser: false, device: false };
+    NodeAssert.equal(
+      buildCodexAdditionalContext(runtime, tools).t3_code_project_tools?.value,
+      T3_CODE_PROJECT_TOOL_INSTRUCTIONS,
+    );
+    NodeAssert.equal(
+      buildCodexAdditionalContext(runtime, { ...tools, project: false }).t3_code_project_tools,
+      undefined,
+    );
+  });
+
   it("routes subagents native first, delegate_task for the rest", () => {
     const orchestration = Object.entries(buildCodexAdditionalContext({ model: "gpt-6.1-sol" }))
       .filter(([key]) => key.startsWith("t3_code_orchestration_"))

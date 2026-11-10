@@ -5,6 +5,7 @@ import {
   T3_CODE_BROWSER_TOOL_INSTRUCTIONS,
   T3_CODE_DEVICE_TOOL_INSTRUCTIONS,
   T3_CODE_ORCHESTRATION_SECTIONS,
+  T3_CODE_PROJECT_TOOL_INSTRUCTIONS,
 } from "@t3tools/provider-core/server/orchestrationInstructions";
 
 /** Codex silently truncates additionalContext values over 1,000 tokens, counted as UTF-8 bytes / 4. */
@@ -13,6 +14,7 @@ export const CODEX_ADDITIONAL_CONTEXT_VALUE_MAX_BYTES = 4_000;
 export interface T3CodeToolAvailability {
   readonly browser: boolean;
   readonly device: boolean;
+  readonly project?: boolean;
 }
 
 const normalizeAvailability = (
@@ -55,6 +57,14 @@ export function buildCodexAdditionalContext(
       kind: "application",
       value: buildRuntimeInstructions({ harness: "Codex", ...runtime }),
     },
+    ...(normalizeAvailability(toolsAvailable).project !== false
+      ? {
+          t3_code_project_tools: {
+            kind: "application" as const,
+            value: T3_CODE_PROJECT_TOOL_INSTRUCTIONS,
+          },
+        }
+      : {}),
     ...(tools ? { t3_code_tools: { kind: "application", value: tools } } : {}),
   };
 }

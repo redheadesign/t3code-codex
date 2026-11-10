@@ -8,10 +8,12 @@ import {
   TaskWorkspaceProjectWiki,
   TaskWorkspaceWikiPageSummary,
 } from "@t3tools/contracts";
+import { TASK_WORKSPACE_MCP_TOOLS } from "@t3tools/provider-core/server/orchestrationInstructions";
 import * as Schema from "effect/Schema";
 import { Tool, Toolkit } from "effect/ai";
 
 import * as ThreadManagement from "../../../orchestration-v2/ThreadManagementService.ts";
+import { ManagedProjectFolders } from "../../../project/ManagedProjectFolders.ts";
 import * as Project from "../../../project/ProjectService.ts";
 import { TaskBoardService } from "../../../taskWorkspace/TaskBoardService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
@@ -22,6 +24,7 @@ const shared = {
   dependencies: [
     McpInvocationContext.McpInvocationContext,
     ThreadManagement.ThreadManagementService,
+    ManagedProjectFolders,
     Project.ProjectService,
     TaskBoardService,
   ],
@@ -37,10 +40,10 @@ const taskSummary = Schema.Struct({
   link: Schema.optional(Schema.String),
 });
 
-const TaskBoardTool = Tool.make("t3_task_board", {
+const TaskBoardTool = Tool.make(TASK_WORKSPACE_MCP_TOOLS.read, {
   ...shared,
   description:
-    "Read a project's task board and wiki. Omit projectId inside a T3 chat. Pass taskId for the brief, feedback, artifact links and chat history, or wikiPageId to read a page from wikiPages. Use nextOffset and wikiNextOffset to continue.",
+    "Read this chat's board and wiki; omit projectId to use its project. Check for duplicates. taskId shows the brief, feedback and links; wikiPageId selects Markdown. Follow nextOffset and wikiNextOffset.",
   parameters: Schema.Struct({
     projectId: Schema.optional(ProjectId),
     taskId: Schema.optional(TaskWorkspaceBoardTask.fields.id),
@@ -65,10 +68,10 @@ const TaskBoardTool = Tool.make("t3_task_board", {
   }),
 }).annotate(Tool.Readonly, true);
 
-const TaskUpdateTool = Tool.make("t3_task_update", {
+const TaskUpdateTool = Tool.make(TASK_WORKSPACE_MCP_TOOLS.update, {
   ...shared,
   description:
-    "Update tasks with the current revision from t3_task_board. Claim work, comment with results, then release. Resolve feedback after addressing it. Artifact targets are HTTP(S) URLs, project-relative files or Canvas document IDs. Moving a linked task to done archives its chat. Open a new task chat only when asked.",
+    "Use the latest board revision; reread on conflict. Save ideas with createLocalTask, status backlog, without starting work. For wiki, read all Markdown, merge and saveProjectWikiPage by ID. Claim, comment, release; resolve addressed feedback. Links: HTTP(S), project-relative file or Canvas ID. Done archives chat. Open chats only on request.",
   parameters: Schema.Struct({
     projectId: Schema.optional(ProjectId),
     revision: TaskWorkspaceBoard.fields.revision,

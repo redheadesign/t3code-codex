@@ -42,9 +42,11 @@ To hand off a task, comment with what changed, which checks passed and what rema
 the claim. The next agent can continue in its linked chat or claim it from another chat. Record
 discoveries outside the current scope as backlog cards.
 
-T3 Code tells agents about the board in their startup context. Agents use `t3_task_board` to
-read the wiki, current task and other project work, and `t3_task_update` to change the board.
-Ask for a project summary to see what's done, what's blocked and what's ready to start.
+Codex and Claude receive guidance about the board when you send a message. In a
+project chat, they can use its project automatically. From a chat without a
+project, name the project you want. Ask the agent to add an idea to the backlog,
+update a wiki page, or summarize what's done, blocked and ready to start. Plan
+mode allows reading the board and wiki.
 
 If the project has Design files, add descriptions and sync them from the editor. The
 `t3_project_design_list` tool shows synced packages with their project paths and available

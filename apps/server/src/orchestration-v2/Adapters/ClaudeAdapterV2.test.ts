@@ -81,7 +81,10 @@ import { attachmentRelativePath } from "../../attachmentStore.ts";
 import { WorkflowAgentTranscriptReadObserver } from "../workflowAgentTranscript.ts";
 import * as ServerConfig from "../../config.ts";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
-import { T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH } from "@t3tools/provider-core/server/orchestrationInstructions";
+import {
+  T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH,
+  T3_CODE_PROJECT_TOOL_INSTRUCTIONS,
+} from "@t3tools/provider-core/server/orchestrationInstructions";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import { PreviewControlsToolkit } from "../../mcp/toolkits/previewControls/tools.ts";
 import { HtmlToolkit } from "../../mcp/toolkits/html/tools.ts";
@@ -523,6 +526,52 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
     endpoint: "http://127.0.0.1:43123/mcp",
     authorizationHeader,
     browserToolsAvailable: true,
+  });
+
+  it("delivers the same current project guidance on resumed SDK prompts when T3 tools are available", async () => {
+    const input = {
+      modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+      nativeThreadId: "native-project-context",
+      resume: true,
+      cwd: "/workspace",
+    };
+    const options = ClaudeAdapterV2.makeClaudeQueryOptions({
+      ...input,
+      mcpServers: T3_MCP_SERVERS,
+    });
+    const hook = options.hooks?.UserPromptSubmit?.[0]?.hooks[0];
+    assert.isDefined(hook);
+    assert.deepEqual(
+      await hook!(
+        {
+          hook_event_name: "UserPromptSubmit",
+          prompt: "Save this idea",
+          session_id: input.nativeThreadId,
+          transcript_path: "/transcript.jsonl",
+          cwd: input.cwd,
+        },
+        undefined,
+        { signal: new AbortController().signal },
+      ),
+      {
+        hookSpecificOutput: {
+          hookEventName: "UserPromptSubmit",
+          additionalContext: T3_CODE_PROJECT_TOOL_INSTRUCTIONS,
+        },
+      },
+    );
+    assert.notInclude(
+      (options.systemPrompt as { readonly append?: string }).append ?? "",
+      T3_CODE_PROJECT_TOOL_INSTRUCTIONS,
+    );
+    assert.isUndefined(ClaudeAdapterV2.makeClaudeQueryOptions(input).hooks?.UserPromptSubmit);
+    assert.isUndefined(
+      ClaudeAdapterV2.makeClaudeQueryOptions({
+        ...input,
+        mcpServers: T3_MCP_SERVERS,
+        projectToolsAvailable: false,
+      }).hooks?.UserPromptSubmit,
+    );
   });
 
   it("pre-approves only read-only t3-code tools in a read-only sandbox", () => {

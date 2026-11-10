@@ -1,10 +1,15 @@
 import type { ProviderInteractionMode } from "@t3tools/contracts";
 
+export const TASK_WORKSPACE_MCP_TOOLS = {
+  read: "t3_task_board",
+  update: "t3_task_update",
+} as const;
+
+export const T3_CODE_PROJECT_TOOL_INSTRUCTIONS = `For project tasks or wiki, read \`${TASK_WORKSPACE_MCP_TOOLS.read}\`; write via \`${TASK_WORKSPACE_MCP_TOOLS.update}\` when asked. No project? Resolve the target via \`t3_project_list\`. Server identity: \`t3_environment_read\`. Synced Canvas files: \`t3_project_design_list\`.`;
+
 // Codex truncates entries over 4,000 bytes; keep each section self-contained and below that limit.
 export const T3_CODE_ORCHESTRATION_SECTIONS: ReadonlyArray<string> = [
   `## T3 Code orchestration
-
-For project work, use \`t3_task_board\` to find this chat's task, blockers and wiki. Use \`t3_task_update\` to claim work, leave handoff notes and record backlog items. For UI work, \`t3_project_design_list\` finds the project's design documents.
 
 - Subagents: use your native tool when the child uses your provider, a model it offers, and no settings beyond yours (Claude \`Agent\`, \`run_in_background:false\`; Codex \`spawn_agent\`, then wait). Use \`delegate_task\` for another provider's model, user-asked settings, a separate checkout (\`isolation:"worktree"\`), or \`delegate_task\` by name. A native type on another provider's model counts too. Background agent: \`delegate_task\`, never a background \`Agent\`. Workflow only when asked.
 - Call \`orchestrator_capabilities\` once per thread, before the first \`delegate_task\`. Again only after an error or a user-named provider change. Settings go in \`target.options\`. Provider or model unavailable: say so. Never switch unasked, or fall back to native tools, Workflow, or CLIs. Never make a child's checkout in the shell or in \`task\`.
@@ -24,10 +29,12 @@ For project work, use \`t3_task_board\` to find this chat's task, blockers and w
 - Never use \`preview_*\` unasked to verify or show your own edit. Use them when the current request asks for browser work, including recording edits, or names a page or tab. Do not repeat preview calls from an earlier turn. Public pages: web fetch or search unless browser work was asked; then preview tools only, no web fetch. Close a tab you opened before you reply, unless the user asked for it or uses it.`,
 ];
 
-export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = `
+export const T3_CODE_ORCHESTRATION_SYSTEM_PROMPT = `
 
 ${T3_CODE_ORCHESTRATION_SECTIONS.join("\n\n")}
 `;
+
+export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = `${T3_CODE_ORCHESTRATION_SYSTEM_PROMPT}\n${T3_CODE_PROJECT_TOOL_INSTRUCTIONS}\n`;
 
 export const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `
 

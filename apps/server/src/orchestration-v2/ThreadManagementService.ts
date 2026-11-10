@@ -145,6 +145,7 @@ export interface ThreadManagementSendInput {
   readonly text: string;
   readonly attachments: ReadonlyArray<ChatAttachment>;
   readonly modelSelection?: ModelSelection;
+  readonly freshContext?: boolean;
   readonly mode: ThreadManagementSendMode;
   readonly createdBy: OrchestrationV2Actor;
   readonly creationSource: OrchestrationV2CreationSource;
@@ -851,6 +852,7 @@ const make = Effect.gen(function* () {
       text: input.text,
       attachments: input.attachments,
       ...(input.modelSelection === undefined ? {} : { modelSelection: input.modelSelection }),
+      ...(input.freshContext === undefined ? {} : { freshContext: input.freshContext }),
       dispatchMode,
       createdBy: input.createdBy,
       creationSource: input.creationSource,

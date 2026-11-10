@@ -55,6 +55,24 @@ The MCP HTTP server resolves the bearer token and supplies the resulting
 `McpInvocationScope` to tool handlers. Orchestration handlers additionally
 check the `orchestration` capability before reading or mutating state.
 
+## Keep tool guidance current
+
+T3's tool catalog is shared by Codex and Claude. A registered MCP toolkit owns
+the tool names, descriptions and schemas that agents discover at runtime. Put
+the details of how to use a feature there. The short, shared routing instructions
+only tell agents when to look for a tool. Project-owned `AGENTS.md` and
+`CLAUDE.md` files remain the place for repository conventions.
+
+When adding an app tool, use the [task board toolkit](../../apps/server/src/mcp/toolkits/taskBoard/tools.ts)
+as an example. Define the schema and describe when to call the tool. Keep the
+handler thin, wrap it in `McpToolAccess.reads` or `.writes`, and call the same
+server service used by the app. If the toolkit is new, register it in
+[`McpHttpServer`](../../apps/server/src/mcp/McpHttpServer.ts). Change the
+[shared routing instructions](../../packages/provider-core/src/server/orchestrationInstructions.ts)
+only when agents need a cue to discover the feature. Add a case to
+[MCP tool use](../../evals/mcp-tool-use/) when the change affects tool choice,
+and verify denied calls at the handler boundary.
+
 ## Provider Injection
 
 ### Codex V2
@@ -71,6 +89,10 @@ while a blocking wait runs. The second entry makes the wait a direct tool call,
 like Codex's own wait tools. Codex reports calls as `<server>.<tool>`, so
 `packages/shared/src/t3McpToolPresentation.ts` must resolve both server names.
 Tool display and pending-work detection depend on it.
+
+For a session with orchestration access, Codex receives the shared project
+routing hint in `turn/start` application context. It can discover the current
+catalog after reconnecting to the updated T3 server.
 
 ### Claude Agent SDK V2
 
@@ -94,8 +116,15 @@ Claude receives an HTTP MCP server in its query options:
 }
 ```
 
-The adapter logs only whether MCP configuration exists; it does not log the
-server headers or token.
+The adapter logs only whether MCP configuration exists. It never logs the
+server headers or token. The allowlist depends on the session's access.
+
+Claude can retain a recorded system prompt when resuming a conversation.
+T3 delivers the shared project routing hint through `UserPromptSubmit`, so
+the next message receives it even in a resumed conversation. ToolSearch can
+load the current MCP descriptions on demand. Updating the app replaces the
+catalog and routing together without rewriting repository instructions or
+replacing the provider conversation.
 
 ### Cursor Agent SDK V2
 
