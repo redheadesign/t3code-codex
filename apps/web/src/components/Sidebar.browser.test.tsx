@@ -77,8 +77,16 @@ describe("sidebar header new thread", () => {
 
     const projectFilter = () =>
       screen.container.querySelector('[aria-label="Filter threads by project"]');
-    if (scenario.mode === "boring") expect(projectFilter()).not.toBeNull();
-    else expect(projectFilter()).toBeNull();
+    if (scenario.mode === "boring") {
+      expect(projectFilter()).not.toBeNull();
+      await expect.element(screen.getByText("Projects", { exact: true })).toBeVisible();
+      expect(
+        screen.container.querySelectorAll('[data-testid="sidebar-project-folder"]'),
+      ).toHaveLength(scenario.count);
+      expect(screen.getByText("No chats", { exact: true }).all()).toHaveLength(scenario.count);
+    } else {
+      expect(projectFilter()).toBeNull();
+    }
 
     await userEvent.click(screen.getByRole("button", { name: "New thread", exact: true }), {
       modifiers: scenario.shift ? ["Shift"] : [],

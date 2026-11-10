@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type {
   EnvironmentId,
@@ -28,6 +29,8 @@ import { useEnvironmentQuery } from "../../state/query";
 import { taskWorkspaceCommand, taskWorkspaceRead } from "../../state/taskWorkspace";
 import { useAtomCommand } from "../../state/use-atom-command";
 import ChatMarkdown from "../ChatMarkdown";
+import { ProjectFavicon } from "../ProjectFavicon";
+import { ProjectPicker } from "../ProjectPicker";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -71,43 +74,6 @@ type LocalTaskTarget = {
   workspaceRoot: string;
 };
 
-function TaskScopeSelect<Id extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: Id | null;
-  options: ReadonlyArray<{ id: Id; label: string }>;
-  onChange: (id: Id) => void;
-}) {
-  return (
-    <div className="min-w-0 flex-1 sm:max-w-56">
-      <Select<Id>
-        value={value}
-        disabled={options.length === 0}
-        onValueChange={(id) => {
-          if (id !== null) onChange(id);
-        }}
-      >
-        <SelectTrigger size="sm" width="fluid" aria-label={label}>
-          <SelectValue placeholder={label}>
-            {(id) => options.find((option) => option.id === id)?.label ?? label}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectPopup>
-          {options.map((option) => (
-            <SelectItem key={option.id} value={option.id}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectPopup>
-      </Select>
-    </div>
-  );
-}
-
 export function TaskTracker({ target }: { target: TasksSearch }) {
   const navigate = useNavigate();
   const { environments } = useEnvironments();
@@ -117,20 +83,42 @@ export function TaskTracker({ target }: { target: TasksSearch }) {
     (environment) =>
       environment.connection.phase === "connected" && environment.serverConfig !== null,
   );
+  const connectedById = new Map(
+    connected.map((environment) => [environment.environmentId, environment]),
+  );
+  const projectOptions = projects.filter(
+    (project) => !project.isScratch && connectedById.has(project.environmentId),
+  );
+  const defaultEnvironment =
+    connected.find((entry) => entry.environmentId === primaryEnvironmentId) ?? connected[0];
   const environment =
     target.environmentId === undefined
-      ? (connected.find((entry) => entry.environmentId === primaryEnvironmentId) ?? connected[0])
-      : connected.find((entry) => entry.environmentId === target.environmentId);
-  const environmentId = environment?.environmentId;
-  const projectOptions = projects.filter(
-    (entry) => entry.environmentId === environmentId && !entry.isScratch,
+      ? defaultEnvironment
+      : connectedById.get(target.environmentId);
+  const defaultProject = projectOptions.find(
+    (entry) => entry.environmentId === environment?.environmentId,
   );
   const project =
     target.projectId === undefined
-      ? projectOptions[0]
+      ? (defaultProject ?? (target.environmentId === undefined ? projectOptions[0] : undefined))
       : projects.find(
-          (entry) => entry.environmentId === environmentId && entry.id === target.projectId,
+          (entry) =>
+            entry.environmentId === environment?.environmentId && entry.id === target.projectId,
         );
+  const environmentId = project?.environmentId ?? environment?.environmentId;
+  const pickerItems = projectOptions.map((entry) => {
+    const environmentLabel = connectedById.get(entry.environmentId)?.label ?? entry.environmentId;
+    return {
+      value: scopedProjectKey(scopeProjectRef(entry.environmentId, entry.id)),
+      label: entry.title,
+      searchText: `${entry.title} ${environmentLabel}`,
+      environmentLabel,
+      project: entry,
+    };
+  });
+  const selectedValue = project
+    ? scopedProjectKey(scopeProjectRef(project.environmentId, project.id))
+    : undefined;
   const projectId = project?.id;
   const scope = {
     ...(environmentId === undefined ? {} : { environmentId }),
@@ -143,60 +131,65 @@ export function TaskTracker({ target }: { target: TasksSearch }) {
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-background"
       {...workspaceAreaProps("tasks", 0, "Tasks workspace")}
     >
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3 md:px-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-sm font-semibold">Tasks</h1>
-          <ToggleGroup
-            aria-label="Task views"
-            value={[view]}
-            onValueChange={([next]) => {
-              const chosen = TASK_VIEWS.find((item) => item.id === next);
-              if (chosen) void navigate({ to: "/tasks", search: { ...scope, view: chosen.id } });
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/70 px-4 py-3 md:px-6">
+        <h1 className="sr-only">Tasks</h1>
+        <div className="flex min-w-0 max-w-full items-center text-sm font-medium sm:max-w-72">
+          <ProjectPicker
+            items={pickerItems}
+            selectedValue={selectedValue}
+            title={project?.title ?? "Choose a project"}
+            titleIcon={project ? <ProjectFavicon project={project} className="size-full" /> : null}
+            titleTooltip={project?.title}
+            ariaLabel={project ? `Project: ${project.title}` : "Choose a project"}
+            onSelect={(item) => {
+              if (item.value === selectedValue) return;
+              void navigate({
+                to: "/tasks",
+                search: {
+                  environmentId: item.project.environmentId,
+                  projectId: item.project.id,
+                  view,
+                },
+              });
             }}
-          >
-            {TASK_VIEWS.map(({ id, label, icon: Icon }) => (
-              <ToggleGroupItem key={id} value={id}>
-                <Icon />
-                {label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+            renderIcon={(item) => (
+              <ProjectFavicon project={item.project} className="size-4 shrink-0" />
+            )}
+            renderTrailing={
+              connected.length > 1
+                ? (item) => (
+                    <span className="max-w-24 shrink-0 truncate text-xs text-muted-foreground">
+                      {item.environmentLabel}
+                    </span>
+                  )
+                : undefined
+            }
+          />
         </div>
-        {view !== "jira" ? (
-          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:flex-1 sm:justify-end">
-            {connected.length > 1 || environment === undefined ? (
-              <TaskScopeSelect
-                label="Environment"
-                value={environmentId ?? null}
-                options={connected.map((entry) => ({
-                  id: entry.environmentId,
-                  label: entry.label,
-                }))}
-                onChange={(id) =>
-                  void navigate({ to: "/tasks", search: { environmentId: id, view } })
-                }
-              />
-            ) : null}
-            <TaskScopeSelect
-              label="Project"
-              value={projectId ?? null}
-              options={projectOptions.map((entry) => ({ id: entry.id, label: entry.title }))}
-              onChange={(id) =>
-                void navigate({ to: "/tasks", search: { ...scope, projectId: id, view } })
-              }
-            />
-          </div>
-        ) : null}
+        <ToggleGroup
+          aria-label="Task views"
+          value={[view]}
+          onValueChange={([next]) => {
+            const chosen = TASK_VIEWS.find((item) => item.id === next);
+            if (chosen) void navigate({ to: "/tasks", search: { ...scope, view: chosen.id } });
+          }}
+        >
+          {TASK_VIEWS.map(({ id, label, icon: Icon }) => (
+            <ToggleGroupItem key={id} value={id}>
+              <Icon />
+              {label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </div>
       {view === "jira" ? (
-        <TasksWorkspace target={target} />
+        <TasksWorkspace target={{ ...target, ...scope }} scopeInHeader />
       ) : environmentId !== undefined && project !== undefined ? (
         <LocalTaskTracker
           key={`${environmentId}:${project.id}`}
           environmentId={environmentId}
           projectId={project.id}
           workspaceRoot={project.workspaceRoot}
-          projectTitle={project.title}
           view={view}
           target={target}
         />
@@ -216,11 +209,9 @@ function LocalTaskTracker({
   environmentId,
   projectId,
   workspaceRoot,
-  projectTitle,
   view,
   target,
 }: LocalTaskTarget & {
-  projectTitle: string;
   view: Exclude<TaskView, "jira">;
   target: TasksSearch;
 }) {
@@ -359,7 +350,6 @@ function LocalTaskTracker({
           content={board.wiki.content}
           environmentId={environmentId}
           workspaceRoot={workspaceRoot}
-          projectTitle={projectTitle}
           disabled={disabled}
           error={error}
           onSave={async (content) =>
@@ -369,12 +359,9 @@ function LocalTaskTracker({
       ) : (
         <>
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 pt-4 md:px-6">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold wrap-anywhere">{projectTitle}</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {view === "archive" ? "Completed tasks" : "Project board"}
-              </p>
-            </div>
+            <h2 className="text-sm font-medium">
+              {view === "archive" ? "Completed tasks" : "Board"}
+            </h2>
             <div className="flex flex-wrap items-center gap-2">
               <div className="min-w-36 flex-1 sm:w-48">
                 <Input
@@ -574,7 +561,6 @@ function ProjectWiki({
   content,
   workspaceRoot,
   environmentId,
-  projectTitle,
   disabled,
   error,
   onSave,
@@ -582,7 +568,6 @@ function ProjectWiki({
   content: string;
   workspaceRoot: string;
   environmentId: EnvironmentId;
-  projectTitle: string;
   disabled: boolean;
   error: string | null;
   onSave: (content: string) => Promise<boolean>;
@@ -593,10 +578,7 @@ function ProjectWiki({
     <div className="min-h-0 flex-1 overflow-auto p-4 md:px-6">
       <section className="max-w-3xl space-y-4">
         <header className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Project wiki</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">{projectTitle}</p>
-          </div>
+          <h2 className="text-lg font-semibold">Project wiki</h2>
           {edit === null ? (
             <Button
               size="sm"

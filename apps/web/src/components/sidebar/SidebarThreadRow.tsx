@@ -1155,6 +1155,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         {...(fileDropHandlers ?? {})}
         className={cn(
           "list-none [content-visibility:auto] [contain-intrinsic-size:auto_--spacing(9)]",
+          inFolder && !multiline && "[contain-intrinsic-size:auto_--spacing(8)]",
           metaLine !== null && multiline && "[contain-intrinsic-size:auto_--spacing(13.5)]",
           sortable?.isDragging && "relative z-20",
         )}
@@ -1176,8 +1177,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                   rowSurfaceClassName,
                   multiline
                     ? "flex flex-col justify-center px-2.5 py-1.5"
-                    : "flex h-9 items-center gap-2.5 px-2.5",
-                  // Lines titles up with the folder name, past its chevron and icon.
+                    : cn("flex items-center gap-2.5 px-2.5", inFolder ? "h-8" : "h-9"),
                   inFolder && "ps-9",
                 )}
                 onClick={handleClick}

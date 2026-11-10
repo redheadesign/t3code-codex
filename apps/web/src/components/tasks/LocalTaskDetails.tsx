@@ -5,7 +5,7 @@ import type {
   TaskWorkspaceCommand,
 } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
-import { Link2Icon, MessageSquareIcon, PencilIcon, XIcon } from "lucide-react";
+import { HistoryIcon, Link2Icon, MessageSquareIcon, PencilIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
 import ChatMarkdown from "../ChatMarkdown";
@@ -124,6 +124,10 @@ export function LocalTaskDetails({
   const [comment, setComment] = useState("");
   const dependencies = new Set(task.blockedBy);
   const byId = new Map(tasks.map((candidate) => [candidate.id, candidate]));
+  const chatTitles = new Map<string, string>();
+  for (const candidate of tasks) {
+    if (candidate.threadId !== null) chatTitles.set(candidate.threadId, candidate.title);
+  }
   const blockers = task.blockedBy.map(
     (id) => byId.get(id) ?? { id, title: "Unavailable task", status: null },
   );
@@ -132,6 +136,11 @@ export function LocalTaskDetails({
     (candidate) => candidate.id !== task.id && !dependencies.has(candidate.id),
   );
   const isBlocked = blockers.some((candidate) => candidate.status !== "done");
+  const canAssign = !disabled && !isBlocked && task.status !== "done";
+  const timeline = [
+    ...task.activity.map((entry) => ({ type: "change" as const, entry })),
+    ...task.comments.map((entry) => ({ type: "comment" as const, entry })),
+  ].sort((left, right) => Date.parse(right.entry.createdAt) - Date.parse(left.entry.createdAt));
   const editStale =
     edit !== null && (edit.baseTitle !== task.title || edit.baseDescription !== task.description);
   const updateDependencies = (blockedBy: ReadonlyArray<string>) =>
@@ -144,21 +153,21 @@ export function LocalTaskDetails({
         if (!open) onClose();
       }}
     >
-      <DialogPopup className="sm:max-w-3xl">
+      <DialogPopup className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>
             <span className="block pe-6">{task.title}</span>
           </DialogTitle>
           <DialogDescription>
             Created <TaskTimestamp value={task.createdAt} />
+            {task.threadId === null
+              ? task.status === "done"
+                ? " · Reopen the task to start its chat"
+                : " · Start a chat when you’re ready to work on this task"
+              : task.status === "done"
+                ? " · Chat archived"
+                : null}
           </DialogDescription>
-        </DialogHeader>
-        <DialogPanel>
-          {error ? (
-            <p role="alert" className="text-sm text-destructive-foreground">
-              {error}
-            </p>
-          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             {task.threadId !== null ? (
               <Button
@@ -171,7 +180,7 @@ export function LocalTaskDetails({
                 }
               >
                 <MessageSquareIcon />
-                Open chat
+                {task.status === "done" ? "View archived chat" : "Open chat"}
               </Button>
             ) : (
               <Button
@@ -183,20 +192,26 @@ export function LocalTaskDetails({
                 Start chat
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={onCopyLink}>
+            <Button size="sm" variant="ghost-muted" onClick={onCopyLink}>
               <Link2Icon />
               Copy task link
             </Button>
           </div>
-          <div className="grid gap-5 pt-2 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,0.65fr)]">
-            <section className="min-w-0 space-y-3">
+        </DialogHeader>
+        <DialogPanel>
+          {error ? (
+            <p role="alert" className="text-sm text-destructive-foreground">
+              {error}
+            </p>
+          ) : null}
+          <div className="grid gap-5 border-t border-border pt-4 md:grid-cols-[minmax(0,1fr)_minmax(14rem,0.55fr)]">
+            <section className="min-w-0 space-y-3 md:col-start-1 md:row-start-1">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold">Description</h2>
                 {edit === null ? (
                   <Button
-                    size="icon-xs"
+                    size="sm"
                     variant="ghost-muted"
-                    aria-label="Edit task"
                     disabled={disabled}
                     onClick={() =>
                       setEdit({
@@ -208,6 +223,7 @@ export function LocalTaskDetails({
                     }
                   >
                     <PencilIcon />
+                    Edit task
                   </Button>
                 ) : null}
               </div>
@@ -277,12 +293,18 @@ export function LocalTaskDetails({
                   headingLevelOffset={2}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground">No description</p>
+                <p className="text-sm text-muted-foreground">
+                  Add the goal, relevant links, and how to tell when the work is done.
+                </p>
               )}
             </section>
-            <section className="min-w-0 space-y-4">
+            <aside
+              aria-label="Task properties"
+              className="min-w-0 space-y-4 border-t border-border pt-4 md:col-start-2 md:row-span-2 md:row-start-1 md:border-s md:border-t-0 md:ps-5 md:pt-0"
+            >
+              <h2 className="text-sm font-semibold">Properties</h2>
               <div className="space-y-1.5">
-                <h2 className="text-sm font-semibold">Status</h2>
+                <h3 className="text-xs font-medium text-muted-foreground">Status</h3>
                 <Select<TaskWorkspaceBoardStatus>
                   value={task.status}
                   disabled={disabled}
@@ -308,25 +330,34 @@ export function LocalTaskDetails({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <h2 className="text-sm font-semibold">Owner</h2>
+                <h3 className="text-xs font-medium text-muted-foreground">Assignee</h3>
                 {task.claim ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm wrap-anywhere">{task.claim.owner}</span>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      disabled={disabled}
-                      onClick={() => void onCommand({ _tag: "releaseLocalTask", taskId: task.id })}
-                    >
-                      Release
-                    </Button>
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm wrap-anywhere">
+                        {chatTitles.get(task.claim.owner) ?? task.claim.owner}
+                      </span>
+                      <Button
+                        size="xs"
+                        variant="ghost-muted"
+                        disabled={disabled}
+                        onClick={() =>
+                          void onCommand({ _tag: "releaseLocalTask", taskId: task.id })
+                        }
+                      >
+                        Release
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Claimed <TaskTimestamp value={task.claim.claimedAt} />
+                    </p>
                   </div>
                 ) : (
                   <form
-                    className="flex items-center gap-2"
+                    className="space-y-1.5"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      if (!owner.trim() || disabled) return;
+                      if (!owner.trim() || !canAssign) return;
                       void onCommand({
                         _tag: "claimLocalTask",
                         taskId: task.id,
@@ -336,29 +367,41 @@ export function LocalTaskDetails({
                       });
                     }}
                   >
-                    <Input
-                      size="sm"
-                      value={owner}
-                      maxLength={TASK_TITLE_LIMIT}
-                      aria-label="Owner name"
-                      placeholder="Unassigned"
-                      disabled={disabled || task.status === "done"}
-                      onChange={(event) => setOwner(event.target.value)}
-                    />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="outline"
-                      disabled={disabled || !owner.trim() || task.status === "done"}
-                    >
-                      Assign
-                    </Button>
+                    <p className="text-sm">Unassigned</p>
+                    {isBlocked && task.status !== "done" ? (
+                      <p className="text-xs text-muted-foreground">
+                        Resolve the blockers to assign this task.
+                      </p>
+                    ) : null}
+                    {task.status !== "done" && !isBlocked ? (
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <Input
+                            size="sm"
+                            value={owner}
+                            maxLength={TASK_TITLE_LIMIT}
+                            aria-label="Assignee name"
+                            placeholder="Name"
+                            disabled={!canAssign}
+                            onChange={(event) => setOwner(event.target.value)}
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="outline"
+                          disabled={!canAssign || !owner.trim()}
+                        >
+                          Assign
+                        </Button>
+                      </div>
+                    ) : null}
                   </form>
                 )}
               </div>
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-sm font-semibold">Dependencies</h2>
+                  <h3 className="text-xs font-medium text-muted-foreground">Dependencies</h3>
                   {isBlocked ? (
                     <Badge size="sm" variant="warning">
                       Blocked
@@ -375,6 +418,9 @@ export function LocalTaskDetails({
                   }
                 />
                 <TaskLinks label="Blocking" tasks={blocks} disabled={disabled} onOpen={onSelect} />
+                {blockers.length === 0 && blocks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No linked tasks</p>
+                ) : null}
                 <Select<string>
                   value={null}
                   disabled={
@@ -384,8 +430,8 @@ export function LocalTaskDetails({
                     if (id !== null) updateDependencies([...task.blockedBy, id]);
                   }}
                 >
-                  <SelectTrigger size="sm" width="fluid" aria-label="Add dependency">
-                    <SelectValue placeholder="Add dependency" />
+                  <SelectTrigger size="sm" width="fluid" aria-label="Add blocker">
+                    <SelectValue placeholder="Add blocker" />
                   </SelectTrigger>
                   <SelectPopup>
                     {availableDependencies.map((candidate) => (
@@ -396,82 +442,96 @@ export function LocalTaskDetails({
                   </SelectPopup>
                 </Select>
               </div>
+            </aside>
+            <section className="min-w-0 space-y-4 border-t border-border pt-4 md:col-start-1 md:row-start-2">
+              <h2 className="text-sm font-semibold">Activity</h2>
+              <form
+                className="space-y-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!comment.trim() || disabled) return;
+                  void onCommand({
+                    _tag: "commentLocalTask",
+                    taskId: task.id,
+                    body: comment.trim(),
+                  }).then((saved) => {
+                    if (saved) setComment("");
+                  });
+                }}
+              >
+                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                  Add a comment
+                  <Textarea
+                    value={comment}
+                    maxLength={TASK_TEXT_LIMIT}
+                    aria-label="Comment"
+                    placeholder="Handoff note"
+                    disabled={disabled}
+                    onChange={(event) => setComment(event.target.value)}
+                  />
+                </label>
+                <div className="flex justify-end">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant="outline"
+                    disabled={disabled || !comment.trim()}
+                  >
+                    Post comment
+                  </Button>
+                </div>
+              </form>
+              {timeline.length > 0 ? (
+                <ol aria-label="Task activity" className="divide-y divide-border/60">
+                  {timeline.map((item) => (
+                    <li
+                      key={`${item.type}:${item.entry.id}`}
+                      className="flex gap-2 py-2 first:pt-0"
+                    >
+                      {item.type === "comment" ? (
+                        <MessageSquareIcon
+                          aria-hidden="true"
+                          className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                        />
+                      ) : (
+                        <HistoryIcon
+                          aria-hidden="true"
+                          className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+                          <span className="font-medium wrap-anywhere">
+                            {chatTitles.get(item.entry.author) ?? item.entry.author}
+                          </span>
+                          {item.type === "change" ? (
+                            <span className="wrap-anywhere text-muted-foreground">
+                              {item.entry.description}
+                            </span>
+                          ) : null}
+                          <span className="text-xs text-muted-foreground">
+                            <TaskTimestamp value={item.entry.createdAt} />
+                          </span>
+                        </div>
+                        {item.type === "comment" ? (
+                          <ChatMarkdown
+                            text={item.entry.body}
+                            cwd={workspaceRoot}
+                            environmentId={environmentId}
+                            headingLevelOffset={2}
+                          />
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Comments and changes to the task appear here.
+                </p>
+              )}
             </section>
           </div>
-          <section className="space-y-3 border-t border-border pt-4">
-            <h2 className="text-sm font-semibold">Comments</h2>
-            {task.comments.length > 0 ? (
-              <ul className="space-y-3">
-                {task.comments.map((entry) => (
-                  <li key={entry.id}>
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="text-sm font-medium wrap-anywhere">{entry.author}</span>
-                      <span className="text-xs text-muted-foreground">
-                        <TaskTimestamp value={entry.createdAt} />
-                      </span>
-                    </div>
-                    <ChatMarkdown
-                      text={entry.body}
-                      cwd={workspaceRoot}
-                      environmentId={environmentId}
-                      headingLevelOffset={2}
-                    />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">No comments yet</p>
-            )}
-            <form
-              className="space-y-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (!comment.trim() || disabled) return;
-                void onCommand({
-                  _tag: "commentLocalTask",
-                  taskId: task.id,
-                  body: comment.trim(),
-                }).then((saved) => {
-                  if (saved) setComment("");
-                });
-              }}
-            >
-              <Textarea
-                value={comment}
-                maxLength={TASK_TEXT_LIMIT}
-                aria-label="Comment"
-                placeholder="Add a comment"
-                disabled={disabled}
-                onChange={(event) => setComment(event.target.value)}
-              />
-              <Button
-                type="submit"
-                size="sm"
-                variant="outline"
-                disabled={disabled || !comment.trim()}
-              >
-                Post comment
-              </Button>
-            </form>
-          </section>
-          <section className="space-y-2 border-t border-border pt-4">
-            <h2 className="text-sm font-semibold">Activity</h2>
-            {task.activity.length > 0 ? (
-              <ol className="space-y-2 text-sm">
-                {task.activity.toReversed().map((entry) => (
-                  <li key={entry.id} className="flex flex-wrap gap-x-2 gap-y-1">
-                    <span className="font-medium wrap-anywhere">{entry.author}</span>
-                    <span className="wrap-anywhere">{entry.description}</span>
-                    <span className="text-xs text-muted-foreground">
-                      <TaskTimestamp value={entry.createdAt} />
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="text-sm text-muted-foreground">No task changes yet</p>
-            )}
-          </section>
         </DialogPanel>
       </DialogPopup>
     </Dialog>

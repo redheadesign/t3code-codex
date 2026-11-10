@@ -1,6 +1,6 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { ChevronDownIcon, SquarePenIcon } from "lucide-react";
+import { ChevronDownIcon, FolderIcon, SquarePenIcon } from "lucide-react";
 import { memo } from "react";
 
 import { cn } from "~/lib/utils";
@@ -62,7 +62,7 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
   return (
     <li
       data-testid="sidebar-project-folder"
-      className="group/project-folder relative mt-2 list-none first:mt-0"
+      className="group/project-folder relative mt-1.5 list-none first:mt-0"
     >
       <button
         type="button"
@@ -75,7 +75,7 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
         }}
         className="flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-(--control-radius) px-(--sidebar-row-content-inset) text-left outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
-        <ProjectFavicon project={group} className="size-4 shrink-0" />
+        <ProjectFavicon project={group} className="size-4 shrink-0" fallbackIcon={FolderIcon} />
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-sidebar-foreground/90">
           {group.displayName}
         </span>
@@ -93,7 +93,9 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
           aria-hidden
           className={cn(
             "size-3 shrink-0 text-sidebar-muted-foreground transition-transform",
-            collapsed && "-rotate-90",
+            collapsed
+              ? "-rotate-90"
+              : "opacity-0 group-focus-within/project-folder:opacity-100 group-hover/project-folder:opacity-100 pointer-coarse:opacity-100",
           )}
         />
       </button>

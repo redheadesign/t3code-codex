@@ -87,13 +87,14 @@ function AutomaticProjectFavicon(input: Parameters<typeof ProjectFavicon>[0]) {
     }),
   );
   const FallbackIcon = input.fallbackIcon ?? FolderCodeIcon;
+  const fallbackProjectName = input.fallbackIcon === undefined ? project.title : undefined;
 
   if (!src || isProjectFaviconFallbackUrl(src)) {
     return (
       <ProjectFaviconFallback
         className={input.className}
         icon={FallbackIcon}
-        projectName={project.title}
+        projectName={fallbackProjectName}
       />
     );
   }
@@ -110,7 +111,7 @@ function AutomaticProjectFavicon(input: Parameters<typeof ProjectFavicon>[0]) {
       src={src}
       className={input.className}
       fallbackIcon={FallbackIcon}
-      fallbackProjectName={project.title}
+      fallbackProjectName={fallbackProjectName}
     />
   );
 }

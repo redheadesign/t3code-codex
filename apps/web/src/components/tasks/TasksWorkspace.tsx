@@ -47,7 +47,11 @@ import { cn } from "../../lib/utils";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
 import { useEnvironmentQuery } from "../../state/query";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { useEnvironments, usePrimaryEnvironmentId, usePullRequestsSupported } from "../../state/environments";
+import {
+  useEnvironments,
+  usePrimaryEnvironmentId,
+  usePullRequestsSupported,
+} from "../../state/environments";
 import { useProjects } from "../../state/entities";
 import { taskWorkspaceCommand, taskWorkspaceRead } from "../../state/taskWorkspace";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
@@ -315,244 +319,290 @@ function ScenarioCard({
           aria-label="Scenario editor"
         >
           <fieldset disabled={commandDisabled} className="contents">
-          <div className="grid gap-3 sm:grid-cols-4">
-            <label className="text-xs text-muted-foreground">
-              Variants
-              <Input
-                type="number"
-                min={1}
-                max={20}
-                value={draft.maxVariants}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    maxVariants: Math.max(1, Math.min(20, Number(event.target.value) || 1)),
-                  }))
-                }
-              />
-            </label>
-            <label className="text-xs text-muted-foreground">
-              Retries
-              <Input
-                type="number"
-                min={0}
-                max={5}
-                value={draft.maxRetries}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    maxRetries: Math.max(0, Math.min(5, Number(event.target.value) || 0)),
-                  }))
-                }
-              />
-            </label>
-            <label className="flex items-center gap-2 self-end pb-1 text-xs text-foreground">
-              <Switch
-                size="sm"
-                checked={draft.enabled}
-                onCheckedChange={(checked) =>
-                  setDraft((current) => ({ ...current, enabled: checked }))
-                }
-                aria-label="Scenario enabled"
-              />
-              Enabled
-            </label>
-            <label className="flex items-center gap-2 self-end pb-1 text-xs text-foreground">
-              <Switch
-                size="sm"
-                checked={draft.autoStart === true}
-                onCheckedChange={(checked) =>
-                  setDraft((current) => ({ ...current, autoStart: checked }))
-                }
-                aria-label="Auto-start matching Jira tasks"
-              />
-              Auto-start matching Jira tasks
-            </label>
-          </div>
-          <div className="space-y-2">
-            {draft.stages.map((stage) => (
-              <div key={stage.id} className="rounded-lg border border-border/60 p-2.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="grid min-w-48 flex-1 gap-1 text-2xs text-muted-foreground">
-                    Stage name
-                    <Input
-                      aria-label={`${stage.name} name`}
-                      value={stage.name}
-                      onChange={(event) => updateStage(stage.id, { name: event.target.value })}
-                    />
-                  </label>
-                  <Badge variant="outline" size="sm">
-                    {stage.kind}
-                  </Badge>
-                  <Badge variant="outline" size="sm">
-                    id:{stage.id}
-                  </Badge>
-                  <Button size="icon-xs" variant="ghost-muted" aria-label={`Move ${stage.name} up`} onClick={() => moveStage(stage.id, -1)} disabled={commandDisabled}>↑</Button>
-                  <Button size="icon-xs" variant="ghost-muted" aria-label={`Move ${stage.name} down`} onClick={() => moveStage(stage.id, 1)} disabled={commandDisabled}>↓</Button>
-                  <Button size="xs" variant="ghost-muted" aria-label={`Remove ${stage.name}`} onClick={() => removeStage(stage.id)} disabled={commandDisabled || draft.stages.length <= 1}>Remove</Button>
-                </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                  <div className="grid gap-1 text-2xs text-muted-foreground sm:col-span-2">
-                    <span>Depends on</span>
-                    <div className="flex flex-wrap gap-1.5" aria-label={`${stage.name} dependencies`}>
-                      {draft.stages
-                        .filter((candidate) => candidate.id !== stage.id)
-                        .map((candidate) => (
-                          <Button
-                            key={candidate.id}
-                            size="xs"
-                            variant={stage.dependsOn.includes(candidate.id) ? "secondary" : "outline"}
-                            onClick={() => toggleDependency(stage.id, candidate.id)}
-                          >
-                            {candidate.name}
-                          </Button>
-                        ))}
-                    </div>
-                    <span className="text-2xs text-muted-foreground/70">
-                      Select the stages that must finish first.
-                    </span>
+            <div className="grid gap-3 sm:grid-cols-4">
+              <label className="text-xs text-muted-foreground">
+                Variants
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={draft.maxVariants}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      maxVariants: Math.max(1, Math.min(20, Number(event.target.value) || 1)),
+                    }))
+                  }
+                />
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Retries
+                <Input
+                  type="number"
+                  min={0}
+                  max={5}
+                  value={draft.maxRetries}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      maxRetries: Math.max(0, Math.min(5, Number(event.target.value) || 0)),
+                    }))
+                  }
+                />
+              </label>
+              <label className="flex items-center gap-2 self-end pb-1 text-xs text-foreground">
+                <Switch
+                  size="sm"
+                  checked={draft.enabled}
+                  onCheckedChange={(checked) =>
+                    setDraft((current) => ({ ...current, enabled: checked }))
+                  }
+                  aria-label="Scenario enabled"
+                />
+                Enabled
+              </label>
+              <label className="flex items-center gap-2 self-end pb-1 text-xs text-foreground">
+                <Switch
+                  size="sm"
+                  checked={draft.autoStart === true}
+                  onCheckedChange={(checked) =>
+                    setDraft((current) => ({ ...current, autoStart: checked }))
+                  }
+                  aria-label="Auto-start matching Jira tasks"
+                />
+                Auto-start matching Jira tasks
+              </label>
+            </div>
+            <div className="space-y-2">
+              {draft.stages.map((stage) => (
+                <div key={stage.id} className="rounded-lg border border-border/60 p-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="grid min-w-48 flex-1 gap-1 text-2xs text-muted-foreground">
+                      Stage name
+                      <Input
+                        aria-label={`${stage.name} name`}
+                        value={stage.name}
+                        onChange={(event) => updateStage(stage.id, { name: event.target.value })}
+                      />
+                    </label>
+                    <Badge variant="outline" size="sm">
+                      {stage.kind}
+                    </Badge>
+                    <Badge variant="outline" size="sm">
+                      id:{stage.id}
+                    </Badge>
+                    <Button
+                      size="icon-xs"
+                      variant="ghost-muted"
+                      aria-label={`Move ${stage.name} up`}
+                      onClick={() => moveStage(stage.id, -1)}
+                      disabled={commandDisabled}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      size="icon-xs"
+                      variant="ghost-muted"
+                      aria-label={`Move ${stage.name} down`}
+                      onClick={() => moveStage(stage.id, 1)}
+                      disabled={commandDisabled}
+                    >
+                      ↓
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="ghost-muted"
+                      aria-label={`Remove ${stage.name}`}
+                      onClick={() => removeStage(stage.id)}
+                      disabled={commandDisabled || draft.stages.length <= 1}
+                    >
+                      Remove
+                    </Button>
                   </div>
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Switch
-                      size="sm"
-                      checked={stage.parallel}
-                      onCheckedChange={(parallel) => updateStage(stage.id, { parallel })}
-                      aria-label={`${stage.name} parallel`}
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    <div className="grid gap-1 text-2xs text-muted-foreground sm:col-span-2">
+                      <span>Depends on</span>
+                      <div
+                        className="flex flex-wrap gap-1.5"
+                        aria-label={`${stage.name} dependencies`}
+                      >
+                        {draft.stages
+                          .filter((candidate) => candidate.id !== stage.id)
+                          .map((candidate) => (
+                            <Button
+                              key={candidate.id}
+                              size="xs"
+                              variant={
+                                stage.dependsOn.includes(candidate.id) ? "secondary" : "outline"
+                              }
+                              onClick={() => toggleDependency(stage.id, candidate.id)}
+                            >
+                              {candidate.name}
+                            </Button>
+                          ))}
+                      </div>
+                      <span className="text-2xs text-muted-foreground/70">
+                        Select the stages that must finish first.
+                      </span>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Switch
+                        size="sm"
+                        checked={stage.parallel}
+                        onCheckedChange={(parallel) => updateStage(stage.id, { parallel })}
+                        aria-label={`${stage.name} parallel`}
+                      />
+                      Parallel
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Switch
+                        size="sm"
+                        checked={stage.required}
+                        onCheckedChange={(required) => updateStage(stage.id, { required })}
+                        aria-label={`${stage.name} required`}
+                      />
+                      Required
+                    </label>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <p className="sm:col-span-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Execution inputs
+                    </p>
+                    <label className="grid gap-1 text-2xs text-muted-foreground">
+                      Provider
+                      <Input
+                        aria-label={`${stage.name} provider`}
+                        value={stage.provider ?? ""}
+                        placeholder="codex"
+                        onChange={(event) =>
+                          updateStage(stage.id, { provider: event.target.value || null })
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 text-2xs text-muted-foreground">
+                      Model
+                      <Input
+                        aria-label={`${stage.name} model`}
+                        value={stage.model ?? ""}
+                        placeholder="Default model"
+                        onChange={(event) =>
+                          updateStage(stage.id, { model: event.target.value || null })
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <p className="sm:col-span-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Checks and extensions
+                    </p>
+                    <label className="grid gap-1 text-2xs text-muted-foreground">
+                      Check command
+                      <Input
+                        aria-label={`${stage.name} command`}
+                        value={stage.command ?? ""}
+                        placeholder="npm test"
+                        onChange={(event) =>
+                          updateStage(stage.id, { command: event.target.value || null })
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 text-2xs text-muted-foreground">
+                      Skills
+                      <Input
+                        aria-label={`${stage.name} skills`}
+                        value={stage.skills.join(", ")}
+                        placeholder="Comma separated"
+                        onChange={(event) =>
+                          updateStage(stage.id, {
+                            skills: event.target.value
+                              .split(",")
+                              .map((value) => value.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 text-2xs text-muted-foreground">
+                      Connectors
+                      <Input
+                        aria-label={`${stage.name} connectors`}
+                        value={stage.connectors.join(", ")}
+                        placeholder="Comma separated"
+                        onChange={(event) =>
+                          updateStage(stage.id, {
+                            connectors: event.target.value
+                              .split(",")
+                              .map((value) => value.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 text-2xs text-muted-foreground">
+                      Rules
+                      <Input
+                        aria-label={`${stage.name} rules`}
+                        value={stage.rules.join(", ")}
+                        placeholder="Comma separated"
+                        onChange={(event) =>
+                          updateStage(stage.id, {
+                            rules: event.target.value
+                              .split(",")
+                              .map((value) => value.trim())
+                              .filter(Boolean),
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label className="mt-2 grid gap-1 text-2xs text-muted-foreground">
+                    Prompt
+                    <Textarea
+                      className="min-h-20"
+                      aria-label={`${stage.name} prompt`}
+                      value={stage.prompt}
+                      placeholder="Stage prompt"
+                      onChange={(event) => updateStage(stage.id, { prompt: event.target.value })}
                     />
-                    Parallel
                   </label>
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Switch
-                      size="sm"
-                      checked={stage.required}
-                      onCheckedChange={(required) => updateStage(stage.id, { required })}
-                      aria-label={`${stage.name} required`}
-                    />
-                    Required
-                  </label>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {stage.skills.map((skill) => (
+                      <Badge key={skill} variant="secondary" size="sm">
+                        skill:{skill}
+                      </Badge>
+                    ))}
+                    {stage.connectors.map((connector) => (
+                      <Badge key={connector} variant="outline" size="sm">
+                        connector:{connector}
+                      </Badge>
+                    ))}
+                    {stage.rules.map((rule) => (
+                      <Badge key={rule} variant="outline" size="sm">
+                        rule:{rule}
+                      </Badge>
+                    ))}
+                  </div>
+                  {stage.command ? (
+                    <code className="mt-2 block truncate text-2xs text-muted-foreground">
+                      check: {stage.command}
+                    </code>
+                  ) : null}
                 </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <p className="sm:col-span-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Execution inputs
-                  </p>
-                  <label className="grid gap-1 text-2xs text-muted-foreground">
-                    Provider
-                    <Input
-                      aria-label={`${stage.name} provider`}
-                      value={stage.provider ?? ""}
-                      placeholder="codex"
-                      onChange={(event) =>
-                        updateStage(stage.id, { provider: event.target.value || null })
-                      }
-                    />
-                  </label>
-                  <label className="grid gap-1 text-2xs text-muted-foreground">
-                    Model
-                    <Input
-                      aria-label={`${stage.name} model`}
-                      value={stage.model ?? ""}
-                      placeholder="Default model"
-                      onChange={(event) =>
-                        updateStage(stage.id, { model: event.target.value || null })
-                      }
-                    />
-                  </label>
-                </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <p className="sm:col-span-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Checks and extensions
-                  </p>
-                  <label className="grid gap-1 text-2xs text-muted-foreground">
-                    Check command
-                    <Input
-                      aria-label={`${stage.name} command`}
-                      value={stage.command ?? ""}
-                      placeholder="npm test"
-                      onChange={(event) => updateStage(stage.id, { command: event.target.value || null })}
-                    />
-                  </label>
-                  <label className="grid gap-1 text-2xs text-muted-foreground">
-                    Skills
-                    <Input
-                      aria-label={`${stage.name} skills`}
-                      value={stage.skills.join(", ")}
-                      placeholder="Comma separated"
-                      onChange={(event) =>
-                        updateStage(stage.id, {
-                          skills: event.target.value.split(",").map((value) => value.trim()).filter(Boolean),
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="grid gap-1 text-2xs text-muted-foreground">
-                    Connectors
-                    <Input
-                      aria-label={`${stage.name} connectors`}
-                      value={stage.connectors.join(", ")}
-                      placeholder="Comma separated"
-                      onChange={(event) =>
-                        updateStage(stage.id, {
-                          connectors: event.target.value.split(",").map((value) => value.trim()).filter(Boolean),
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="grid gap-1 text-2xs text-muted-foreground">
-                    Rules
-                    <Input
-                      aria-label={`${stage.name} rules`}
-                      value={stage.rules.join(", ")}
-                      placeholder="Comma separated"
-                      onChange={(event) =>
-                        updateStage(stage.id, {
-                          rules: event.target.value.split(",").map((value) => value.trim()).filter(Boolean),
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-                <label className="mt-2 grid gap-1 text-2xs text-muted-foreground">
-                  Prompt
-                  <Textarea
-                    className="min-h-20"
-                    aria-label={`${stage.name} prompt`}
-                    value={stage.prompt}
-                    placeholder="Stage prompt"
-                    onChange={(event) => updateStage(stage.id, { prompt: event.target.value })}
-                  />
-                </label>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {stage.skills.map((skill) => (
-                    <Badge key={skill} variant="secondary" size="sm">
-                      skill:{skill}
-                    </Badge>
-                  ))}
-                  {stage.connectors.map((connector) => (
-                    <Badge key={connector} variant="outline" size="sm">
-                      connector:{connector}
-                    </Badge>
-                  ))}
-                  {stage.rules.map((rule) => (
-                    <Badge key={rule} variant="outline" size="sm">
-                      rule:{rule}
-                    </Badge>
-                  ))}
-                </div>
-                {stage.command ? (
-                  <code className="mt-2 block truncate text-2xs text-muted-foreground">
-                    check: {stage.command}
-                  </code>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          <Button size="xs" variant="outline" onClick={addStage} disabled={commandDisabled}>
-            Add stage
-          </Button>
-          {graphError ? <p className="text-xs text-destructive" role="alert">{graphError}</p> : null}
+              ))}
+            </div>
+            <Button size="xs" variant="outline" onClick={addStage} disabled={commandDisabled}>
+              Add stage
+            </Button>
+            {graphError ? (
+              <p className="text-xs text-destructive" role="alert">
+                {graphError}
+              </p>
+            ) : null}
           </fieldset>
           {commandDisabled ? (
-            <p className="text-xs text-muted-foreground">Read-only: you do not have permission to change this workspace.</p>
+            <p className="text-xs text-muted-foreground">
+              Read-only: you do not have permission to change this workspace.
+            </p>
           ) : null}
           <div className="flex justify-end gap-2">
             <Button
@@ -746,7 +796,11 @@ function VariantRow({
       {artifacts.length > 0 ? (
         <ul className="mt-2 space-y-1.5">
           {artifacts.map((artifact) => (
-            <ArtifactCard key={artifact.id} artifact={artifact} onLaunch={() => onLaunchArtifact(artifact)} />
+            <ArtifactCard
+              key={artifact.id}
+              artifact={artifact}
+              onLaunch={() => onLaunchArtifact(artifact)}
+            />
           ))}
         </ul>
       ) : null}
@@ -771,6 +825,7 @@ function TaskList({
   onProjectChange,
   onAssigneeChange,
   onStatusFilterChange,
+  showScopeSelectors,
   selectedId,
   filter,
   onFilterChange,
@@ -793,6 +848,7 @@ function TaskList({
   onProjectChange: (value: ProjectId) => void;
   onAssigneeChange: (value: string) => void;
   onStatusFilterChange: (value: string) => void;
+  showScopeSelectors: boolean;
   selectedId: string | undefined;
   filter: string;
   onFilterChange: (value: string) => void;
@@ -817,7 +873,8 @@ function TaskList({
     assigneeFilter === ""
       ? statusVisible
       : statusVisible.filter(
-          (task) => task.issue.assigneeId === assigneeFilter || task.issue.assignee === assigneeFilter,
+          (task) =>
+            task.issue.assigneeId === assigneeFilter || task.issue.assignee === assigneeFilter,
         );
   const groups = new Map<string, TaskWorkspaceTask[]>();
   assigneeVisible
@@ -843,7 +900,13 @@ function TaskList({
           </p>
         </div>
         <Badge variant="secondary">{assigneeVisible.length}</Badge>
-        <Button size="icon-sm" variant="ghost-muted" aria-label="Sync tasks" onClick={onSync} disabled={syncDisabled}>
+        <Button
+          size="icon-sm"
+          variant="ghost-muted"
+          aria-label="Sync tasks"
+          onClick={onSync}
+          disabled={syncDisabled}
+        >
           <RefreshCwIcon className={syncDisabled ? "animate-spin" : undefined} />
         </Button>
       </div>
@@ -857,31 +920,44 @@ function TaskList({
         />
       </label>
       <div className="grid gap-2 border-b border-border/70 px-3 pb-3 sm:grid-cols-2 md:grid-cols-1">
-        <Select value={environmentId} onValueChange={(value) => value && onEnvironmentChange(value as EnvironmentId)}>
-          <SelectTrigger size="sm" aria-label="Environment">
-            <SelectValue placeholder="Environment" />
-          </SelectTrigger>
-          <SelectPopup>
-            {environmentOptions.map((entry) => (
-              <SelectItem key={entry.id} value={entry.id}>
-                {entry.label}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
-        <Select value={projectId} onValueChange={(value) => value && onProjectChange(value as ProjectId)}>
-          <SelectTrigger size="sm" aria-label="Project">
-            <SelectValue placeholder="Project" />
-          </SelectTrigger>
-          <SelectPopup>
-            {projectOptions.map((entry) => (
-              <SelectItem key={entry.id} value={entry.id}>
-                {entry.label}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
-        <Select value={assigneeFilter || "all"} onValueChange={(value) => onAssigneeChange(value === "all" ? "" : (value ?? ""))}>
+        {showScopeSelectors ? (
+          <>
+            <Select
+              value={environmentId}
+              onValueChange={(value) => value && onEnvironmentChange(value as EnvironmentId)}
+            >
+              <SelectTrigger size="sm" aria-label="Environment">
+                <SelectValue placeholder="Environment" />
+              </SelectTrigger>
+              <SelectPopup>
+                {environmentOptions.map((entry) => (
+                  <SelectItem key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+            <Select
+              value={projectId}
+              onValueChange={(value) => value && onProjectChange(value as ProjectId)}
+            >
+              <SelectTrigger size="sm" aria-label="Project">
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectPopup>
+                {projectOptions.map((entry) => (
+                  <SelectItem key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          </>
+        ) : null}
+        <Select
+          value={assigneeFilter || "all"}
+          onValueChange={(value) => onAssigneeChange(value === "all" ? "" : (value ?? ""))}
+        >
           <SelectTrigger size="sm" aria-label="Jira assignee">
             <SelectValue placeholder="All assignees" />
           </SelectTrigger>
@@ -894,7 +970,10 @@ function TaskList({
             ))}
           </SelectPopup>
         </Select>
-        <Select value={statusFilter || "all"} onValueChange={(value) => onStatusFilterChange(value === "all" ? "" : (value ?? ""))}>
+        <Select
+          value={statusFilter || "all"}
+          onValueChange={(value) => onStatusFilterChange(value === "all" ? "" : (value ?? ""))}
+        >
           <SelectTrigger size="sm" aria-label="Jira status">
             <SelectValue placeholder="All Jira statuses" />
           </SelectTrigger>
@@ -1027,9 +1106,7 @@ function TaskDetails({
   );
   const selectedArtifactId = selectedArtifact?.id;
   const visibleSummary = task.draft?.dirty ? task.draft.summary : task.issue.summary;
-  const visibleDescription = task.draft?.dirty
-    ? task.draft.description
-    : task.issue.description;
+  const visibleDescription = task.draft?.dirty ? task.draft.description : task.issue.description;
   const saveDraft = () => {
     onCommand({
       _tag: "saveDraft",
@@ -1432,11 +1509,10 @@ function TaskDetails({
           <AlertDialogHeader>
             <AlertDialogTitle>Start {task.scenario.maxVariants} task variants?</AlertDialogTitle>
             <AlertDialogDescription>
-              This starts independent agent threads in separate worktrees. The scenario will use
-              {" "}
-              {task.scenario.stages.find((stage) => stage.kind === "agent")?.provider ?? "codex"}
-              {" "}with full workspace access. Audit and checks remain pending until their workers
-              report results.
+              This starts independent agent threads in separate worktrees. The scenario will use{" "}
+              {task.scenario.stages.find((stage) => stage.kind === "agent")?.provider ?? "codex"}{" "}
+              with full workspace access. Audit and checks remain pending until their workers report
+              results.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1457,7 +1533,7 @@ function TaskDetails({
           <AlertDialogHeader>
             <AlertDialogTitle>Publish {selectedVariant?.label ?? "this variant"}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Push the selected worktree to <strong>{branch}</strong>, then send {" "}
+              Push the selected worktree to <strong>{branch}</strong>, then send{" "}
               {task.comments.filter((comment) => comment.source === "agent").length} prepared Jira
               comments. A partial failure keeps the push receipt for recovery.
             </AlertDialogDescription>
@@ -1594,7 +1670,13 @@ export function TaskMobileNavigation({
   );
 }
 
-export function TasksWorkspace({ target }: { target: TaskWorkspaceSearch }) {
+export function TasksWorkspace({
+  target,
+  scopeInHeader = false,
+}: {
+  target: TaskWorkspaceSearch;
+  scopeInHeader?: boolean;
+}) {
   const navigate = useNavigate();
   const { environments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -1669,8 +1751,7 @@ export function TasksWorkspace({ target }: { target: TaskWorkspaceSearch }) {
   // Keeps the server-owned detached worker state visible while a run is active.
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- timer is an external polling resource held until unmount
   useEffect(() => {
-    if (snapshot === null || !snapshot.configured)
-      return;
+    if (snapshot === null || !snapshot.configured) return;
     const refreshId = window.setInterval(
       query.refresh,
       snapshot.tasks.some((task) => task.run?.status === "running") ? 2_000 : 30_000,
@@ -1782,7 +1863,9 @@ export function TasksWorkspace({ target }: { target: TaskWorkspaceSearch }) {
                 placeholder="Jira project key, for example NEUROKEY"
                 aria-label="Jira project key"
               />
-              {snapshot?.error ? <p className="text-sm text-destructive">{snapshot.error}</p> : null}
+              {snapshot?.error ? (
+                <p className="text-sm text-destructive">{snapshot.error}</p>
+              ) : null}
               <Button
                 className="w-full justify-center"
                 disabled={commandPending || !canCommand || jiraUrl.trim() === ""}
@@ -1838,6 +1921,7 @@ export function TasksWorkspace({ target }: { target: TaskWorkspaceSearch }) {
         >
           <TaskList
             tasks={snapshot.tasks}
+            showScopeSelectors={!scopeInHeader}
             contextLabel={`${project?.title ?? projectId} · ${environment.label ?? environment.environmentId}`}
             environmentId={environmentId}
             environmentOptions={environmentOptions}
@@ -1854,7 +1938,10 @@ export function TasksWorkspace({ target }: { target: TaskWorkspaceSearch }) {
             }}
             onProjectChange={(value) => {
               setAssigneeFilter("");
-              void navigate({ to: "/tasks", search: { environmentId, projectId: value, view: "jira" } });
+              void navigate({
+                to: "/tasks",
+                search: { environmentId, projectId: value, view: "jira" },
+              });
             }}
             onAssigneeChange={setAssigneeFilter}
             onStatusFilterChange={setStatusFilter}
@@ -1866,7 +1953,10 @@ export function TasksWorkspace({ target }: { target: TaskWorkspaceSearch }) {
             onSelect={(task) => {
               setCommandError(null);
               setCommandNotice(null);
-              void navigate({ to: "/tasks", search: { environmentId, projectId, taskId: task.id } });
+              void navigate({
+                to: "/tasks",
+                search: { environmentId, projectId, taskId: task.id },
+              });
             }}
           />
         </div>
@@ -1876,7 +1966,9 @@ export function TasksWorkspace({ target }: { target: TaskWorkspaceSearch }) {
             task={selectedTask}
             environmentId={environmentId}
             onCommand={runCommand}
-            onBack={() => void navigate({ to: "/tasks", search: { environmentId, projectId, view: "jira" } })}
+            onBack={() =>
+              void navigate({ to: "/tasks", search: { environmentId, projectId, view: "jira" } })
+            }
             commandDisabled={commandPending || !canCommand}
             commandError={commandError}
             commandNotice={commandNotice}

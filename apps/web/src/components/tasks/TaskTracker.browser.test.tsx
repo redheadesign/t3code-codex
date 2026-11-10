@@ -16,6 +16,8 @@ import { TaskTracker } from "./TaskTracker";
 
 const environmentId = EnvironmentId.make("laptop");
 const projectId = ProjectId.make("project");
+const remoteEnvironmentId = EnvironmentId.make("remote");
+const remoteProjectId = ProjectId.make("mobile");
 const threadId = ThreadId.make("thread");
 const timestamp = "2026-11-10T08:00:00.000Z";
 const scope = { environmentId, projectId };
@@ -31,8 +33,24 @@ const board: TaskWorkspaceBoard = {
       threadId,
       claim: null,
       blockedBy: [],
-      comments: [],
-      activity: [],
+      comments: [
+        {
+          id: "handoff",
+          author: "Designer",
+          body: "Navigation is ready for review.",
+          source: "user",
+          createdAt: "2026-11-10T08:05:00.000Z",
+        },
+      ],
+      activity: [
+        {
+          id: "created",
+          kind: "created",
+          author: "Designer",
+          description: "Created task",
+          createdAt: timestamp,
+        },
+      ],
       createdAt: timestamp,
       updatedAt: timestamp,
     },
@@ -89,6 +107,12 @@ vi.mock("../../state/environments", () => ({
   useEnvironments: () => ({
     environments: [
       { environmentId, label: "Laptop", connection: { phase: "connected" }, serverConfig: {} },
+      {
+        environmentId: remoteEnvironmentId,
+        label: "Build host",
+        connection: { phase: "connected" },
+        serverConfig: {},
+      },
     ],
   }),
   usePrimaryEnvironmentId: () => environmentId,
@@ -96,7 +120,20 @@ vi.mock("../../state/environments", () => ({
 }));
 vi.mock("../../state/entities", () => ({
   useProjects: () => [
-    { environmentId, id: projectId, title: "Workspaces", workspaceRoot: "/workspace/project" },
+    {
+      environmentId,
+      id: projectId,
+      title: "Workspaces",
+      workspaceRoot: "/workspace/project",
+      projectIcon: { kind: "emoji", emoji: "📁" },
+    },
+    {
+      environmentId: remoteEnvironmentId,
+      id: remoteProjectId,
+      title: "Mobile app",
+      workspaceRoot: "/workspace/mobile",
+      projectIcon: { kind: "emoji", emoji: "📱" },
+    },
   ],
 }));
 vi.mock("../../state/query", () => ({
@@ -152,4 +189,21 @@ it("moves a task to another column and opens the same task from its chat link", 
   await expect
     .element(dialog.getByRole("combobox", { name: "Task status" }))
     .toHaveTextContent("In review");
+  const activity = dialog.getByRole("list", { name: "Task activity" }).getByRole("listitem");
+  await expect.element(activity.nth(0)).toHaveTextContent(/Navigation is ready for review\./);
+  await expect.element(activity.nth(1)).toHaveTextContent(/Created task/);
+});
+
+it("switches projects from the header and keeps the current view", async () => {
+  setup();
+  await using screen = await render(<TaskTracker target={{ ...scope, view: "archive" }} />);
+  await userEvent.click(screen.getByRole("combobox", { name: "Project: Workspaces" }));
+  const search = page.getByPlaceholder("Search projects");
+  await userEvent.fill(search, "Build host");
+  await expect.element(page.getByRole("option", { name: /Workspaces/ })).not.toBeInTheDocument();
+  await userEvent.click(page.getByRole("option", { name: /Mobile app/ }));
+  expect(fixture.navigate).toHaveBeenCalledWith({
+    to: "/tasks",
+    search: { environmentId: remoteEnvironmentId, projectId: remoteProjectId, view: "archive" },
+  });
 });

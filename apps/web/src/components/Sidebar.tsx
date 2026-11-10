@@ -443,7 +443,7 @@ function useSidebarThreads(input: {
   readonly routeRowThreadKey: string | null;
   // Set in boring mode: the project groups to fold active threads into, in order.
   readonly folderGroups: readonly SidebarProjectSnapshot[] | null;
-  // Keeps folders with no active threads, so a project the user filtered to or pinned can start one.
+  // Named projects remain visible while their active thread list is empty.
   readonly keepEmptyFolders: (group: SidebarProjectSnapshot) => boolean;
 }) {
   const {
@@ -558,6 +558,12 @@ function useSidebarThreads(input: {
   const visibleWorkingThreads = workingShelfExpanded
     ? workingThreads
     : routeThreadOnly(workingThreads, routeRowThreadKey);
+  const projectKeysWithChats =
+    folderGroups === null
+      ? null
+      : new Set(
+          partition.visibleThreads.map((thread) => `${thread.environmentId}:${thread.projectId}`),
+        );
   const projectFolders =
     folderGroups === null
       ? null
@@ -569,6 +575,9 @@ function useSidebarThreads(input: {
           return {
             group: folder.group,
             collapsed,
+            hasChats: folder.group.memberProjectRefs.some((ref) =>
+              projectKeysWithChats?.has(`${ref.environmentId}:${ref.projectId}`),
+            ),
             // A closed folder still shows the open thread, and hints at the rest.
             threads: collapsed
               ? routeThreadOnly(folder.threads, routeRowThreadKey)
@@ -1456,7 +1465,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         : scopedProjectGroups
       : null,
     keepEmptyFolders: (group) =>
-      scopedProjectGroups.length > 0 || (group.pinned && !group.archived),
+      !group.archived && (!group.isScratch || group.pinned || scopedProjectGroups.length > 0),
   });
 
   const orderedThreadKeysRef = useRef(orderedThreadKeys);
@@ -1918,7 +1927,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
         return { kind: "thread", key, section };
       });
-    // Boring mode keeps a pinned open project or one the user filtered to, so it can start a thread.
     if (
       !hasProjectFolders &&
       pinnedThreads.length +
@@ -3453,6 +3461,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         continue;
                       }
                       if (projectFolders !== null && item.marker === "active-placeholder") {
+                        if (projectFolders.length > 0) {
+                          items.push(
+                            <li
+                              key="projects-label"
+                              className="mt-2 list-none px-(--sidebar-row-content-inset) py-1 text-xs font-medium text-sidebar-muted-foreground"
+                            >
+                              Projects
+                            </li>,
+                          );
+                        }
                         for (const folder of projectFolders) {
                           items.push(
                             <SidebarProjectFolderHeader
@@ -3472,6 +3490,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 "active",
                                 sidebarFolderRowId(folder.group.projectKey),
                               ),
+                            );
+                          }
+                          if (!folder.collapsed && folder.threads.length === 0) {
+                            items.push(
+                              <li
+                                key={`empty-project-folder:${folder.group.projectKey}`}
+                                className="flex h-8 list-none items-center ps-9 pe-2.5 text-sm text-sidebar-muted-foreground"
+                              >
+                                {folder.hasChats ? "No active chats" : "No chats"}
+                              </li>,
                             );
                           }
                         }
@@ -3549,6 +3577,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           );
                           break;
                         case "settled-header":
+                          if (projectFolders !== null && settledCount === 0) break;
                           items.push(
                             <SidebarSectionHeader
                               key="settled-shelf-header"

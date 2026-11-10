@@ -93,7 +93,7 @@ function WorkspaceGlobalChrome() {
   const projection = useQuietThreadProjection(shell === null ? threadRef : null);
   const thread = shell ?? projection?.projection.thread ?? null;
   const title = tasksPage
-    ? "Tasks"
+    ? ""
     : designPage
       ? "Design"
       : automationsPage
