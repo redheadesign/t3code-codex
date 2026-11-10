@@ -11,6 +11,8 @@ const validPreload = `
     getLocalEnvironmentBootstraps: () => [],
     getPathForFile: () => "",
     pickFolder: (options) => electron.ipcRenderer.invoke(PICK_FOLDER_CHANNEL, options),
+    pickFolders: (options) => electron.ipcRenderer.invoke("desktop:pick-folders", options),
+    trustProjectFolders: (input) => electron.ipcRenderer.invoke("desktop:trust-project-folders", input),
   });
 `;
 

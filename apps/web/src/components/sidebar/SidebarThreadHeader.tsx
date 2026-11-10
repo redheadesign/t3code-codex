@@ -9,7 +9,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export function SidebarThreadHeader(props: {
   onArchive: () => void;
-  onNewProject: () => void;
+  onNewProject?: () => void;
   importSessions: ReactNode;
   activity?: ReactNode;
 }) {
@@ -20,12 +20,14 @@ export function SidebarThreadHeader(props: {
         <SidebarBrandMark />
       </div>
       {props.activity}
-      <SidebarHeaderIconButton
-        label={text("Add project", "Добавить проект")}
-        onClick={props.onNewProject}
-      >
-        <FolderPlusIcon />
-      </SidebarHeaderIconButton>
+      {props.onNewProject ? (
+        <SidebarHeaderIconButton
+          label={text("Add project", "Добавить проект")}
+          onClick={props.onNewProject}
+        >
+          <FolderPlusIcon />
+        </SidebarHeaderIconButton>
+      ) : null}
       {props.importSessions}
       <SidebarHeaderIconButton
         label={text("Archived threads", "Архив чатов")}

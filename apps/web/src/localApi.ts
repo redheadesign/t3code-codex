@@ -13,6 +13,13 @@ export function createLocalApi(): LocalApi {
         if (!window.desktopBridge) return null;
         return window.desktopBridge.pickFolder(options);
       },
+      pickFolders: async (options) => {
+        const bridge = window.desktopBridge;
+        if (!bridge) return [];
+        if (bridge.pickFolders) return bridge.pickFolders(options);
+        const path = await bridge.pickFolder(options);
+        return path === null ? [] : [path];
+      },
       confirm: async (message, options?: ConfirmDialogOptions) => {
         return requestConfirmDialog(message, options) ?? false;
       },

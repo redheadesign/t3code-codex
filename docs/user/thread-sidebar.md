@@ -153,6 +153,11 @@ On web and desktop, **Projects** lists each project with its chats underneath. E
 visible. Click a project to collapse or expand it. Use the pen button on a project or its context
 menu to start a chat there. Chats without a project are in **Recent**.
 
+Hover over **Projects** or tab to **Add project** to add a folder. In the Windows
+desktop app, hold `Ctrl` in File Explorer to select several folders at once.
+Confirm the trust prompt to save those folders as trusted in Codex. Claude Code
+asks you to confirm trust when you first open each folder there.
+
 Use **View activity** in the sidebar header to jump to a chat that needs your attention,
 is running, or recently finished.
 

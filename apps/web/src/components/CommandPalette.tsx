@@ -96,6 +96,7 @@ import { useDesktopLocalBootstraps } from "../connection/useDesktopLocalBootstra
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useOpenPanelPullRequestUrl } from "../hooks/useOpenPanelPullRequestUrl";
 import { copyThreadReference } from "../lib/copyThreadReference";
+import { tryAddProjectsFromExplorer } from "../lib/openAddProjects";
 import {
   queueWorkspaceFocusFromPalette,
   restoreWorkspaceFocusFromPalette,
@@ -955,6 +956,13 @@ function OpenCommandPaletteDialog(props: {
   const startAddProjectBrowse = async (environmentId: EnvironmentId): Promise<void> => {
     const initialQuery = getAddProjectInitialQueryForEnvironment(environmentId);
     const initialBrowsePath = getBrowseDirectoryPath(initialQuery);
+    const explorer = tryAddProjectsFromExplorer(text, {
+      environmentId,
+      ...(initialBrowsePath ? { initialPath: initialBrowsePath } : {}),
+      onOpen: () => setOpen(false),
+    });
+    if (explorer) return explorer;
+
     const browseCwd = getBrowseCwdForEnvironment(environmentId);
     const view: CommandPaletteView = {
       addonIcon: <FolderPlusIcon className={ADDON_ICON_CLASS} />,
@@ -2730,6 +2738,15 @@ function OpenCommandPaletteDialog(props: {
     if (!canOpenProjectFromFileManager || isPickingProjectFolder) {
       return;
     }
+    const explorer = browseEnvironmentId
+      ? tryAddProjectsFromExplorer(text, {
+          environmentId: browseEnvironmentId,
+          ...(fileManagerInitialPath ? { initialPath: fileManagerInitialPath } : {}),
+          onOpen: () => setOpen(false),
+        })
+      : null;
+    if (explorer) return explorer;
+
     const api = readLocalApi();
     if (!api) {
       return;

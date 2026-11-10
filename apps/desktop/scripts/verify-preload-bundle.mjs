@@ -11,6 +11,8 @@ const expectedDesktopBridgeApis = [
   "getLocalEnvironmentBootstraps",
   "getPathForFile",
   "pickFolder",
+  "pickFolders",
+  "trustProjectFolders",
 ];
 const clerkPasskeysGlobal = "__clerk_internal_electron_passkeys";
 const preloadExecutionTimeoutMs = 1_000;
@@ -108,6 +110,7 @@ const executeBundle = (source, sandboxModules) => {
     {
       process: sandboxProcess,
       require: requireSandboxModule,
+      window: { addEventListener: () => undefined },
     },
     {
       filename: "desktop-preload.cjs",

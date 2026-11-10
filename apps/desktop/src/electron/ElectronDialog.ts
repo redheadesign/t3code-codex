@@ -74,9 +74,10 @@ export const ElectronDialogError = Schema.Union([
 ]);
 export type ElectronDialogError = typeof ElectronDialogError.Type;
 
-export interface ElectronDialogPickFolderInput {
+export interface ElectronDialogPickFoldersInput {
   readonly owner: Option.Option<Electron.BrowserWindow>;
   readonly defaultPath: Option.Option<string>;
+  readonly multiple: boolean;
 }
 
 export interface ElectronDialogPickFilesInput {
@@ -89,9 +90,9 @@ export interface ElectronDialogPickFilesInput {
 export class ElectronDialog extends Context.Service<
   ElectronDialog,
   {
-    readonly pickFolder: (
-      input: ElectronDialogPickFolderInput,
-    ) => Effect.Effect<Option.Option<string>, ElectronDialogPickFolderError>;
+    readonly pickFolders: (
+      input: ElectronDialogPickFoldersInput,
+    ) => Effect.Effect<readonly string[], ElectronDialogPickFolderError>;
     readonly pickFiles: (
       input: ElectronDialogPickFilesInput,
     ) => Effect.Effect<readonly string[], ElectronDialogPickFilesError>;
@@ -106,21 +107,18 @@ export class ElectronDialog extends Context.Service<
 
 /** @public */
 export const make = ElectronDialog.of({
-  pickFolder: Effect.fn("desktop.electron.dialog.pickFolder")(function* (input) {
+  pickFolders: Effect.fn("desktop.electron.dialog.pickFolders")(function* (input) {
     const ownerWindowId = Option.match(input.owner, {
       onNone: () => null,
       onSome: (owner) => owner.id,
     });
     const defaultPath = Option.getOrNull(input.defaultPath);
-    const openDialogOptions: Electron.OpenDialogOptions = Option.match(input.defaultPath, {
-      onNone: () => ({
-        properties: ["openDirectory", "createDirectory"],
-      }),
-      onSome: (defaultPath) => ({
-        properties: ["openDirectory", "createDirectory"],
-        defaultPath,
-      }),
-    });
+    const openDialogOptions: Electron.OpenDialogOptions = {
+      properties: input.multiple
+        ? ["openDirectory", "createDirectory", "multiSelections"]
+        : ["openDirectory", "createDirectory"],
+      ...(defaultPath === null ? {} : { defaultPath }),
+    };
     const result = yield* Effect.tryPromise({
       try: () =>
         Option.match(input.owner, {
@@ -135,10 +133,7 @@ export const make = ElectronDialog.of({
         }),
     });
 
-    if (result.canceled) {
-      return Option.none();
-    }
-    return Option.fromNullishOr(result.filePaths[0]);
+    return result.canceled ? [] : result.filePaths;
   }),
   pickFiles: Effect.fn("desktop.electron.dialog.pickFiles")(function* (input) {
     const ownerWindowId = Option.match(input.owner, {

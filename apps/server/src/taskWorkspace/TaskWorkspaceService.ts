@@ -57,7 +57,10 @@ export interface TaskWorkspaceAdapters {
     readonly workspaceRoot: string;
     readonly branch: string;
     readonly variant: TaskWorkspaceVariant;
-  }) => Effect.Effect<{ readonly pushedSha: string; readonly remoteUrl?: string }, TaskWorkspaceError>;
+  }) => Effect.Effect<
+    { readonly pushedSha: string; readonly remoteUrl?: string },
+    TaskWorkspaceError
+  >;
   readonly dispatchVariants?: (input: {
     readonly workspaceRoot: string;
     readonly projectId: ProjectId;
@@ -126,7 +129,13 @@ const now = () => DateTime.formatIso(DateTime.nowUnsafe());
 export const emptyTaskWorkspaceSnapshot = (): TaskWorkspaceSnapshot => ({
   revision: 0,
   configured: false,
-  connection: { configured: false, url: null, username: null, secretConfigured: false, projectKeys: [] },
+  connection: {
+    configured: false,
+    url: null,
+    username: null,
+    secretConfigured: false,
+    projectKeys: [],
+  },
   assignee: null,
   sprints: [],
   tasks: [],
@@ -147,8 +156,12 @@ function stateFile(input: Pick<TaskWorkspaceReadInput, "environmentId" | "projec
   return `${STATE_DIRECTORY}/${segment(input.environmentId)}/${segment(input.projectId)}.json`;
 }
 
-function jiraSourceKey(connection: Pick<TaskWorkspaceConnection, "url" | "username" | "projectKeys">): string {
-  const raw = `${connection.url ?? ""}|${connection.username ?? ""}|${[...(connection.projectKeys ?? [])]
+function jiraSourceKey(
+  connection: Pick<TaskWorkspaceConnection, "url" | "username" | "projectKeys">,
+): string {
+  const raw = `${connection.url ?? ""}|${connection.username ?? ""}|${[
+    ...(connection.projectKeys ?? []),
+  ]
     .sort()
     .join(",")}`;
   let hash = 2_166_136_261;
@@ -171,7 +184,8 @@ function sameJiraSource(
   return (
     (left.url ?? "") === (right.url ?? "") &&
     (left.username ?? "") === (right.username ?? "") &&
-    [...(left.projectKeys ?? [])].sort().join(",") === [...(right.projectKeys ?? [])].sort().join(",")
+    [...(left.projectKeys ?? [])].sort().join(",") ===
+      [...(right.projectKeys ?? [])].sort().join(",")
   );
 }
 
@@ -321,7 +335,7 @@ export function updateVariantRun(
       variant.id === update.variantId
         ? {
             ...variant,
-            ...( ["cancelled", "failed", "succeeded"].includes(task.run!.status)
+            ...(["cancelled", "failed", "succeeded"].includes(task.run!.status)
               ? {}
               : { status: update.status, error: update.error ?? null }),
             ...(update.output === undefined ? {} : { output: update.output }),
@@ -412,7 +426,9 @@ export function updateVariantRun(
       update.stageId !== undefined &&
       task.scenario.stages.find((stage) => stage.id === update.stageId)?.kind === "publish";
     const agentStage = task.scenario.stages.find((stage) => stage.kind === "agent");
-    const nextStage = task.scenario.stages.find((stage) => stage.dependsOn.includes(agentStage?.id ?? ""));
+    const nextStage = task.scenario.stages.find((stage) =>
+      stage.dependsOn.includes(agentStage?.id ?? ""),
+    );
     return {
       ...task,
       run: {
@@ -429,22 +445,21 @@ export function updateVariantRun(
           ? update.final && !anyFailed && !anyCancelled
             ? "succeeded"
             : anyFailed
-            ? "failed"
-            : anyCancelled
-              ? "cancelled"
-              : nextStage === undefined
-                ? "succeeded"
-                : "running"
+              ? "failed"
+              : anyCancelled
+                ? "cancelled"
+                : nextStage === undefined
+                  ? "succeeded"
+                  : "running"
           : "running",
-        currentStageId:
-          publishPending
-            ? update.stageId!
-            : update.stageCompleted === true && update.stageId !== undefined && !update.final
-            ? nextRunnableStage?.id ?? null
+        currentStageId: publishPending
+          ? update.stageId!
+          : update.stageCompleted === true && update.stageId !== undefined && !update.final
+            ? (nextRunnableStage?.id ?? null)
             : allTerminal
               ? update.final && !anyFailed && !anyCancelled
                 ? null
-                : nextStage?.id ?? (anyFailed || anyCancelled ? task.run.currentStageId : null)
+                : (nextStage?.id ?? (anyFailed || anyCancelled ? task.run.currentStageId : null))
               : task.run.currentStageId,
         completedStageIds:
           update.final && !anyFailed && !anyCancelled
@@ -455,8 +470,7 @@ export function updateVariantRun(
               ? [...new Set([...reportedCompletedStageIds, agentStage.id])]
               : reportedCompletedStageIds,
         finishedAt:
-          allTerminal &&
-          (anyFailed || anyCancelled || nextStage === undefined || update.final)
+          allTerminal && (anyFailed || anyCancelled || nextStage === undefined || update.final)
             ? now()
             : null,
         error: anyFailed
@@ -570,7 +584,9 @@ export function makeTaskWorkspaceService(
   adapters: TaskWorkspaceAdapters = {},
   semaphore?: Semaphore.Semaphore,
 ) {
-  const lockFor = (input: Pick<TaskWorkspaceReadInput, "environmentId" | "projectId" | "workspaceRoot">) => {
+  const lockFor = (
+    input: Pick<TaskWorkspaceReadInput, "environmentId" | "projectId" | "workspaceRoot">,
+  ) => {
     if (semaphore !== undefined) return semaphore;
     const key = stateFile(input);
     const existing = STATE_SEMAPHORES.get(key);
@@ -579,9 +595,7 @@ export function makeTaskWorkspaceService(
     STATE_SEMAPHORES.set(key, created);
     return created;
   };
-  const dispatchLockFor = (
-    input: Pick<TaskWorkspaceReadInput, "environmentId" | "projectId">,
-  ) => {
+  const dispatchLockFor = (input: Pick<TaskWorkspaceReadInput, "environmentId" | "projectId">) => {
     const key = stateFile(input);
     const existing = DISPATCH_SEMAPHORES.get(key);
     if (existing !== undefined) return existing;
@@ -611,7 +625,11 @@ export function makeTaskWorkspaceService(
           result.exists !== false
             ? decodeStored(result.contents, "stored")
             : workspaceFileSystem
-                .readFile({ cwd: input.workspaceRoot, relativePath: LEGACY_STATE_FILE, allowMissing: true })
+                .readFile({
+                  cwd: input.workspaceRoot,
+                  relativePath: LEGACY_STATE_FILE,
+                  allowMissing: true,
+                })
                 .pipe(
                   Effect.flatMap((legacy) =>
                     legacy.exists !== false
@@ -632,7 +650,9 @@ export function makeTaskWorkspaceService(
                 })
                 .pipe(
                   Effect.flatMap((source) =>
-                    source.exists === false ? Effect.succeed(snapshot) : decodeStored(source.contents, "source"),
+                    source.exists === false
+                      ? Effect.succeed(snapshot)
+                      : decodeStored(source.contents, "source"),
                   ),
                 ),
         ),
@@ -670,7 +690,9 @@ export function makeTaskWorkspaceService(
       });
       return snapshot;
     }).pipe(
-      Effect.mapError((cause) => taskError("write", "Could not persist task workspace state.", cause)),
+      Effect.mapError((cause) =>
+        taskError("write", "Could not persist task workspace state.", cause),
+      ),
     );
   });
   const readSourceStored = Effect.fn("TaskWorkspace.readSourceStored")(function* (
@@ -938,7 +960,8 @@ export function makeTaskWorkspaceService(
         message: "Task workspace changed. Reload before applying this command.",
       });
     const command: TaskWorkspaceCommand = input.command;
-    if (isBoardCommand(command)) return yield* taskError("command", "Use the local task board for this command.");
+    if (isBoardCommand(command))
+      return yield* taskError("command", "Use the local task board for this command.");
     switch (command._tag) {
       case "sync": {
         const synced = yield* sync(input, snapshot);
@@ -974,7 +997,7 @@ export function makeTaskWorkspaceService(
         const base =
           sourceChanged && targetSource === null
             ? { ...snapshot, tasks: [], sprints: [], lastSyncedAt: null }
-            : targetSource ?? snapshot;
+            : (targetSource ?? snapshot);
         return {
           ...base,
           configured: true,
@@ -1029,54 +1052,51 @@ export function makeTaskWorkspaceService(
       }
       case "runScenario":
         return yield* startTaskRun(input, snapshot, command.taskId);
-      case "cancelRun":
-        {
-          const task = snapshot.tasks.find((entry) => entry.id === command.taskId);
-          if (task?.run && ["queued", "running"].includes(task.run.status)) {
-            const threadIds = [
-              ...new Set([
-                ...(task.run.workerThreadIds ?? []),
-                ...task.run.variants.flatMap((variant) => variant.threadIds),
-              ]),
-            ];
-            if (adapters.cancelVariants !== undefined && threadIds.length > 0)
-              yield* adapters.cancelVariants({ projectId: input.projectId, threadIds });
-          }
-          return updateTask(snapshot, command.taskId, (current) =>
-            current.run === null ||
-            ["succeeded", "failed", "cancelled"].includes(current.run.status)
-              ? current
-              : {
-                  ...current,
-                  run: {
-                    ...current.run,
-                    status: "cancelled",
-                    finishedAt: now(),
-                    error: "Cancelled by the user.",
-                  },
-                  updatedAt: now(),
+      case "cancelRun": {
+        const task = snapshot.tasks.find((entry) => entry.id === command.taskId);
+        if (task?.run && ["queued", "running"].includes(task.run.status)) {
+          const threadIds = [
+            ...new Set([
+              ...(task.run.workerThreadIds ?? []),
+              ...task.run.variants.flatMap((variant) => variant.threadIds),
+            ]),
+          ];
+          if (adapters.cancelVariants !== undefined && threadIds.length > 0)
+            yield* adapters.cancelVariants({ projectId: input.projectId, threadIds });
+        }
+        return updateTask(snapshot, command.taskId, (current) =>
+          current.run === null || ["succeeded", "failed", "cancelled"].includes(current.run.status)
+            ? current
+            : {
+                ...current,
+                run: {
+                  ...current.run,
+                  status: "cancelled",
+                  finishedAt: now(),
+                  error: "Cancelled by the user.",
                 },
+                updatedAt: now(),
+              },
+        );
+      }
+      case "retryStage": {
+        const task = snapshot.tasks.find((entry) => entry.id === command.taskId);
+        const stage = task?.scenario.stages.find((entry) => entry.id === command.stageId);
+        if (task === undefined || stage === undefined)
+          return yield* taskError("retryStage", `Stage ${command.stageId} was not found.`);
+        if (task.run === null) return yield* taskError("retryStage", "There is no run to retry.");
+        if (stage.kind === "publish")
+          return yield* taskError(
+            "retryStage",
+            "Publish stages are retried through the explicit Publish action.",
           );
-        }
-      case "retryStage":
-        {
-          const task = snapshot.tasks.find((entry) => entry.id === command.taskId);
-          const stage = task?.scenario.stages.find((entry) => entry.id === command.stageId);
-          if (task === undefined || stage === undefined)
-            return yield* taskError("retryStage", `Stage ${command.stageId} was not found.`);
-          if (task.run === null) return yield* taskError("retryStage", "There is no run to retry.");
-          if (stage.kind === "publish")
-            return yield* taskError(
-              "retryStage",
-              "Publish stages are retried through the explicit Publish action.",
-            );
-          const reset = updateTask(snapshot, command.taskId, (current) => ({
-            ...current,
-            run: null,
-            updatedAt: now(),
-          }));
-          return yield* startTaskRun(input, reset, command.taskId);
-        }
+        const reset = updateTask(snapshot, command.taskId, (current) => ({
+          ...current,
+          run: null,
+          updatedAt: now(),
+        }));
+        return yield* startTaskRun(input, reset, command.taskId);
+      }
       case "selectVariants":
         return updateTask(snapshot, command.taskId, (task) => {
           if (new Set(command.variantIds).size !== command.variantIds.length)
@@ -1174,7 +1194,7 @@ export function makeTaskWorkspaceService(
         const previousReceipt = task.publishes.find(
           (entry) =>
             entry.variantId === command.variantId &&
-              (publishStageId === undefined || entry.stageId === publishStageId) &&
+            (publishStageId === undefined || entry.stageId === publishStageId) &&
             entry.branch === command.branch &&
             entry.phase !== "succeeded",
         );
@@ -1255,13 +1275,13 @@ export function makeTaskWorkspaceService(
           ...current,
           publishes: current.publishes.map((entry) =>
             entry.id === publishId
-                  ? {
-                      ...entry,
-                      phase: "commenting" as const,
-                      pushedSha: pushed.pushedSha,
-                      ...(pushed.remoteUrl === undefined ? {} : { remoteUrl: pushed.remoteUrl }),
-                      updatedAt: now(),
-                    }
+              ? {
+                  ...entry,
+                  phase: "commenting" as const,
+                  pushedSha: pushed.pushedSha,
+                  ...(pushed.remoteUrl === undefined ? {} : { remoteUrl: pushed.remoteUrl }),
+                  updatedAt: now(),
+                }
               : entry,
           ),
           updatedAt: now(),
@@ -1355,7 +1375,7 @@ export function makeTaskWorkspaceService(
           const completedStageIds =
             publishCompletedForAll && publishStage !== undefined && current.run !== null
               ? [...new Set([...current.run.completedStageIds, publishStage.id])]
-              : current.run?.completedStageIds ?? [];
+              : (current.run?.completedStageIds ?? []);
           return {
             ...current,
             publishes: current.publishes.map((entry) =>
@@ -1376,12 +1396,14 @@ export function makeTaskWorkspaceService(
                     ...current.run,
                     variants,
                     currentStageId: publishCompletedForAll
-                      ? current.scenario.stages.find(
+                      ? (current.scenario.stages.find(
                           (stage) =>
                             stage.kind === "publish" &&
                             !completedStageIds.includes(stage.id) &&
-                            stage.dependsOn.every((dependency) => completedStageIds.includes(dependency)),
-                        )?.id ?? null
+                            stage.dependsOn.every((dependency) =>
+                              completedStageIds.includes(dependency),
+                            ),
+                        )?.id ?? null)
                       : publishStage.id,
                     completedStageIds,
                   },
@@ -1393,91 +1415,92 @@ export function makeTaskWorkspaceService(
     }
   });
 
-  const startMonitor = Effect.fn("TaskWorkspace.startMonitor")(
-    function* (input: TaskWorkspaceReadInput, task: TaskWorkspaceTask) {
-      if (
-        adapters.monitorRun === undefined ||
-        task.run === null ||
-        !["queued", "running"].includes(task.run.status)
-      )
-        return;
-      const key = `${stateFile(input)}:${task.run.id}`;
-      if (ACTIVE_MONITORS.has(key)) return;
-      ACTIVE_MONITORS.add(key);
-      const report = (update: {
-        readonly variantId: string;
-        readonly status: "succeeded" | "failed" | "cancelled";
-        readonly stageId?: string;
-        readonly stageCompleted?: boolean;
-        readonly error?: string | null;
-        readonly output?: string;
-        readonly final?: boolean;
-        readonly checks?: ReadonlyArray<TaskWorkspaceCheckResult>;
-        readonly threadIds?: ReadonlyArray<ThreadId>;
-        readonly comments?: ReadonlyArray<TaskWorkspaceComment>;
-        readonly artifacts?: ReadonlyArray<TaskWorkspaceArtifact>;
-      }) =>
-        lockFor(input).withPermits(1)(
-          readStored(input).pipe(
-            Effect.map((stored) =>
-              updateVariantRun(stored, {
-                taskId: task.id,
-                runId: task.run!.id,
-                ...update,
-              }),
-            ),
-            Effect.flatMap((updated) => writeStored(input, updated)),
-          ),
-        );
-      const recordThread = (variantId: string, threadIds: ReadonlyArray<ThreadId>) =>
-        lockFor(input).withPermits(1)(
-          readStored(input).pipe(
-            Effect.flatMap((stored) => {
-              const updated = attachVariantThreads(stored, {
-                taskId: task.id,
-                runId: task.run!.id,
-                variantId,
-                threadIds,
-              });
-              const cancelled =
-                updated.tasks.find((entry) => entry.id === task.id)?.run?.status === "cancelled";
-              return writeStored(input, updated).pipe(
-                Effect.andThen(
-                  cancelled && adapters.cancelVariants !== undefined
-                    ? adapters.cancelVariants({ projectId: input.projectId, threadIds })
-                    : Effect.void,
-                ),
-              );
+  const startMonitor = Effect.fn("TaskWorkspace.startMonitor")(function* (
+    input: TaskWorkspaceReadInput,
+    task: TaskWorkspaceTask,
+  ) {
+    if (
+      adapters.monitorRun === undefined ||
+      task.run === null ||
+      !["queued", "running"].includes(task.run.status)
+    )
+      return;
+    const key = `${stateFile(input)}:${task.run.id}`;
+    if (ACTIVE_MONITORS.has(key)) return;
+    ACTIVE_MONITORS.add(key);
+    const report = (update: {
+      readonly variantId: string;
+      readonly status: "succeeded" | "failed" | "cancelled";
+      readonly stageId?: string;
+      readonly stageCompleted?: boolean;
+      readonly error?: string | null;
+      readonly output?: string;
+      readonly final?: boolean;
+      readonly checks?: ReadonlyArray<TaskWorkspaceCheckResult>;
+      readonly threadIds?: ReadonlyArray<ThreadId>;
+      readonly comments?: ReadonlyArray<TaskWorkspaceComment>;
+      readonly artifacts?: ReadonlyArray<TaskWorkspaceArtifact>;
+    }) =>
+      lockFor(input).withPermits(1)(
+        readStored(input).pipe(
+          Effect.map((stored) =>
+            updateVariantRun(stored, {
+              taskId: task.id,
+              runId: task.run!.id,
+              ...update,
             }),
           ),
-        );
-      const isCancelled = readStored(input).pipe(
-        Effect.map((stored) =>
-          stored.tasks.find((entry) => entry.id === task.id)?.run?.status === "cancelled",
+          Effect.flatMap((updated) => writeStored(input, updated)),
         ),
       );
-      yield* Effect.gen(function* () {
-        const result = yield* Effect.result(
-          adapters.monitorRun!({
-            workspaceRoot: input.workspaceRoot,
-            projectId: input.projectId,
-            task,
-            run: task.run!,
-            report,
-            recordThread,
-            isCancelled,
+    const recordThread = (variantId: string, threadIds: ReadonlyArray<ThreadId>) =>
+      lockFor(input).withPermits(1)(
+        readStored(input).pipe(
+          Effect.flatMap((stored) => {
+            const updated = attachVariantThreads(stored, {
+              taskId: task.id,
+              runId: task.run!.id,
+              variantId,
+              threadIds,
+            });
+            const cancelled =
+              updated.tasks.find((entry) => entry.id === task.id)?.run?.status === "cancelled";
+            return writeStored(input, updated).pipe(
+              Effect.andThen(
+                cancelled && adapters.cancelVariants !== undefined
+                  ? adapters.cancelVariants({ projectId: input.projectId, threadIds })
+                  : Effect.void,
+              ),
+            );
           }),
-        );
-        if (Result.isFailure(result)) {
-          yield* report({
-            variantId: task.run!.variants[0]!.id,
-            status: "failed",
-            error: "The worker monitor stopped unexpectedly.",
-          });
-        }
-      }).pipe(Effect.ensuring(Effect.sync(() => ACTIVE_MONITORS.delete(key))), Effect.forkDetach);
-    },
-  );
+        ),
+      );
+    const isCancelled = readStored(input).pipe(
+      Effect.map(
+        (stored) => stored.tasks.find((entry) => entry.id === task.id)?.run?.status === "cancelled",
+      ),
+    );
+    yield* Effect.gen(function* () {
+      const result = yield* Effect.result(
+        adapters.monitorRun!({
+          workspaceRoot: input.workspaceRoot,
+          projectId: input.projectId,
+          task,
+          run: task.run!,
+          report,
+          recordThread,
+          isCancelled,
+        }),
+      );
+      if (Result.isFailure(result)) {
+        yield* report({
+          variantId: task.run!.variants[0]!.id,
+          status: "failed",
+          error: "The worker monitor stopped unexpectedly.",
+        });
+      }
+    }).pipe(Effect.ensuring(Effect.sync(() => ACTIVE_MONITORS.delete(key))), Effect.forkDetach);
+  });
 
   const ensureBackgroundSync = Effect.fn("TaskWorkspace.ensureBackgroundSync")(function* (
     input: TaskWorkspaceReadInput,
@@ -1497,9 +1520,9 @@ export function makeTaskWorkspaceService(
   });
 
   const read = (input: TaskWorkspaceReadInput) =>
-    lockFor(input).withPermits(1)(readUnlocked(input)).pipe(
-      Effect.tap(() => ensureBackgroundSync(input)),
-    );
+    lockFor(input)
+      .withPermits(1)(readUnlocked(input))
+      .pipe(Effect.tap(() => ensureBackgroundSync(input)));
   const command = (input: TaskWorkspaceCommandInput) =>
     lockFor(input).withPermits(1)(
       readStored(input).pipe(

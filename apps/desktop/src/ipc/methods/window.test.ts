@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
+import * as NodePath from "@effect/platform-node/NodePath";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import type { ManagedPolicyLimits } from "@t3tools/contracts";
+import { PRIMARY_LOCAL_ENVIRONMENT_ID, type ManagedPolicyLimits } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { ManagedPolicyFileError } from "@t3tools/shared/managedPolicyFile";
 import * as FileSystem from "effect/FileSystem";
@@ -11,15 +12,19 @@ import * as Option from "effect/Option";
 import { vi } from "vite-plus/test";
 import type * as Electron from "electron";
 
-const { focusedWebContents, ownerWindow } = vi.hoisted(() => ({
+const { focusedWebContents, ownerWindow, showOpenDialog } = vi.hoisted(() => ({
   focusedWebContents: vi.fn(),
   ownerWindow: vi.fn(),
+  showOpenDialog: vi.fn(),
 }));
 vi.mock("electron", () => ({
   webContents: { getFocusedWebContents: focusedWebContents },
   BrowserWindow: { fromWebContents: ownerWindow },
+  dialog: { showOpenDialog },
 }));
 
+import * as DesktopConfig from "../../app/DesktopConfig.ts";
+import * as DesktopEnvironment from "../../app/DesktopEnvironment.ts";
 import * as DesktopBackendConfiguration from "../../backend/DesktopBackendConfiguration.ts";
 import * as DesktopBackendManager from "../../backend/DesktopBackendManager.ts";
 import * as DesktopBackendPool from "../../backend/DesktopBackendPool.ts";
@@ -27,11 +32,14 @@ import * as DesktopAppSettings from "../../settings/DesktopAppSettings.ts";
 import * as DesktopManagedPolicy from "../../app/DesktopManagedPolicy.ts";
 import * as ElectronDialog from "../../electron/ElectronDialog.ts";
 import * as ElectronWindow from "../../electron/ElectronWindow.ts";
+import * as DesktopWslEnvironment from "../../wsl/DesktopWslEnvironment.ts";
 import * as IpcChannels from "../channels.ts";
 import * as DesktopIpc from "../DesktopIpc.ts";
 import {
   getLocalEnvironmentBootstraps,
   installRelayTelemetryEnabled,
+  pickFolder,
+  pickFolders,
   pickProjectFavicon,
   probeRemoteEditors,
   readMedia,
@@ -281,6 +289,68 @@ describe("readMedia", () => {
         data: new Uint8Array(),
       });
     }),
+  );
+});
+
+describe("project folder picker", () => {
+  const pickerLayer = Layer.mergeAll(
+    DesktopEnvironment.layer({
+      dirname: "C:\\T3\\dist-electron",
+      homeDirectory: "C:\\Users\\alice",
+      platform: "win32",
+      processArch: "x64",
+      appVersion: "0.0.22",
+      appPath: "C:\\T3\\resources\\app.asar",
+      isPackaged: true,
+      resourcesPath: "C:\\T3\\resources",
+      runningUnderArm64Translation: false,
+    }).pipe(Layer.provide(Layer.merge(NodePath.layerWin32, DesktopConfig.layerTest({})))),
+    DesktopWslEnvironment.layerTest(),
+    DesktopAppSettings.layerTest(),
+    ElectronDialog.layer,
+    Layer.mock(ElectronWindow.ElectronWindow)({
+      focusedMainOrFirst: Effect.succeedNone,
+    }),
+  );
+
+  it.effect("returns all selected native directories while preserving the single picker", () =>
+    Effect.gen(function* () {
+      const paths = ["C:\\Projects\\One", "C:\\Projects\\Two"];
+      showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: paths });
+      showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: paths });
+      showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
+      const options = { targetEnvironmentId: PRIMARY_LOCAL_ENVIRONMENT_ID, initialPath: "~/repos" };
+
+      assert.deepEqual(yield* pickFolders.handler(options), paths);
+      assert.strictEqual(yield* pickFolder.handler(options), paths[0]);
+      assert.deepEqual(yield* pickFolders.handler(options), []);
+      assert.deepEqual(showOpenDialog.mock.lastCall, [
+        {
+          properties: ["openDirectory", "createDirectory", "multiSelections"],
+          defaultPath: "C:\\Users\\alice\\repos",
+        },
+      ]);
+      assert.deepEqual(showOpenDialog.mock.calls.at(-2)?.[0]?.properties, [
+        "openDirectory",
+        "createDirectory",
+      ]);
+    }).pipe(Effect.provide(pickerLayer)),
+  );
+
+  it.effect("preserves the distro on WSL paths that belong to another backend", () =>
+    Effect.gen(function* () {
+      showOpenDialog.mockResolvedValueOnce({
+        canceled: false,
+        filePaths: [
+          "\\\\wsl.localhost\\Ubuntu\\home\\alice\\project",
+          "\\\\wsl.localhost\\Debian\\home\\alice\\project",
+        ],
+      });
+      assert.deepEqual(yield* pickFolders.handler({ targetEnvironmentId: "wsl:Ubuntu" }), [
+        "/home/alice/project",
+        "\\\\wsl.localhost\\Debian\\home\\alice\\project",
+      ]);
+    }).pipe(Effect.provide(pickerLayer)),
   );
 });
 

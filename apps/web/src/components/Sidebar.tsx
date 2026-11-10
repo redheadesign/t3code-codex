@@ -226,6 +226,7 @@ import { useStableCallback } from "../hooks/useStableCallback";
 import { type SidebarRouteReveal, useActiveRowReveal } from "./sidebar/routeReveal";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { copyThreadReference } from "../lib/copyThreadReference";
+import { openAddProjects } from "../lib/openAddProjects";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import { Button } from "./ui/button";
 
@@ -1055,7 +1056,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const removeFromSelection = useThreadSelectionStore((s) => s.removeFromSelection);
   const shortcutModifiers = useShortcutModifierState();
   const terminalFocused = useTerminalFocus();
-  const openAddProjectCommandPalette = () => openCommandPalette({ open: "add-project" });
+  const addProject = () => void openAddProjects(text);
   const routeThreadRef = resolveActiveThreadRouteRef(routeTarget, routeDraftThread);
   const routeThreadKey = routeThreadRef ? scopedThreadKey(routeThreadRef) : null;
 
@@ -1751,7 +1752,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         event.activatorEvent instanceof PointerEvent ? event.activatorEvent.clientY : null,
     });
   };
-  const hasProjectFolders = projectFolders !== null && projectFolders.length > 0;
   const sidebarListItemsFresh = ((): readonly SidebarListItem[] => {
     const rowsOf = (
       list: readonly EnvironmentThreadShell[],
@@ -1762,7 +1762,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         return { kind: "thread", key, section };
       });
     if (
-      !hasProjectFolders &&
+      projectFolders === null &&
       pinnedThreads.length +
         activeThreads.length +
         workingThreads.length +
@@ -2868,7 +2868,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   />
                 ) : null
               }
-              onNewProject={openAddProjectCommandPalette}
+              {...(projectSidebarEnabled ? {} : { onNewProject: addProject })}
               importSessions={
                 <Menu>
                   <MenuTrigger
@@ -3156,13 +3156,29 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         continue;
                       }
                       if (projectFolders !== null && item.marker === "active-placeholder") {
-                        if (projectFolders.length > 0) {
+                        items.push(
+                          <li
+                            key="projects-label"
+                            className="group/projects mt-2 flex min-h-7 list-none items-center justify-between gap-1 ps-(--sidebar-row-content-inset) pe-2 text-xs font-medium text-sidebar-muted-foreground"
+                          >
+                            <span>{text("Projects", "Проекты")}</span>
+                            <div className="transition-opacity motion-reduce:transition-none pointer-fine:opacity-0 pointer-fine:group-hover/projects:opacity-100 pointer-fine:group-focus-within/projects:opacity-100">
+                              <SidebarHeaderIconButton
+                                label={text("Add project", "Добавить проект")}
+                                onClick={addProject}
+                              >
+                                <PlusIcon />
+                              </SidebarHeaderIconButton>
+                            </div>
+                          </li>,
+                        );
+                        if (projectFolders.length === 0) {
                           items.push(
                             <li
-                              key="projects-label"
-                              className="mt-2 list-none px-(--sidebar-row-content-inset) py-1 text-xs font-medium text-sidebar-muted-foreground"
+                              key="empty-projects"
+                              className="list-none px-(--sidebar-row-content-inset) py-1 text-xs text-sidebar-muted-foreground"
                             >
-                              {text("Projects", "Проекты")}
+                              {text("No projects yet", "Проектов пока нет")}
                             </li>,
                           );
                         }
@@ -3370,7 +3386,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               </SortableContext>
             </DndContext>
           </TooltipProvider>
-          {!hasProjectFolders &&
+          {projectFolders === null &&
           visibleDraftSessionCount === 0 &&
           pinnedThreads.length +
             activeThreads.length +
@@ -3381,10 +3397,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-xs text-muted-foreground/60">
               {projects.length === 0 ? (
                 <>
-                  <span>No projects yet</span>
+                  <span>{text("No projects yet", "Проектов пока нет")}</span>
                   <button
                     type="button"
-                    onClick={openAddProjectCommandPalette}
+                    onClick={addProject}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
                   >
                     <PlusIcon className="-mx-0.5 size-3" />

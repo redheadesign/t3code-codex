@@ -141,7 +141,10 @@ import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts"
 import * as DocumentText from "./provider/DocumentText.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
-import { emptyTaskWorkspaceSnapshot, makeTaskWorkspaceService } from "./taskWorkspace/TaskWorkspaceService.ts";
+import {
+  emptyTaskWorkspaceSnapshot,
+  makeTaskWorkspaceService,
+} from "./taskWorkspace/TaskWorkspaceService.ts";
 import { TaskBoardService, isBoardCommand } from "./taskWorkspace/TaskBoardService.ts";
 import { createJiraClient } from "./taskWorkspace/jiraClient.ts";
 import * as SecretRequests from "./secrets/SecretRequests.ts";
@@ -1531,167 +1534,165 @@ export const layerWsRpc = (
       const vcsDriverRegistryOption = yield* Effect.serviceOption(
         VcsDriverRegistry.VcsDriverRegistry,
       );
-      const jiraClientFor = Effect.fn("TaskWorkspace.jiraClientFor")(
-        function* (connection: TaskWorkspaceConnection) {
-          const secretReference = isSecretReference(connection.secretRef)
-            ? connection.secretRef
-            : null;
-          const resolved =
-            secretReference === null ? [] : yield* secretResolver.read([secretReference]);
-          const token = resolved[0]?.trim() || process.env.T3_JIRA_TOKEN?.trim() || null;
-          const url = connection.url?.trim() || process.env.T3_JIRA_URL?.trim() || null;
-          if (token === null || url === null) return null;
-          return createJiraClient({
-            baseUrl: url,
-            token,
-            username: connection.username,
-          });
-        },
-      );
-      const storybookWorkspaces = new Map<
-        string,
-        Deferred.Deferred<void, TaskWorkspaceError>
-      >();
-      const ensureStorybookProcess = Effect.fn("TaskWorkspace.ensureStorybookProcess")(
-        function* (workspaceRoot: string) {
-          const existing = storybookWorkspaces.get(workspaceRoot);
-          if (existing !== undefined) return yield* Deferred.await(existing);
-          if (childProcessSpawnerOption._tag === "None") return;
-          const readiness = yield* Deferred.make<void, TaskWorkspaceError>();
-          storybookWorkspaces.set(workspaceRoot, readiness);
-          const packageFile = yield* Effect.result(
-            workspaceFileSystem.readFile({
-              cwd: workspaceRoot,
-              relativePath: "package.json",
-              allowMissing: true,
-            }),
-          );
-          if (Result.isFailure(packageFile) || packageFile.success.exists === false) {
-            storybookWorkspaces.delete(workspaceRoot);
-            yield* Deferred.succeed(readiness, undefined);
-            return;
-          }
-          const packageJson = Option.getOrNull(decodeUnknownJson(packageFile.success.contents));
-          const packageRecord =
-            packageJson !== null && typeof packageJson === "object"
-              ? (packageJson as { readonly packageManager?: unknown; readonly scripts?: unknown })
-              : {};
-          const scripts =
-            packageRecord.scripts !== null && typeof packageRecord.scripts === "object"
-              ? (packageRecord.scripts as { readonly storybook?: unknown })
-              : {};
-          if (typeof scripts.storybook !== "string" || scripts.storybook.trim() === "") {
-            storybookWorkspaces.delete(workspaceRoot);
-            yield* Deferred.succeed(readiness, undefined);
-            return;
-          }
-          const packageManager =
-            typeof packageRecord.packageManager === "string" ? packageRecord.packageManager : "pnpm";
-          const runner = packageManager.startsWith("npm")
-            ? "npm"
-            : packageManager.startsWith("yarn")
-              ? "yarn"
-              : "pnpm";
-          const command = (yield* HostProcess.Platform) === "win32" ? `${runner}.cmd` : runner;
-          const args =
-            runner === "yarn"
-              ? ["storybook", "--no-open", "--port", "6006"]
-              : ["run", "storybook", "--", "--no-open", "--port", "6006"];
-          if (httpClientOption._tag === "Some") {
-            const alreadyReady = yield* HttpClient.withScope(httpClientOption.value)
-              .get("http://localhost:6006")
-              .pipe(
-                Effect.timeout(Duration.seconds(1)),
-                Effect.flatMap((response) =>
-                  response.arrayBuffer.pipe(Effect.as(response.status === 200)),
-                ),
-                Effect.scoped,
-                Effect.orElseSucceed(() => false),
-              );
-            if (alreadyReady) {
-              yield* Deferred.succeed(readiness, undefined);
-              return;
-            }
-          }
-          const spawned = yield* Effect.result(
-            childProcessSpawnerOption.value
-              .spawn(
-                ChildProcess.make(command, args, {
-                  cwd: workspaceRoot,
-                  detached: true,
-                  stdin: "ignore",
-                  stdout: "ignore",
-                  stderr: "ignore",
-                }),
-              )
-              .pipe(Effect.flatMap((handle) => handle.unref), Effect.scoped),
-          );
-          if (Result.isFailure(spawned)) {
-            storybookWorkspaces.delete(workspaceRoot);
-            yield* Deferred.fail(
-              readiness,
-              new TaskWorkspaceError({
-                operation: "launchStorybook",
-                message: "Could not start the Storybook process.",
-              }),
+      const jiraClientFor = Effect.fn("TaskWorkspace.jiraClientFor")(function* (
+        connection: TaskWorkspaceConnection,
+      ) {
+        const secretReference = isSecretReference(connection.secretRef)
+          ? connection.secretRef
+          : null;
+        const resolved =
+          secretReference === null ? [] : yield* secretResolver.read([secretReference]);
+        const token = resolved[0]?.trim() || process.env.T3_JIRA_TOKEN?.trim() || null;
+        const url = connection.url?.trim() || process.env.T3_JIRA_URL?.trim() || null;
+        if (token === null || url === null) return null;
+        return createJiraClient({
+          baseUrl: url,
+          token,
+          username: connection.username,
+        });
+      });
+      const storybookWorkspaces = new Map<string, Deferred.Deferred<void, TaskWorkspaceError>>();
+      const ensureStorybookProcess = Effect.fn("TaskWorkspace.ensureStorybookProcess")(function* (
+        workspaceRoot: string,
+      ) {
+        const existing = storybookWorkspaces.get(workspaceRoot);
+        if (existing !== undefined) return yield* Deferred.await(existing);
+        if (childProcessSpawnerOption._tag === "None") return;
+        const readiness = yield* Deferred.make<void, TaskWorkspaceError>();
+        storybookWorkspaces.set(workspaceRoot, readiness);
+        const packageFile = yield* Effect.result(
+          workspaceFileSystem.readFile({
+            cwd: workspaceRoot,
+            relativePath: "package.json",
+            allowMissing: true,
+          }),
+        );
+        if (Result.isFailure(packageFile) || packageFile.success.exists === false) {
+          storybookWorkspaces.delete(workspaceRoot);
+          yield* Deferred.succeed(readiness, undefined);
+          return;
+        }
+        const packageJson = Option.getOrNull(decodeUnknownJson(packageFile.success.contents));
+        const packageRecord =
+          packageJson !== null && typeof packageJson === "object"
+            ? (packageJson as { readonly packageManager?: unknown; readonly scripts?: unknown })
+            : {};
+        const scripts =
+          packageRecord.scripts !== null && typeof packageRecord.scripts === "object"
+            ? (packageRecord.scripts as { readonly storybook?: unknown })
+            : {};
+        if (typeof scripts.storybook !== "string" || scripts.storybook.trim() === "") {
+          storybookWorkspaces.delete(workspaceRoot);
+          yield* Deferred.succeed(readiness, undefined);
+          return;
+        }
+        const packageManager =
+          typeof packageRecord.packageManager === "string" ? packageRecord.packageManager : "pnpm";
+        const runner = packageManager.startsWith("npm")
+          ? "npm"
+          : packageManager.startsWith("yarn")
+            ? "yarn"
+            : "pnpm";
+        const command = (yield* HostProcess.Platform) === "win32" ? `${runner}.cmd` : runner;
+        const args =
+          runner === "yarn"
+            ? ["storybook", "--no-open", "--port", "6006"]
+            : ["run", "storybook", "--", "--no-open", "--port", "6006"];
+        if (httpClientOption._tag === "Some") {
+          const alreadyReady = yield* HttpClient.withScope(httpClientOption.value)
+            .get("http://localhost:6006")
+            .pipe(
+              Effect.timeout(Duration.seconds(1)),
+              Effect.flatMap((response) =>
+                response.arrayBuffer.pipe(Effect.as(response.status === 200)),
+              ),
+              Effect.scoped,
+              Effect.orElseSucceed(() => false),
             );
-            return yield* new TaskWorkspaceError({
+          if (alreadyReady) {
+            yield* Deferred.succeed(readiness, undefined);
+            return;
+          }
+        }
+        const spawned = yield* Effect.result(
+          childProcessSpawnerOption.value
+            .spawn(
+              ChildProcess.make(command, args, {
+                cwd: workspaceRoot,
+                detached: true,
+                stdin: "ignore",
+                stdout: "ignore",
+                stderr: "ignore",
+              }),
+            )
+            .pipe(
+              Effect.flatMap((handle) => handle.unref),
+              Effect.scoped,
+            ),
+        );
+        if (Result.isFailure(spawned)) {
+          storybookWorkspaces.delete(workspaceRoot);
+          yield* Deferred.fail(
+            readiness,
+            new TaskWorkspaceError({
               operation: "launchStorybook",
               message: "Could not start the Storybook process.",
-            });
-          }
-          if (httpClientOption._tag === "None") {
+            }),
+          );
+          return yield* new TaskWorkspaceError({
+            operation: "launchStorybook",
+            message: "Could not start the Storybook process.",
+          });
+        }
+        if (httpClientOption._tag === "None") {
+          yield* Deferred.succeed(readiness, undefined);
+          return;
+        }
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          const ready = yield* HttpClient.withScope(httpClientOption.value)
+            .get("http://localhost:6006")
+            .pipe(
+              Effect.timeout(Duration.seconds(1)),
+              Effect.flatMap((response) =>
+                response.arrayBuffer.pipe(Effect.as(response.status === 200)),
+              ),
+              Effect.scoped,
+              Effect.orElseSucceed(() => false),
+            );
+          if (ready) {
             yield* Deferred.succeed(readiness, undefined);
             return;
           }
-          for (let attempt = 0; attempt < 30; attempt += 1) {
-            const ready = yield* HttpClient.withScope(httpClientOption.value)
-              .get("http://localhost:6006")
-              .pipe(
-                Effect.timeout(Duration.seconds(1)),
-                Effect.flatMap((response) =>
-                  response.arrayBuffer.pipe(Effect.as(response.status === 200)),
-                ),
-                Effect.scoped,
-                Effect.orElseSucceed(() => false),
-              );
-            if (ready) {
-              yield* Deferred.succeed(readiness, undefined);
-              return;
-            }
-            yield* Effect.sleep(Duration.seconds(1));
-          }
-          storybookWorkspaces.delete(workspaceRoot);
-          const timeoutError = new TaskWorkspaceError({
-            operation: "launchStorybook",
-            message: "Storybook did not become ready on http://localhost:6006 within 30 seconds.",
-          });
-          yield* Deferred.fail(readiness, timeoutError);
-          return yield* timeoutError;
-        },
-      );
-      const launchStorybook = Effect.fn("TaskWorkspace.launchStorybook")(
-        function* (launch: {
-          readonly workspaceRoot: string;
-          readonly storyId: string;
-          readonly url: string | null;
-        }) {
-          const target =
-            launch.url?.trim() ||
-            `http://localhost:6006/?path=/story/${encodeURIComponent(launch.storyId)}`;
-          if (target.includes("localhost:6006")) yield* ensureStorybookProcess(launch.workspaceRoot);
-          return yield* externalLauncher.launchBrowser(target).pipe(
-            Effect.mapError(
-              (cause) =>
-                new TaskWorkspaceError({
-                  operation: "launchStorybook",
-                  message: `Could not open Storybook story ${launch.storyId}.`,
-                  cause,
-                }),
-            ),
-          );
-        },
-      );
+          yield* Effect.sleep(Duration.seconds(1));
+        }
+        storybookWorkspaces.delete(workspaceRoot);
+        const timeoutError = new TaskWorkspaceError({
+          operation: "launchStorybook",
+          message: "Storybook did not become ready on http://localhost:6006 within 30 seconds.",
+        });
+        yield* Deferred.fail(readiness, timeoutError);
+        return yield* timeoutError;
+      });
+      const launchStorybook = Effect.fn("TaskWorkspace.launchStorybook")(function* (launch: {
+        readonly workspaceRoot: string;
+        readonly storyId: string;
+        readonly url: string | null;
+      }) {
+        const target =
+          launch.url?.trim() ||
+          `http://localhost:6006/?path=/story/${encodeURIComponent(launch.storyId)}`;
+        if (target.includes("localhost:6006")) yield* ensureStorybookProcess(launch.workspaceRoot);
+        return yield* externalLauncher.launchBrowser(target).pipe(
+          Effect.mapError(
+            (cause) =>
+              new TaskWorkspaceError({
+                operation: "launchStorybook",
+                message: `Could not open Storybook story ${launch.storyId}.`,
+                cause,
+              }),
+          ),
+        );
+      });
       const publishVariant =
         vcsDriverRegistryOption._tag === "None"
           ? undefined
@@ -1791,7 +1792,8 @@ export const layerWsRpc = (
                 if (sourceIsAncestor.exitCode !== 0) {
                   return yield* new TaskWorkspaceError({
                     operation: "publishVariant",
-                    message: "The selected worktree does not descend from the recorded scenario source.",
+                    message:
+                      "The selected worktree does not descend from the recorded scenario source.",
                   });
                 }
                 const dirty = yield* vcs.driver.execute({
@@ -1863,100 +1865,97 @@ export const layerWsRpc = (
           ) => Effect.Effect<void, TaskWorkspaceError>;
           readonly isCancelled: Effect.Effect<boolean, TaskWorkspaceError>;
         }) {
-          const runStage = Effect.fn("TaskWorkspace.runStage")(
-            function* (
-              stage: import("@t3tools/contracts").TaskWorkspaceStage,
-              cwd: string,
-              prompt: string,
-              variantId?: string,
-            ) {
-              const uuid = yield* random.uuidV4();
-              const launched = yield* threadLaunch.launch({
-                commandId: CommandId.make(`task-workspace-stage:${uuid}`),
-                projectId: monitor.projectId,
-                title: `${monitor.task.issue.key} · ${stage.name}`,
-                modelSelection: {
-                  instanceId: ProviderInstanceId.make(stage.provider ?? "codex"),
-                  model: stage.model ?? DEFAULT_MODEL,
-                },
-                runtimeMode: "full-access",
-                interactionMode: "default",
-                workspaceStrategy: { type: "existing_worktree", worktreePath: cwd },
-                initialMessage: {
-                  text: [prompt, stage.prompt, ...(stage.rules ?? [])].filter(Boolean).join("\n\n"),
-                  attachments: [],
-                },
-                createdBy: "agent",
-                creationSource: "mcp",
-              });
-              yield* monitor.recordThread(
-                variantId ??
-                  monitor.run.variants.find((variant) => variant.worktreePath === cwd)?.id ??
-                  monitor.run.variants[0]!.id,
-                [launched.threadId],
-              );
-              const waited = yield* threadManagement.waitForThread({
-                projectId: monitor.projectId,
-                threadId: launched.threadId,
-                timeoutMs: stage.timeoutMs,
-              });
-              const snapshot = yield* threadManagement.getThreadSnapshot(launched.threadId);
-              const output = snapshot.projection.visibleTurnItems
-                .flatMap((row) => (row.item.type === "assistant_message" ? [row.item.text] : []))
-                .join("\n")
-                .slice(-20_000);
-              return {
-                threadId: launched.threadId,
-                completed: !waited.timedOut && (waited.resultRun ?? waited.run)?.status === "completed",
-                output,
-                exitCode: null,
-                attempt: 1,
-              };
-            },
-          );
-          const runStageWithRetries = Effect.fn("TaskWorkspace.runStageWithRetries")(
-            function* (
-              stage: import("@t3tools/contracts").TaskWorkspaceStage,
-              cwd: string,
-              prompt: string,
-              variantId?: string,
-            ) {
-              let attempt = 0;
-              while (attempt <= monitor.task.scenario.maxRetries) {
-                if (yield* monitor.isCancelled) {
-                  return {
-                    threadId: null,
-                    completed: false,
-                    output: "Stage cancelled before retry.",
-                    exitCode: null,
-                    attempt: attempt + 1,
-                  };
-                }
-                const result = yield* Effect.result(runStage(stage, cwd, prompt, variantId));
-                if (Result.isSuccess(result) && result.success.completed)
-                  return { ...result.success, attempt: attempt + 1 };
-                if (attempt === monitor.task.scenario.maxRetries) {
-                  return Result.isSuccess(result)
-                    ? { ...result.success, attempt: attempt + 1 }
-                    : {
-                        threadId: null,
-                        completed: false,
-                        output: "The stage worker failed before returning a result.",
-                          exitCode: null,
-                        attempt: attempt + 1,
-                      };
-                }
-                attempt += 1;
+          const runStage = Effect.fn("TaskWorkspace.runStage")(function* (
+            stage: import("@t3tools/contracts").TaskWorkspaceStage,
+            cwd: string,
+            prompt: string,
+            variantId?: string,
+          ) {
+            const uuid = yield* random.uuidV4();
+            const launched = yield* threadLaunch.launch({
+              commandId: CommandId.make(`task-workspace-stage:${uuid}`),
+              projectId: monitor.projectId,
+              title: `${monitor.task.issue.key} · ${stage.name}`,
+              modelSelection: {
+                instanceId: ProviderInstanceId.make(stage.provider ?? "codex"),
+                model: stage.model ?? DEFAULT_MODEL,
+              },
+              runtimeMode: "full-access",
+              interactionMode: "default",
+              workspaceStrategy: { type: "existing_worktree", worktreePath: cwd },
+              initialMessage: {
+                text: [prompt, stage.prompt, ...(stage.rules ?? [])].filter(Boolean).join("\n\n"),
+                attachments: [],
+              },
+              createdBy: "agent",
+              creationSource: "mcp",
+            });
+            yield* monitor.recordThread(
+              variantId ??
+                monitor.run.variants.find((variant) => variant.worktreePath === cwd)?.id ??
+                monitor.run.variants[0]!.id,
+              [launched.threadId],
+            );
+            const waited = yield* threadManagement.waitForThread({
+              projectId: monitor.projectId,
+              threadId: launched.threadId,
+              timeoutMs: stage.timeoutMs,
+            });
+            const snapshot = yield* threadManagement.getThreadSnapshot(launched.threadId);
+            const output = snapshot.projection.visibleTurnItems
+              .flatMap((row) => (row.item.type === "assistant_message" ? [row.item.text] : []))
+              .join("\n")
+              .slice(-20_000);
+            return {
+              threadId: launched.threadId,
+              completed:
+                !waited.timedOut && (waited.resultRun ?? waited.run)?.status === "completed",
+              output,
+              exitCode: null,
+              attempt: 1,
+            };
+          });
+          const runStageWithRetries = Effect.fn("TaskWorkspace.runStageWithRetries")(function* (
+            stage: import("@t3tools/contracts").TaskWorkspaceStage,
+            cwd: string,
+            prompt: string,
+            variantId?: string,
+          ) {
+            let attempt = 0;
+            while (attempt <= monitor.task.scenario.maxRetries) {
+              if (yield* monitor.isCancelled) {
+                return {
+                  threadId: null,
+                  completed: false,
+                  output: "Stage cancelled before retry.",
+                  exitCode: null,
+                  attempt: attempt + 1,
+                };
               }
-              return {
-                threadId: null,
-                completed: false,
-                output: "The stage retry limit was reached.",
-                exitCode: null,
-                attempt: attempt + 1,
-              };
-            },
-          );
+              const result = yield* Effect.result(runStage(stage, cwd, prompt, variantId));
+              if (Result.isSuccess(result) && result.success.completed)
+                return { ...result.success, attempt: attempt + 1 };
+              if (attempt === monitor.task.scenario.maxRetries) {
+                return Result.isSuccess(result)
+                  ? { ...result.success, attempt: attempt + 1 }
+                  : {
+                      threadId: null,
+                      completed: false,
+                      output: "The stage worker failed before returning a result.",
+                      exitCode: null,
+                      attempt: attempt + 1,
+                    };
+              }
+              attempt += 1;
+            }
+            return {
+              threadId: null,
+              completed: false,
+              output: "The stage retry limit was reached.",
+              exitCode: null,
+              attempt: attempt + 1,
+            };
+          });
           const runCommandCheckWithRetries = Effect.fn("TaskWorkspace.runCommandCheckWithRetries")(
             function* (stage: import("@t3tools/contracts").TaskWorkspaceStage, cwd: string) {
               const configuredCommand = stage.command?.trim();
@@ -1997,24 +1996,22 @@ export const layerWsRpc = (
                     timeoutBehavior: "timedOutResult",
                   }),
                 );
-                const outcome =
-                  Result.isSuccess(result)
-                    ? {
-                        threadId: null,
-                        completed: result.success.code === 0 && !result.success.timedOut,
-                        output: [result.success.stdout, result.success.stderr]
-                          .filter(Boolean)
-                          .join("\n")
-                          .slice(-20_000),
-                        exitCode:
-                          result.success.code === null ? null : Number(result.success.code),
-                      }
-                    : {
-                        threadId: null,
-                        completed: false,
-                        output: "Check process failed before returning a result.",
-                        exitCode: 1,
-                      };
+                const outcome = Result.isSuccess(result)
+                  ? {
+                      threadId: null,
+                      completed: result.success.code === 0 && !result.success.timedOut,
+                      output: [result.success.stdout, result.success.stderr]
+                        .filter(Boolean)
+                        .join("\n")
+                        .slice(-20_000),
+                      exitCode: result.success.code === null ? null : Number(result.success.code),
+                    }
+                  : {
+                      threadId: null,
+                      completed: false,
+                      output: "Check process failed before returning a result.",
+                      exitCode: 1,
+                    };
                 if (outcome.completed || attempt === monitor.task.scenario.maxRetries)
                   return { ...outcome, attempt: attempt + 1 };
                 attempt += 1;
@@ -2072,10 +2069,13 @@ export const layerWsRpc = (
                 yield* monitor.report({
                   variantId: variant.id,
                   status: completed ? "succeeded" : "failed",
-                  ...(monitor.task.scenario.stages.find((stage) => stage.kind === "agent")?.id === undefined
+                  ...(monitor.task.scenario.stages.find((stage) => stage.kind === "agent")?.id ===
+                  undefined
                     ? {}
                     : {
-                        stageId: monitor.task.scenario.stages.find((stage) => stage.kind === "agent")!.id,
+                        stageId: monitor.task.scenario.stages.find(
+                          (stage) => stage.kind === "agent",
+                        )!.id,
                       }),
                   stageCompleted: completed,
                   output: agentOutput,
@@ -2096,9 +2096,7 @@ export const layerWsRpc = (
                           },
                         ],
                       }),
-                  ...(completed
-                    ? {}
-                    : { error: "The agent stage did not complete successfully." }),
+                  ...(completed ? {} : { error: "The agent stage did not complete successfully." }),
                 });
                 return completed;
               }),
@@ -2108,7 +2106,9 @@ export const layerWsRpc = (
           if (yield* monitor.isCancelled) return;
           const candidateStages = monitor.task.scenario.stages;
           const candidateAgentStages = candidateStages.filter((stage) => stage.kind === "agent");
-          const candidatePublishStages = candidateStages.filter((stage) => stage.kind === "publish");
+          const candidatePublishStages = candidateStages.filter(
+            (stage) => stage.kind === "publish",
+          );
           const candidateAgentId =
             candidateAgentStages.find((stage) => stage.dependsOn.length === 0)?.id ??
             candidateAgentStages[0]?.id;
@@ -2140,42 +2140,42 @@ export const layerWsRpc = (
             const firstWorktree =
               monitor.run.variants.find((variant) => variant.worktreePath !== null)?.worktreePath ??
               null;
-            const runGenericCheck = Effect.fn("TaskWorkspace.runGenericCheck")(
-              function* (
-                stage: import("@t3tools/contracts").TaskWorkspaceStage,
-                cwd: string,
-                variantId: string,
-              ) {
-                const configuredCommand = stage.command?.trim();
-                if (configuredCommand !== undefined && configuredCommand !== "")
-                  return yield* runCommandCheckWithRetries(stage, cwd);
-                const worker = yield* Effect.result(
-                  runStageWithRetries(
-                    stage,
-                    cwd,
-                    `${stage.prompt}\n\nRun the check and end your response with exactly CHECK_RESULT: PASS or CHECK_RESULT: FAIL.`,
-                    variantId,
-                  ),
-                );
-                if (Result.isFailure(worker))
-                  return {
-                    threadId: null,
-                    completed: false,
-                    output: "Worker stage failed before completion.",
-                    exitCode: 1,
-                    attempt: 1,
-                  };
-                const completed = worker.success.completed && /(?:^|\n)CHECK_RESULT:\s*PASS\b/i.test(worker.success.output);
+            const runGenericCheck = Effect.fn("TaskWorkspace.runGenericCheck")(function* (
+              stage: import("@t3tools/contracts").TaskWorkspaceStage,
+              cwd: string,
+              variantId: string,
+            ) {
+              const configuredCommand = stage.command?.trim();
+              if (configuredCommand !== undefined && configuredCommand !== "")
+                return yield* runCommandCheckWithRetries(stage, cwd);
+              const worker = yield* Effect.result(
+                runStageWithRetries(
+                  stage,
+                  cwd,
+                  `${stage.prompt}\n\nRun the check and end your response with exactly CHECK_RESULT: PASS or CHECK_RESULT: FAIL.`,
+                  variantId,
+                ),
+              );
+              if (Result.isFailure(worker))
                 return {
-                  ...worker.success,
-                  completed,
-                  output: completed
-                    ? worker.success.output
-                    : `${worker.success.output}\nWorker did not provide CHECK_RESULT: PASS.`,
-                  exitCode: completed ? 0 : 1,
+                  threadId: null,
+                  completed: false,
+                  output: "Worker stage failed before completion.",
+                  exitCode: 1,
+                  attempt: 1,
                 };
-              },
-            );
+              const completed =
+                worker.success.completed &&
+                /(?:^|\n)CHECK_RESULT:\s*PASS\b/i.test(worker.success.output);
+              return {
+                ...worker.success,
+                completed,
+                output: completed
+                  ? worker.success.output
+                  : `${worker.success.output}\nWorker did not provide CHECK_RESULT: PASS.`,
+                exitCode: completed ? 0 : 1,
+              };
+            });
             const completedStageIds = new Set<string>([candidateAgentId!]);
             const pendingStages = candidateRunnableStages.slice();
             while (pendingStages.length > 0) {
@@ -2230,15 +2230,23 @@ export const layerWsRpc = (
                                 ].join("\n\n"),
                                 variant.id,
                               ).pipe(Effect.map((result): AgentStageOutcome => result)),
-                        { concurrency: stage.parallel ? Math.min(monitor.run.variants.length, 5) : 1 },
+                        {
+                          concurrency: stage.parallel
+                            ? Math.min(monitor.run.variants.length, 5)
+                            : 1,
+                        },
                       );
                       yield* Effect.forEach(monitor.run.variants, (variant, index) =>
                         (() => {
-                          const output = agentResults[index]?.output ?? "Agent stage produced no output.";
-                          const storyId = /(?:^|\n)STORY_ID:\s*([A-Za-z0-9._/-]+)/i.exec(output)?.[1];
+                          const output =
+                            agentResults[index]?.output ?? "Agent stage produced no output.";
+                          const storyId = /(?:^|\n)STORY_ID:\s*([A-Za-z0-9._/-]+)/i.exec(
+                            output,
+                          )?.[1];
                           return monitor.report({
                             variantId: variant.id,
-                            status: agentResults[index]?.completed === true ? "succeeded" : "failed",
+                            status:
+                              agentResults[index]?.completed === true ? "succeeded" : "failed",
                             stageId: stage.id,
                             stageCompleted: agentResults[index]?.completed === true,
                             output,
@@ -2266,14 +2274,21 @@ export const layerWsRpc = (
                                 }),
                             ...(agentResults[index]?.completed === true
                               ? {}
-                              : { error: `Agent stage ${stage.name} did not complete successfully.` }),
+                              : {
+                                  error: `Agent stage ${stage.name} did not complete successfully.`,
+                                }),
                           });
                         })(),
                       );
                       return {
                         stage,
-                        ok: agentResults.every((result) => result.completed) || stage.required === false,
-                        output: agentResults.map((result) => result.output).filter(Boolean).join("\n"),
+                        ok:
+                          agentResults.every((result) => result.completed) ||
+                          stage.required === false,
+                        output: agentResults
+                          .map((result) => result.output)
+                          .filter(Boolean)
+                          .join("\n"),
                       };
                     }
                     if (stage.kind === "audit") {
@@ -2355,7 +2370,9 @@ export const layerWsRpc = (
                               attempt: 0,
                             })
                           : runGenericCheck(stage, variant.worktreePath, variant.id),
-                      { concurrency: stage.parallel ? Math.min(monitor.run.variants.length, 5) : 1 },
+                      {
+                        concurrency: stage.parallel ? Math.min(monitor.run.variants.length, 5) : 1,
+                      },
                     );
                     yield* Effect.forEach(monitor.run.variants, (variant, index) =>
                       monitor.report({
@@ -2368,7 +2385,8 @@ export const layerWsRpc = (
                         stageCompleted:
                           results[index]?.completed === true || stage.required === false,
                         threadIds:
-                          results[index]?.threadId === null || results[index]?.threadId === undefined
+                          results[index]?.threadId === null ||
+                          results[index]?.threadId === undefined
                             ? []
                             : [results[index]!.threadId],
                         checks: [
@@ -2378,7 +2396,9 @@ export const layerWsRpc = (
                             status: results[index]?.completed === true ? "passed" : "failed",
                             command: stage.command,
                             exitCode: results[index]?.exitCode ?? null,
-                            ...(results[index]?.attempt === undefined ? {} : { attempt: results[index]!.attempt }),
+                            ...(results[index]?.attempt === undefined
+                              ? {}
+                              : { attempt: results[index]!.attempt }),
                             output: results[index]?.output ?? "Worker produced no output.",
                             startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
                             finishedAt: DateTime.formatIso(DateTime.nowUnsafe()),
@@ -2389,10 +2409,17 @@ export const layerWsRpc = (
                     return {
                       stage,
                       ok: stage.required === false || results.every((result) => result.completed),
-                      output: results.map((result) => result.output).filter(Boolean).join("\n"),
+                      output: results
+                        .map((result) => result.output)
+                        .filter(Boolean)
+                        .join("\n"),
                     };
                   }),
-                { concurrency: ready.every((stage) => stage.parallel) ? Math.min(ready.length, 5) : 1 },
+                {
+                  concurrency: ready.every((stage) => stage.parallel)
+                    ? Math.min(ready.length, 5)
+                    : 1,
+                },
               );
               const failedStage = stageResults.find((result) => !result.ok);
               if (failedStage !== undefined) {
@@ -2437,8 +2464,7 @@ export const layerWsRpc = (
             agentStages.length !== 1 ||
             auditStages.length > 1 ||
             checkStages.some(
-              (stage) =>
-                auditStages.length > 0 && !stage.dependsOn.includes(auditStages[0]!.id),
+              (stage) => auditStages.length > 0 && !stage.dependsOn.includes(auditStages[0]!.id),
             ) ||
             stages.some(
               (stage) =>
@@ -2496,10 +2522,9 @@ export const layerWsRpc = (
               monitor.report({
                 variantId: variant.id,
                 status: "failed",
-                output:
-                  Result.isSuccess(audit)
-                    ? audit.success.output
-                    : "The audit worker failed before returning a result.",
+                output: Result.isSuccess(audit)
+                  ? audit.success.output
+                  : "The audit worker failed before returning a result.",
                 threadIds:
                   Result.isSuccess(audit) && audit.success.threadId !== null
                     ? [audit.success.threadId]
@@ -2529,7 +2554,8 @@ export const layerWsRpc = (
                           id: `${monitor.run.id}-audit-comment`,
                           author: "Audit worker",
                           body:
-                            audit.success.output || "Audit worker completed without a written report.",
+                            audit.success.output ||
+                            "Audit worker completed without a written report.",
                           createdAt: auditCreatedAt,
                           source: "agent" as const,
                         },
@@ -2553,62 +2579,65 @@ export const layerWsRpc = (
             { discard: true },
           );
           if (yield* monitor.isCancelled) return;
-          const runCheck = Effect.fn("TaskWorkspace.runCheck")(
-            function* (
-              stage: import("@t3tools/contracts").TaskWorkspaceStage,
-              cwd: string,
-              variantId: string,
-            ) {
-              const configuredCommand = stage.command?.trim();
-              if (configuredCommand !== undefined && configuredCommand !== "")
-                return yield* runCommandCheckWithRetries(stage, cwd);
-              const worker = yield* Effect.result(
-                runStageWithRetries(
-                  stage,
-                  cwd,
-                  `${stage.prompt}\n\nRun the check and end your response with exactly CHECK_RESULT: PASS or CHECK_RESULT: FAIL.`,
-                  variantId,
-                ),
-              );
-              if (Result.isFailure(worker)) {
-                return {
-                  threadId: null,
-                  completed: false,
-                  output: "Worker stage failed before completion.",
-                  exitCode: 1,
-                      attempt: 1,
-                };
-              }
-              const completed =
-                worker.success.completed && /(?:^|\n)CHECK_RESULT:\s*PASS\b/i.test(worker.success.output);
+          const runCheck = Effect.fn("TaskWorkspace.runCheck")(function* (
+            stage: import("@t3tools/contracts").TaskWorkspaceStage,
+            cwd: string,
+            variantId: string,
+          ) {
+            const configuredCommand = stage.command?.trim();
+            if (configuredCommand !== undefined && configuredCommand !== "")
+              return yield* runCommandCheckWithRetries(stage, cwd);
+            const worker = yield* Effect.result(
+              runStageWithRetries(
+                stage,
+                cwd,
+                `${stage.prompt}\n\nRun the check and end your response with exactly CHECK_RESULT: PASS or CHECK_RESULT: FAIL.`,
+                variantId,
+              ),
+            );
+            if (Result.isFailure(worker)) {
               return {
-                ...worker.success,
-                completed,
-                output: completed
-                  ? worker.success.output
-                  : `${worker.success.output}\nWorker did not provide CHECK_RESULT: PASS.`,
-                exitCode: completed ? 0 : 1,
-                attempt: worker.success.attempt,
+                threadId: null,
+                completed: false,
+                output: "Worker stage failed before completion.",
+                exitCode: 1,
+                attempt: 1,
               };
-            },
-          );
-          const checks = yield* Effect.forEach(monitor.run.variants, (variant) =>
-            Effect.forEach(checkStages, (stage) =>
-              (variant.worktreePath === null
-                ? Effect.succeed({
-                    threadId: null,
-                    completed: false,
-                    output: "No worktree was available.",
-                    exitCode: 1,
-                    attempt: 0,
-                  })
-                : runCheck(stage, variant.worktreePath, variant.id)),
-              {
-                concurrency: checkStages.some((stage) => stage.parallel)
-                  ? Math.min(checkStages.length, 5)
-                  : 1,
-              },
-            ),
+            }
+            const completed =
+              worker.success.completed &&
+              /(?:^|\n)CHECK_RESULT:\s*PASS\b/i.test(worker.success.output);
+            return {
+              ...worker.success,
+              completed,
+              output: completed
+                ? worker.success.output
+                : `${worker.success.output}\nWorker did not provide CHECK_RESULT: PASS.`,
+              exitCode: completed ? 0 : 1,
+              attempt: worker.success.attempt,
+            };
+          });
+          const checks = yield* Effect.forEach(
+            monitor.run.variants,
+            (variant) =>
+              Effect.forEach(
+                checkStages,
+                (stage) =>
+                  variant.worktreePath === null
+                    ? Effect.succeed({
+                        threadId: null,
+                        completed: false,
+                        output: "No worktree was available.",
+                        exitCode: 1,
+                        attempt: 0,
+                      })
+                    : runCheck(stage, variant.worktreePath, variant.id),
+                {
+                  concurrency: checkStages.some((stage) => stage.parallel)
+                    ? Math.min(checkStages.length, 5)
+                    : 1,
+                },
+              ),
             { concurrency: Math.min(monitor.run.variants.length, 5) },
           );
           const checksPassed = checks.every((variantChecks) =>
@@ -2618,7 +2647,9 @@ export const layerWsRpc = (
             }),
           );
           const checkThreadIds = (variantIndex: number) =>
-            checks[variantIndex]?.flatMap((result) => (result.threadId === null ? [] : [result.threadId])) ?? [];
+            checks[variantIndex]?.flatMap((result) =>
+              result.threadId === null ? [] : [result.threadId],
+            ) ?? [];
           const checkResults = (variantIndex: number) =>
             checkStages.map((stage, stageIndex) => ({
               id: `${monitor.run.id}-${monitor.run.variants[variantIndex]!.id}-${stage.id}`,
@@ -2641,7 +2672,9 @@ export const layerWsRpc = (
               monitor.report({
                 variantId: variant.id,
                 status: "failed",
-                ...(checkStages.at(-1)?.id === undefined ? {} : { stageId: checkStages.at(-1)!.id }),
+                ...(checkStages.at(-1)?.id === undefined
+                  ? {}
+                  : { stageId: checkStages.at(-1)!.id }),
                 stageCompleted: false,
                 threadIds: checkThreadIds(index),
                 checks: checkResults(index),
@@ -2677,7 +2710,10 @@ export const layerWsRpc = (
           ),
       );
       const cancelVariants = Effect.fn("TaskWorkspace.cancelVariants")(
-        function* (cancel: { readonly projectId: ProjectId; readonly threadIds: ReadonlyArray<ThreadId> }) {
+        function* (cancel: {
+          readonly projectId: ProjectId;
+          readonly threadIds: ReadonlyArray<ThreadId>;
+        }) {
           yield* Effect.forEach(
             cancel.threadIds,
             (threadId) =>
@@ -2765,8 +2801,7 @@ export const layerWsRpc = (
                             text: [
                               input.task.issue.summary,
                               input.task.issue.description,
-                              agentStage?.prompt ??
-                                "Implement the task in this isolated worktree.",
+                              agentStage?.prompt ?? "Implement the task in this isolated worktree.",
                               `Variant: ${variant.label}`,
                               ...(agentStage?.skills.length
                                 ? [`Skills to use: ${agentStage.skills.join(", ")}`]
@@ -2849,7 +2884,7 @@ export const layerWsRpc = (
       );
       // oxlint-disable-next-line t3code/prefer-effect-fn -- generic input is preserved for both read and command RPCs
       const validateTaskWorkspaceScope = <
-        T extends { environmentId: EnvironmentId; projectId: ProjectId; workspaceRoot: string }
+        T extends { environmentId: EnvironmentId; projectId: ProjectId; workspaceRoot: string },
       >(
         input: T,
       ) =>
@@ -2862,15 +2897,14 @@ export const layerWsRpc = (
           }
           return yield* projectService.getById(input.projectId);
         }).pipe(
-          Effect.mapError(
-            (cause) =>
-              isTaskWorkspaceError(cause)
-                ? cause
-                : new TaskWorkspaceError({
-                    operation: "scope",
-                    message: "The task workspace project could not be resolved.",
-                    cause,
-                  }),
+          Effect.mapError((cause) =>
+            isTaskWorkspaceError(cause)
+              ? cause
+              : new TaskWorkspaceError({
+                  operation: "scope",
+                  message: "The task workspace project could not be resolved.",
+                  cause,
+                }),
           ),
           Effect.flatMap((projectOption) =>
             Option.match(projectOption, {
@@ -3764,9 +3798,9 @@ export const layerWsRpc = (
             validateTaskWorkspaceScope(input).pipe(
               Effect.flatMap((): Effect.Effect<TaskWorkspaceSnapshot, TaskWorkspaceError> =>
                 input.localOnly === true && taskBoard !== undefined
-                  ? taskBoard.read(input.projectId, { taskId: input.taskId, threadId: input.threadId }).pipe(
-                      Effect.map((board) => ({ ...emptyTaskWorkspaceSnapshot(), board })),
-                    )
+                  ? taskBoard
+                      .read(input.projectId, { taskId: input.taskId, threadId: input.threadId })
+                      .pipe(Effect.map((board) => ({ ...emptyTaskWorkspaceSnapshot(), board })))
                   : taskWorkspace.read(input),
               ),
             ),
@@ -3777,9 +3811,14 @@ export const layerWsRpc = (
               const { command, projectId, revision } = input;
               return taskBoard === undefined || !isBoardCommand(command)
                 ? taskWorkspace.command(input)
-                : taskBoard.command({ projectId, revision, command, actor: { name: "You", source: "user" } }).pipe(
-                    Effect.map((board) => ({ ...emptyTaskWorkspaceSnapshot(), board })),
-                  );
+                : taskBoard
+                    .command({
+                      projectId,
+                      revision,
+                      command,
+                      actor: { name: "You", source: "user" },
+                    })
+                    .pipe(Effect.map((board) => ({ ...emptyTaskWorkspaceSnapshot(), board })));
             }),
           ),
         [WS_METHODS.designRead]: (input) =>

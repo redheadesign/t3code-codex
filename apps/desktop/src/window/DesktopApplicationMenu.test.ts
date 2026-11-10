@@ -51,7 +51,7 @@ const layerElectronApp = Layer.succeed(ElectronApp.ElectronApp, {
 } satisfies ElectronApp.ElectronApp["Service"]);
 
 const layerElectronDialog = Layer.succeed(ElectronDialog.ElectronDialog, {
-  pickFolder: () => Effect.succeedNone,
+  pickFolders: () => Effect.succeed([]),
   pickFiles: () => Effect.succeed([]),
   showMessageBox: () => Effect.succeed({ response: 0, checkboxChecked: false }),
   showErrorBox: () => Effect.void,

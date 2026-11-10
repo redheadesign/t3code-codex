@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import { receiveProviderAuthCallback, cancelProviderAuthCallback } from "./methods/providerAuth.ts";
 import * as DesktopIpc from "./DesktopIpc.ts";
 import { installNotificationBadge } from "./methods/notificationBadge.ts";
+import { trustProjectFolders } from "./methods/projectTrust.ts";
 import { getClientSettings, setClientSettings } from "./methods/clientSettings.ts";
 import { getConnectionCatalog, setConnectionCatalog } from "./methods/connectionCatalog.ts";
 import {
@@ -47,6 +48,7 @@ import {
   probeRemoteEditors,
   revealWindow,
   pickFolder,
+  pickFolders,
   pickProjectFavicon,
   pickThemeFiles,
   setTheme,
@@ -137,6 +139,8 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(setWslOnly);
 
   yield* ipc.handle(pickFolder);
+  yield* ipc.handle(pickFolders);
+  yield* ipc.handle(trustProjectFolders);
   yield* ipc.handle(pickProjectFavicon);
   yield* ipc.handle(pickThemeFiles);
   yield* ipc.handle(setTheme);

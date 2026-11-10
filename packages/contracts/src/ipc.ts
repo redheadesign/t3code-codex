@@ -527,6 +527,19 @@ export const PickFolderOptionsSchema = Schema.Struct({
   targetEnvironmentId: Schema.optionalKey(Schema.String),
 });
 
+export const TrustProjectFoldersInputSchema = Schema.Struct({
+  paths: Schema.Array(Schema.String),
+  locale: Schema.optionalKey(Schema.Literals(["en", "ru"])),
+});
+export type TrustProjectFoldersInput = typeof TrustProjectFoldersInputSchema.Type;
+
+export const TrustProjectFoldersResultSchema = Schema.Struct({
+  confirmed: Schema.Boolean,
+  codex: Schema.Literals(["trusted", "unavailable", "failed", "skipped"]),
+  claude: Schema.Literals(["confirmation-required", "skipped"]),
+});
+export type TrustProjectFoldersResult = typeof TrustProjectFoldersResultSchema.Type;
+
 /** Oversized files have empty text so the main process never loads their contents. */
 export interface PickedThemeFile {
   name: string;
@@ -1111,6 +1124,8 @@ export interface DesktopBridge {
   setWslDistro: (distro: string | null) => Promise<DesktopWslState>;
   setWslOnly: (enabled: boolean) => Promise<DesktopWslState>;
   pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
+  pickFolders?: (options?: PickFolderOptions) => Promise<readonly string[]>;
+  trustProjectFolders?: (input: TrustProjectFoldersInput) => Promise<TrustProjectFoldersResult>;
   pickProjectFavicon: (initialPath?: string) => Promise<string | null>;
   pickThemeFiles: () => Promise<readonly PickedThemeFile[] | null>;
   setTheme: (theme: DesktopTheme) => Promise<void>;
@@ -1234,6 +1249,7 @@ export interface ConfirmDialogOptions {
 export interface LocalApi {
   dialogs: {
     pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
+    pickFolders: (options?: PickFolderOptions) => Promise<readonly string[]>;
     confirm: (message: string, options?: ConfirmDialogOptions) => Promise<boolean>;
   };
   shell: {

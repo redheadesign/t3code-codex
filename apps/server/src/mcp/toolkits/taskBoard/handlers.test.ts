@@ -53,6 +53,7 @@ it.effect("requires a named project and only writes to its board outside Plan mo
           }),
       }),
       Layer.mock(ManagedProjectFolders)({
+        namedProjectsRoot: "/projects",
         isScratchProject: (id) => Effect.succeed(id === scratch),
       }),
       Layer.mock(TaskBoardService)({
@@ -80,7 +81,7 @@ it.effect("requires a named project and only writes to its board outside Plan mo
       const projectWrite = yield* toolkit
         .handle("t3_task_update", { projectId, revision: board.revision, command })
         .pipe(Stream.unwrap, Stream.runCollect);
-      yield* Ref.update(caller, (thread) => ({ ...thread, interactionMode: "plan" }));
+      yield* Ref.update(caller, (thread) => ({ ...thread, interactionMode: "plan" as const }));
       const planRead = yield* toolkit
         .handle("t3_task_board", { projectId })
         .pipe(Stream.unwrap, Stream.runCollect);

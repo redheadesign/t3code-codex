@@ -40,7 +40,7 @@ const { showMessageBox } = vi.hoisted(() => ({
   >(() => 1),
 }));
 const layerDialog = Layer.succeed(ElectronDialog.ElectronDialog, {
-  pickFolder: () => Effect.die("unused"),
+  pickFolders: () => Effect.die("unused"),
   pickFiles: () => Effect.die("unused"),
   showMessageBox: (options, owner) =>
     Effect.sync(() => ({ response: showMessageBox(options, owner), checkboxChecked: false })),
