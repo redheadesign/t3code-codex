@@ -67,7 +67,7 @@ it.effect.each([
     proxySettings("0x1", "127.0.0.1:15678") +
       "    AutoConfigURL    REG_SZ    http://example.com/proxy.pac\r\n",
   ],
-])("ignores %s Windows proxy settings", ([, output]) =>
+] satisfies [string, string][])("ignores %s Windows proxy settings", ([, output]) =>
   Effect.gen(function* () {
     registryOutput(output);
     assert.deepEqual(yield* resolveEnv("win32", {}), {});
