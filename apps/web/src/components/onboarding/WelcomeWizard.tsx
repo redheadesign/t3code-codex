@@ -102,7 +102,7 @@ import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import { ScrollArea } from "../ui/scroll-area";
 import { Spinner } from "../ui/spinner";
 import { WizardPanel, WizardSteps, WizardPopup, WizardHeader } from "../ui/wizard";
-import { Dialog } from "../ui/dialog";
+import { Dialog, DialogTitle } from "../ui/dialog";
 import { toastManager } from "../ui/toast";
 import { cn } from "../../lib/utils";
 import { formatRelativeTime } from "../../timestampFormat";
@@ -113,6 +113,61 @@ const NO_ENVIRONMENTS: readonly EnvironmentId[] = [];
 const AGENT_ONBOARDING_THREAD_ID = ThreadId.make("onboarding-agent-setup");
 const ONBOARDING_STAGES = ["Connect", "Agents", "Projects"] as const;
 const SCAN_LIMIT_MESSAGE = "Scan limit reached. Some projects or conversations may be missing.";
+
+function reportProjectImportResult(importWarning?: string, importedThreadCount = 0) {
+  if (importWarning) {
+    toastManager.add({
+      type: "warning",
+      title: "Some history was not imported",
+      description: importWarning,
+      timeout: 0,
+    });
+  } else if (importedThreadCount > 0) {
+    const count = importedThreadCount.toLocaleString();
+    toastManager.add({
+      type: "success",
+      title: `Imported ${count} ${importedThreadCount === 1 ? "thread" : "threads"}`,
+    });
+  }
+}
+
+export function AgentProjectImportDialog(props: {
+  readonly environmentIds: readonly EnvironmentId[];
+  readonly onClose: () => void;
+}) {
+  const scans = useProjectScans(props.environmentIds);
+  const [selection, setSelection] = useState<ImportSelection | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(_, event) => {
+        if (isImporting) event.cancel();
+        else props.onClose();
+      }}
+    >
+      <WizardPopup size="wide" bottomStickOnMobile={false} showCloseButton={!isImporting}>
+        <DialogTitle className="sr-only">Import projects</DialogTitle>
+        <WizardPanel>
+          <ImportStep
+            scans={scans}
+            importSelection={selection}
+            onImportSelectionChange={setSelection}
+            mode="manual"
+            isImporting={isImporting}
+            setIsImporting={setIsImporting}
+            onDone={async (_projectRef, warning, count) => {
+              reportProjectImportResult(warning, count);
+              props.onClose();
+              return true;
+            }}
+          />
+        </WizardPanel>
+      </WizardPopup>
+    </Dialog>
+  );
+}
 
 export function WelcomeWizard({
   localAvailable,
@@ -187,19 +242,7 @@ export function WelcomeWizard({
           completionErrorToastIdRef.current = null;
         }
         await onDone(projectRef);
-        if (importWarning) {
-          toastManager.add({
-            type: "warning",
-            title: "Some history was not imported",
-            description: importWarning,
-            timeout: 0,
-          });
-        } else if (importedThreadCount > 0) {
-          toastManager.add({
-            type: "success",
-            title: `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "thread" : "threads"}`,
-          });
-        }
+        reportProjectImportResult(importWarning, importedThreadCount);
         return true;
       })
       .catch(() => {
@@ -1203,6 +1246,7 @@ function ImportStep({
   scans,
   importSelection,
   onImportSelectionChange,
+  mode = "onboarding",
   isImporting,
   setIsImporting,
   onDone,
@@ -1210,6 +1254,7 @@ function ImportStep({
   readonly scans: ReturnType<typeof useProjectScans>;
   readonly importSelection: ImportSelection | null;
   readonly onImportSelectionChange: (next: ImportSelection) => void;
+  readonly mode?: "onboarding" | "manual";
   readonly isImporting: boolean;
   readonly setIsImporting: (value: boolean) => void;
   readonly onDone: (
@@ -1250,10 +1295,11 @@ function ImportStep({
     ),
   );
   const recentKeys = new Set(recent.map((candidate) => candidate.key));
+  const cancelLabel = mode === "manual" ? "Cancel" : "Do not import projects";
   const selected = candidates.filter((candidate) =>
     importSelection?.environmentIds.has(candidate.environmentId)
       ? importSelection.keys.has(candidate.key)
-      : recentKeys.has(candidate.key),
+      : mode === "onboarding" && recentKeys.has(candidate.key),
   );
   const selectedKeys = new Set(selected.map((candidate) => candidate.key));
   const setSelectedKeys = (keys: ReadonlySet<string>) =>
@@ -1450,7 +1496,7 @@ function ImportStep({
         </div>
         <div className="flex justify-end">
           <Button variant="ghost-muted" onClick={() => void onDone()}>
-            Do not import projects
+            {cancelLabel}
           </Button>
         </div>
       </div>
@@ -1545,7 +1591,7 @@ function ImportStep({
       ) : null}
       <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
         <Button variant="ghost-muted" disabled={isImporting} onClick={finishAfterImport}>
-          Do not import projects
+          {cancelLabel}
         </Button>
         <Button
           autoFocus

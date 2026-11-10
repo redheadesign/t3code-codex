@@ -16,6 +16,7 @@ import {
   addDesignPage,
   addImageNode,
   addTextNode,
+  applyDesignAutoLayout,
   createInitialDesignDocument,
   descendants,
   DesignDocument,
@@ -30,6 +31,9 @@ import {
   groupDesignNodes,
   ungroupDesignNode,
   addComponentNode,
+  addDesignComponentVariant,
+  designComponentVariants,
+  setDesignInstanceVariant,
   addInstanceNode,
   detachDesignInstance,
   restoreDesignContent,
@@ -632,6 +636,32 @@ describe("Design document IR", () => {
     });
   });
 
+  it("wraps sibling layers in auto layout in their visual order", () => {
+    const initial = addTextNode(createInitialDesignDocument());
+    const [first, second] = initial.nodes[0]!.childIds;
+    const arranged = updateDesignNodes(
+      initial,
+      new Map([
+        [first!, { x: 100, y: 20, width: 40, height: 20 }],
+        [second!, { x: 20, y: 20, width: 50, height: 20 }],
+      ]),
+    );
+    const layout = applyDesignAutoLayout(arranged, [first!, second!])!;
+    const frame = layout.document.nodes.at(-1)!;
+    expect(frame).toMatchObject({
+      nodeId: layout.nodeId,
+      kind: "frame",
+      childIds: [second, first],
+      layoutModel: { kind: "auto-layout", direction: "row", gap: 30 },
+      layoutSizing: { width: "hug", height: "hug" },
+    });
+    expect(layout.document.nodes.find((node) => node.nodeId === first)).toMatchObject({
+      parentId: frame.nodeId,
+      x: 80,
+    });
+    expect(applyDesignAutoLayout(layout.document, [frame.nodeId])?.document).toBe(layout.document);
+  });
+
   it("preserves the image appearance when reparenting into a rotated frame", () => {
     const document = updateDesignNode(
       addImageNode(createInitialDesignDocument(), "asset", null, {
@@ -682,6 +712,46 @@ describe("Design document IR", () => {
     const pastedRoot = nodeForPage(pasted).at(-1)!;
     expect(pastedRoot.kind).toBe("frame");
     expect(pastedRoot.instanceOfNodeId).toBeUndefined();
+  });
+
+  it("changes compatible component variants without losing local overrides or layer links", () => {
+    const initial = addComponentNode(createInitialDesignDocument());
+    const component = initial.nodes.at(-1)!;
+    const withText = addTextNode(initial, component.nodeId);
+    const withVariant = addDesignComponentVariant(withText, component.nodeId);
+    const [, variant] = designComponentVariants(withVariant, component.nodeId);
+    const variantText = variant!.childIds[0]!;
+    const styled = updateDesignNode(withVariant, variantText, {
+      text: "Variant label",
+      fill: "#123456",
+    });
+    const withInstance = addInstanceNode(styled, component.nodeId);
+    const instance = withInstance.nodes.find((node) => node.kind === "instance")!;
+    const childId = instance.childIds[0]!;
+    const local = updateDesignNodes(
+      withInstance,
+      new Map([
+        [instance.nodeId, { x: 444, y: 222, rotation: 45 }],
+        [childId, { text: "Local label" }],
+      ]),
+    );
+    const switched = setDesignInstanceVariant(local, instance.nodeId, variant!.nodeId);
+    expect(switched.nodes.find((node) => node.nodeId === instance.nodeId)).toMatchObject({
+      instanceOfNodeId: variant!.nodeId,
+      childIds: [childId],
+      x: 444,
+      y: 222,
+      rotation: 45,
+    });
+    expect(switched.nodes.find((node) => node.nodeId === childId)).toMatchObject({
+      instanceOfNodeId: variantText,
+      text: "Local label",
+      fill: "#123456",
+    });
+    const mismatched = addTextNode(switched, component.nodeId);
+    expect(setDesignInstanceVariant(mismatched, instance.nodeId, component.nodeId)).toBe(
+      mismatched,
+    );
   });
 
   it("detaches inherited children while retaining independent nested component links", () => {

@@ -5,6 +5,9 @@ import { DesignWorkspace } from "../components/design/DesignWorkspace";
 
 export interface DesignRouteSearch {
   readonly documentId?: string;
+  readonly pageId?: string;
+  readonly nodeId?: string;
+  readonly commentId?: string;
   readonly environmentId?: EnvironmentId;
   readonly cwd?: string;
   readonly relativePath?: string;
@@ -21,6 +24,9 @@ function DesignRoute() {
       key={search.documentId ?? "design-default"}
       shellIntegrated
       {...(search.documentId === undefined ? {} : { documentId: search.documentId })}
+      {...(search.pageId === undefined ? {} : { pageId: search.pageId })}
+      {...(search.nodeId === undefined ? {} : { nodeId: search.nodeId })}
+      {...(search.commentId === undefined ? {} : { commentId: search.commentId })}
       syncTarget={
         hasSyncTarget
           ? {
@@ -37,6 +43,9 @@ function DesignRoute() {
 export const Route = createFileRoute("/_chat/design")({
   validateSearch: (raw: Record<string, unknown>): DesignRouteSearch => ({
     ...(typeof raw.documentId === "string" && raw.documentId ? { documentId: raw.documentId } : {}),
+    ...(typeof raw.pageId === "string" && raw.pageId ? { pageId: raw.pageId } : {}),
+    ...(typeof raw.nodeId === "string" && raw.nodeId ? { nodeId: raw.nodeId } : {}),
+    ...(typeof raw.commentId === "string" && raw.commentId ? { commentId: raw.commentId } : {}),
     ...(typeof raw.environmentId === "string" && raw.environmentId
       ? { environmentId: raw.environmentId as EnvironmentId }
       : {}),

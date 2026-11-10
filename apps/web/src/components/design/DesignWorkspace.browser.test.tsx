@@ -303,6 +303,44 @@ it("preserves relative type metrics across font size changes, unit conversion an
   expect(getComputedStyle(text).textDecorationLine).toBe("underline");
 });
 
+it("copies and pastes a layer from the layer list with a non-Latin keyboard", async () => {
+  await resetDesignStorage();
+  await using screen = await render(
+    <div style={{ width: 1280, height: 800 }}>
+      <DesignWorkspace />
+    </div>,
+    { router: "/design" },
+  );
+  using _clipboardRead = vi.spyOn(navigator.clipboard, "readText").mockResolvedValue("");
+  using _clipboardWrite = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockRejectedValue(new DOMException("Permission denied", "NotAllowedError"));
+  const layer = screen
+    .getByRole("region", { name: "Design layers" })
+    .getByRole("button", { name: "Welcome heading", exact: true });
+  await userEvent.click(layer);
+  for (const [key, code] of [
+    ["с", "KeyC"],
+    ["м", "KeyV"],
+  ] as const) {
+    await act(() =>
+      layer.element().dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key,
+          code,
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+  }
+  await vi.waitFor(async () => {
+    const [document] = await storedDesignDocuments();
+    expect(document?.nodes.filter((node) => node.name === "Welcome heading")).toHaveLength(2);
+  });
+});
+
 it("edits mixed properties for every selected layer and undoes the transaction", async () => {
   const source = addFrameNode(createInitialDesignDocument());
   const secondId = source.nodes.at(-1)!.nodeId;

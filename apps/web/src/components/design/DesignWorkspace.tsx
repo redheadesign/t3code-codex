@@ -1,6 +1,5 @@
 import { DesignAssetPayload, ThreadId } from "@t3tools/contracts";
-import type { EnvironmentId } from "@t3tools/contracts";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
 import {
   CloudUploadIcon,
@@ -37,13 +36,17 @@ import {
 import { createPortal } from "react-dom";
 
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
+import { previewRuntimeTabId } from "../../browser/previewRuntimeTabId";
 import { cn } from "../../lib/utils";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+import { ensureLocalApi } from "../../localApi";
+import { readThreadPreviewState } from "../../previewStateStore";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useEnvironments } from "../../state/environments";
 import { useProjects } from "../../state/entities";
+import { previewBridge } from "../preview/previewBridge";
 import { Button } from "../ui/button";
 import {
   Menu,
@@ -80,6 +83,9 @@ import {
   removeDesignAsset,
   replaceDesignAsset,
   addComponentNode,
+  addDesignComponentVariant,
+  designComponentVariants,
+  setDesignInstanceVariant,
   addFrameNode,
   addDesignPage,
   renameDesignPage,
@@ -94,6 +100,7 @@ import {
   designInsertionParent,
   duplicateDesignNodes,
   nodeForPage,
+  nodeAncestry,
   isDesignNodeLocked,
   isDesignNodeInFlow,
   restoreDesignContent,
@@ -101,6 +108,7 @@ import {
   renameDesignNode,
   reparentDesignNode,
   groupDesignNodes,
+  applyDesignAutoLayout,
   ungroupDesignNode,
   reorderDesignNode,
   setActiveDesignPage,
@@ -122,12 +130,15 @@ import {
   deserializeDesignFile,
 } from "./designAssetPackage";
 import { DesignAssetRow } from "./DesignAssetRow";
+import { designAgentReference } from "./designAgentReference";
 import {
   copyDesignSelection,
   readDesignSelection,
   portableDesignSelection,
 } from "./designClipboard";
 import { DesignCanvas, type DesignTool } from "./DesignCanvas";
+import { DesignGallery } from "./DesignGallery";
+import { canImportDesignWebsite, DesignWebsiteImport } from "./DesignWebsiteImport";
 import { DesignScalePanel } from "./DesignScalePanel";
 import { DesignNumberField } from "./DesignNumberField";
 import { DesignInspectorColor } from "./DesignInspectorColor";
@@ -168,6 +179,7 @@ import {
   resolveDesignConflict,
 } from "./designSync";
 import { useDesignDocument } from "./useDesignDocument";
+import { designProjectConnection, type DesignProjectConnection } from "./designDocumentStore";
 import {
   exportDesignHtmlPortable,
   exportDesignPatchPortable,
@@ -187,6 +199,24 @@ import { DesignLayerList, flattenDesignLayers, type DesignLayerEntry } from "./D
 const DESIGN_SIDEBAR_WIDTH = "w-(--design-sidebar-width)";
 const decodeDesignDocument = Schema.decodeUnknownSync(DesignDocumentSchema);
 const decodeDesignAssetPayloads = Schema.decodeUnknownSync(Schema.Array(DesignAssetPayload));
+
+function showLayerReferenceMenu(
+  position: { x: number; y: number },
+  canReferenceAgent: boolean,
+  onAction: (action: string) => void,
+) {
+  void ensureLocalApi()
+    .contextMenu.show(
+      [
+        { id: "copy-link", label: "Copy layer link" },
+        ...(canReferenceAgent ? [{ id: "copy-reference", label: "Copy reference for agent" }] : []),
+      ],
+      position,
+    )
+    .then((action) => {
+      if (action) onAction(action);
+    });
+}
 
 type ServerDesignPackage = {
   readonly document: DesignDocument;
@@ -235,6 +265,7 @@ function LayerRow({
   onToggleLock,
   onRename,
   onAction,
+  canReferenceAgent,
   onDropLayer,
   locked,
   parentLocked,
@@ -250,6 +281,7 @@ function LayerRow({
   onToggleLock: () => void;
   onRename: (name: string) => void;
   onAction: (action: string) => void;
+  canReferenceAgent: boolean;
   onDropLayer: (id: string, position: "before" | "inside" | "after") => void;
   locked: boolean;
   parentLocked: boolean;
@@ -281,6 +313,10 @@ function LayerRow({
       )}
       style={{ paddingInlineStart: `${8 + depth * 14}px` }}
       draggable={!renaming && !locked}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        showLayerReferenceMenu({ x: event.clientX, y: event.clientY }, canReferenceAgent, onAction);
+      }}
       onDragStart={(event) =>
         event.dataTransfer.setData("application/x-t3-design-layer", node.nodeId)
       }
@@ -454,6 +490,12 @@ function LayerRow({
             >
               Rename
             </MenuItem>
+            <MenuItem onClick={() => onAction("copy-link")}>Copy layer link</MenuItem>
+            {canReferenceAgent ? (
+              <MenuItem onClick={() => onAction("copy-reference")}>
+                Copy reference for agent
+              </MenuItem>
+            ) : null}
             <MenuItem onClick={() => onAction("duplicate")}>Duplicate</MenuItem>
             <MenuItem disabled={locked} onClick={() => onAction("up")}>
               Move up
@@ -592,6 +634,7 @@ function LayersPanel({
   onToggleVisibility,
   onToggleLock,
   onAction,
+  canReferenceAgent,
   onDropLayer,
   onPageRename,
   onPageDelete,
@@ -615,6 +658,7 @@ function LayersPanel({
   onToggleVisibility: (nodeId: string) => void;
   onToggleLock: (nodeId: string) => void;
   onAction: (nodeId: string, action: string) => void;
+  canReferenceAgent: boolean;
   onDropLayer: (
     nodeId: string,
     target: DesignNode,
@@ -635,9 +679,13 @@ function LayersPanel({
   const [searchOpen, setSearchOpen] = useState(false);
   const [pagesOpen, setPagesOpen] = useState(true);
   const [assetQuery, setAssetQuery] = useState("");
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(
-    () => new Set(roots.map((node) => node.nodeId)),
-  );
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => {
+    const byId = new Map(document.nodes.map((node) => [node.nodeId, node]));
+    return new Set([
+      ...roots.map((node) => node.nodeId),
+      ...selectedNodeIds.flatMap((id) => nodeAncestry(byId, id).map((node) => node.nodeId)),
+    ]);
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
   const rows = flattenDesignLayers(document, expanded);
   const assetUses = new Map<string, number>();
@@ -691,6 +739,7 @@ function LayersPanel({
       onToggleLock={() => onToggleLock(node.nodeId)}
       onRename={(name) => onRename(node.nodeId, name)}
       onAction={(action) => onAction(node.nodeId, action)}
+      canReferenceAgent={canReferenceAgent}
       onDropLayer={(id, position) => onDropLayer(id, node, position)}
     />
   );
@@ -972,6 +1021,38 @@ function flipShortcutAxis(event: KeyboardEvent<HTMLElement>) {
   return key === "h" ? "horizontal" : key === "v" ? "vertical" : null;
 }
 
+function shortcutLetter(event: KeyboardEvent<HTMLElement>) {
+  const key = event.key.toLowerCase();
+  return /^[a-z]$/.test(key) || !event.code.startsWith("Key")
+    ? key
+    : event.code.slice(3).toLowerCase();
+}
+
+function clipboardShortcut(event: KeyboardEvent<HTMLElement>) {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return null;
+  const key = shortcutLetter(event);
+  return key === "c" || key === "x" || key === "v" ? key : null;
+}
+
+function isBoldShortcut(event: KeyboardEvent<HTMLElement>) {
+  return (
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    shortcutLetter(event) === "b"
+  );
+}
+
+function isAutoLayoutShortcut(event: KeyboardEvent<HTMLElement>) {
+  return (
+    event.shiftKey &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    shortcutLetter(event) === "a"
+  );
+}
+
 function Inspector({
   node,
   selectionCount,
@@ -1001,6 +1082,7 @@ function Inspector({
   propertyLabels,
   page,
   onPageChange,
+  componentControl,
 }: {
   node: DesignNode | null;
   selectionCount: number;
@@ -1026,6 +1108,7 @@ function Inspector({
   propertyLabels: boolean;
   page: DesignDocument["pages"][number];
   onPageChange: (update: Partial<DesignDocument["pages"][number]>) => void;
+  componentControl: ReactNode;
   onAlign: (alignment: "left" | "center" | "right" | "top" | "middle" | "bottom") => void;
   onFlip: (axis: "horizontal" | "vertical") => void;
   onRotate: () => void;
@@ -1294,6 +1377,7 @@ function Inspector({
                   "Unavailable"}
               </div>
             ) : null}
+            {componentControl}
             {tab === "design" ? (
               <>
                 {section(
@@ -2166,22 +2250,25 @@ function Inspector({
 
 type DesignWorkspaceProps = {
   readonly documentId?: string;
+  readonly pageId?: string;
+  readonly nodeId?: string;
+  readonly commentId?: string;
   readonly shellIntegrated?: boolean;
-  readonly syncTarget?: {
-    readonly environmentId: EnvironmentId;
-    readonly cwd: string;
-    readonly relativePath: string;
-  } | null;
+  readonly syncTarget?: DesignProjectConnection | null;
 };
 
 export function DesignWorkspace({
   documentId,
+  pageId,
+  nodeId,
+  commentId,
   shellIntegrated = false,
   syncTarget = null,
 }: DesignWorkspaceProps) {
   const storage = useDesignDocument(documentId);
   const navigate = useNavigate();
   const [showTrash, setShowTrash] = useState(false);
+  const [showWebsiteImport, setShowWebsiteImport] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -2199,7 +2286,10 @@ export function DesignWorkspace({
     );
   };
   const saveError = [...storage.errors.entries()][0];
-  const document = storage.document;
+  const document = shellIntegrated && !documentId ? null : storage.document;
+  const project = storage.records.find(
+    (record) => record.document.documentId === document?.documentId,
+  )?.location?.project;
   const downloadFile = async (file: DesignDocument) => {
     const contents = await serializeDesignFile(file);
     const url = URL.createObjectURL(new Blob([contents], { type: "application/json" }));
@@ -2322,11 +2412,14 @@ export function DesignWorkspace({
       ) : document ? (
         <div className="min-h-0 flex-1" inert={working}>
           <DesignEditor
-            key={document.documentId}
+            key={JSON.stringify([document.documentId, pageId, nodeId, commentId])}
             document={document}
             storage={storage}
             shellIntegrated={shellIntegrated}
-            syncTarget={syncTarget}
+            syncTarget={syncTarget ?? project ?? null}
+            initialPageId={pageId}
+            initialNodeId={nodeId}
+            initialCommentId={commentId}
             onOpenTrash={() => setShowTrash(true)}
             onOpenFile={() => fileInput.current?.click()}
             onDownload={() => run(() => downloadFile(document))}
@@ -2339,46 +2432,27 @@ export function DesignWorkspace({
           />
         </div>
       ) : (
-        <div className="m-auto max-w-md space-y-4 p-8 text-center">
-          <h1 className="text-lg font-semibold">
-            {documentId ? "This Design file is unavailable" : "Your Design files"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {documentId
-              ? "It may have been deleted or saved on another device. Open a local file or check Recently deleted."
-              : "Create a file to start designing."}
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button
-              size="sm"
-              disabled={working}
-              onClick={() =>
-                run(async () => {
-                  const file = await storage.createDocument();
-                  await openDocument(file.documentId);
-                })
-              }
-            >
-              New design document
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => fileInput.current?.click()}>
-              Open Design file…
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => setShowTrash(true)}>
-              Recently deleted
-            </Button>
-          </div>
-          {storage.documents.map((file) => (
-            <Button
-              key={file.documentId}
-              variant="ghost"
-              size="sm"
-              onClick={() => void openDocument(file.documentId)}
-            >
-              {file.title}
-            </Button>
-          ))}
-        </div>
+        <DesignGallery
+          records={storage.records}
+          unavailable={documentId !== undefined}
+          working={working}
+          actions={
+            canImportDesignWebsite() ? (
+              <Button size="sm" variant="secondary" onClick={() => setShowWebsiteImport(true)}>
+                Import website…
+              </Button>
+            ) : null
+          }
+          onCreate={() =>
+            run(async () => {
+              const file = await storage.createDocument();
+              await openDocument(file.documentId);
+            })
+          }
+          onOpen={() => fileInput.current?.click()}
+          onTrash={() => setShowTrash(true)}
+          onMove={(id, location) => run(() => storage.setLocation(id, location))}
+        />
       )}
       <input
         type="file"
@@ -2397,16 +2471,28 @@ export function DesignWorkspace({
           });
         }}
       />
+      {showWebsiteImport ? (
+        <DesignWebsiteImport
+          onClose={() => setShowWebsiteImport(false)}
+          onImport={async (imported) => {
+            const saved = await storage.importDocument(imported);
+            await openDocument(saved.documentId);
+          }}
+        />
+      ) : null}
       {trashDialog}
     </div>
   );
 }
 
 function DesignEditor({
-  document,
+  document: storedDocument,
   storage,
   shellIntegrated,
   syncTarget,
+  initialPageId,
+  initialNodeId,
+  initialCommentId,
   onOpenTrash,
   onOpenFile,
   onDownload,
@@ -2415,7 +2501,10 @@ function DesignEditor({
   readonly document: DesignDocument;
   readonly storage: ReturnType<typeof useDesignDocument>;
   readonly shellIntegrated: boolean;
-  readonly syncTarget: NonNullable<DesignWorkspaceProps["syncTarget"]> | null;
+  readonly syncTarget: DesignProjectConnection | null;
+  readonly initialPageId: string | undefined;
+  readonly initialNodeId: string | undefined;
+  readonly initialCommentId: string | undefined;
   readonly onOpenTrash: () => void;
   readonly onOpenFile: () => void;
   readonly onDownload: () => void;
@@ -2423,6 +2512,22 @@ function DesignEditor({
 }) {
   const { setDocument, documents, createDocument } = storage;
   const navigate = useNavigate();
+  const router = useRouter();
+  const [referencePageId, setReferencePageId] = useState(() => {
+    if (initialNodeId) {
+      const byId = new Map(storedDocument.nodes.map((node) => [node.nodeId, node]));
+      const root = nodeAncestry(byId, initialNodeId).at(-1);
+      const page = root && storedDocument.pages.find((item) => item.nodeIds.includes(root.nodeId));
+      if (page) return page.pageId;
+    }
+    return storedDocument.pages.some((page) => page.pageId === initialPageId)
+      ? initialPageId
+      : undefined;
+  });
+  const document =
+    referencePageId && referencePageId !== storedDocument.activePageId
+      ? { ...storedDocument, activePageId: referencePageId }
+      : storedDocument;
   const projects = useProjects();
   const { environments } = useEnvironments();
   const [designChromeActions, setDesignChromeActions] = useState<HTMLElement | null>(null);
@@ -2439,8 +2544,10 @@ function DesignEditor({
     ids: readonly string[];
     origin: DesignRotationOrigin | null;
   }>(() => {
-    const firstNode = nodeForPage(document)[0];
-    return { ids: firstNode ? [firstNode.nodeId] : [], origin: null };
+    const node =
+      document.nodes.find((candidate) => candidate.nodeId === initialNodeId) ??
+      nodeForPage(document)[0];
+    return { ids: node ? [node.nodeId] : [], origin: null };
   });
   const selectedNodeIds = selection.ids;
   const setSelectedNodeIds = (
@@ -2456,10 +2563,44 @@ function DesignEditor({
   };
   const [rotationOriginVisible, setRotationOriginVisible] = useState(false);
   const { copyToClipboard } = useCopyToClipboard({ target: "design export" });
+  const { copyToClipboard: copyReferenceToClipboard } = useCopyToClipboard({
+    target: "Design reference",
+  });
+  const copyDesignLink = (
+    reference: { pageId?: string; nodeId?: string; commentId?: string } = {},
+  ) => {
+    const location = router.buildLocation({
+      to: "/design",
+      search: { documentId: document.documentId, ...reference },
+    });
+    copyReferenceToClipboard(
+      new URL(router.history.createHref(location.publicHref), window.location.href).href,
+    );
+  };
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const copyAgentReference = (nodeId?: string, commentId?: string) => {
+    if (!syncTarget) return;
+    const needsSync =
+      serverRead.data?.found !== true ||
+      document.syncState !== "synced" ||
+      document.pendingOperations.length > 0;
+    copyReferenceToClipboard(
+      designAgentReference({
+        relativePath: syncTarget.relativePath,
+        documentId: document.documentId,
+        pageId: document.activePageId,
+        ...(nodeId ? { nodeId } : {}),
+        ...(commentId ? { commentId } : {}),
+        needsSync,
+      }),
+    );
+    if (needsSync)
+      setSyncMessage("Use Sync now to make the latest version available to the agent.");
+  };
   const [designTool, setDesignTool] = useState<DesignTool>("select");
   const [propertyLabels, setPropertyLabels] = useState(false);
   const [reactPasteOpen, setReactPasteOpen] = useState(false);
+  const [websiteImportOpen, setWebsiteImportOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [renamingDocument, setRenamingDocument] = useState(false);
   const [documentTitle, setDocumentTitle] = useState(document.title);
@@ -2481,6 +2622,7 @@ function DesignEditor({
       }
     }
     documentRef.current = next;
+    if (referencePageId) setReferencePageId(undefined);
     setDocument(next);
   };
   const undo = () => {
@@ -2529,6 +2671,10 @@ function DesignEditor({
   const selectedNodeMap = new Map(document.nodes.map((node) => [node.nodeId, node]));
   const selectedNodes = selectedNodeIds.flatMap((id) => selectedNodeMap.get(id) ?? []);
   const selectedNode = selectedNodes[0] ?? null;
+  const variantOptions =
+    selectedNodes.length === 1 && selectedNode?.kind === "instance" && selectedNode.instanceOfNodeId
+      ? designComponentVariants(document, selectedNode.instanceOfNodeId)
+      : [];
   const selectedNodeId = selectedNode?.nodeId ?? null;
   const activePage =
     document.pages.find((page) => page.pageId === document.activePageId) ?? document.pages[0]!;
@@ -2548,6 +2694,7 @@ function DesignEditor({
   const copyLayers = async (cut = false) => {
     const selection = copyDesignSelection(documentRef.current, selectedNodeIds);
     if (!selection) return;
+    clipboard.current = selection;
     let text;
     try {
       text = await portableDesignSelection(selection);
@@ -2557,6 +2704,7 @@ function DesignEditor({
       );
       return;
     }
+    if (clipboard.current !== selection) return;
     clipboard.current = text;
     let copiedExternally = false;
     try {
@@ -2573,7 +2721,7 @@ function DesignEditor({
   const pasteLayers = async () => {
     let text = clipboard.current;
     try {
-      text = await navigator.clipboard.readText();
+      text = (await navigator.clipboard.readText()) || clipboard.current;
     } catch {
       /* The in-editor clipboard remains usable without browser clipboard permission. */
     }
@@ -2618,7 +2766,9 @@ function DesignEditor({
     );
   };
   const onCanvasKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.defaultPrevented || event.nativeEvent.isComposing) return;
     const modifier = event.metaKey || event.ctrlKey;
+    const key = shortcutLetter(event);
     const flipAxis = flipShortcutAxis(event);
     if (flipAxis) {
       event.preventDefault();
@@ -2626,21 +2776,60 @@ function DesignEditor({
       commitDocument(flipDesignSelection(documentRef.current, selectedNodeIds, flipAxis));
       return;
     }
-    if (modifier && ["c", "x", "v"].includes(event.key.toLowerCase())) {
+    const clipboardAction = clipboardShortcut(event);
+    if (clipboardAction && (clipboardAction === "v" || selectedNodeIds.length > 0)) {
       event.preventDefault();
       event.stopPropagation();
-      if (event.key.toLowerCase() === "v") void pasteLayers();
-      else void copyLayers(event.key.toLowerCase() === "x");
+      if (!event.repeat) {
+        if (clipboardAction === "v") void pasteLayers();
+        else void copyLayers(clipboardAction === "x");
+      }
       return;
     }
-    if (modifier && event.key.toLowerCase() === "z") {
+    if (isAutoLayoutShortcut(event) && selectedNodeIds.length > 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.repeat) return;
+      const next = applyDesignAutoLayout(documentRef.current, selectedNodeIds);
+      if (next) {
+        commitDocument(next.document);
+        setSelectedNodeIds([next.nodeId]);
+      }
+      return;
+    }
+    if (isBoldShortcut(event)) {
+      const current = documentRef.current;
+      const texts = selectedNodes.filter(
+        (node) =>
+          node.kind === "text" && !isDesignNodeLocked(current, node.nodeId, selectedNodeMap),
+      );
+      if (!texts.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.repeat) return;
+      const weight = texts.some((node) => (node.typography?.weight ?? node.fontWeight ?? 400) < 700)
+        ? 700
+        : 400;
+      const changes = new Map(
+        texts.map((node) => [
+          node.nodeId,
+          {
+            fontWeight: weight,
+            typography: { ...node.typography, weight },
+          },
+        ]),
+      );
+      commitDocument(updateDesignNodes(current, changes));
+      return;
+    }
+    if (modifier && key === "z") {
       event.preventDefault();
       event.stopPropagation();
       if (event.shiftKey) redo();
       else undo();
       return;
     }
-    if (modifier && event.key.toLowerCase() === "d") {
+    if (modifier && key === "d") {
       event.preventDefault();
       const before = documentRef.current;
       const next = duplicateDesignNodes(before, selectedNodeIds);
@@ -2654,7 +2843,7 @@ function DesignEditor({
       );
       return;
     }
-    if (modifier && event.key.toLowerCase() === "g") {
+    if (modifier && key === "g") {
       event.preventDefault();
       if (event.shiftKey) {
         let next = documentRef.current;
@@ -2669,7 +2858,7 @@ function DesignEditor({
       }
       return;
     }
-    if (modifier && event.key.toLowerCase() === "a") {
+    if (modifier && key === "a") {
       event.preventDefault();
       setSelectedNodeIds(
         nodeForPage(documentRef.current)
@@ -2771,6 +2960,14 @@ function DesignEditor({
   const layerAction = (nodeId: string, action: string) => {
     const current = documentRef.current;
     const ids = selectedNodeIds.includes(nodeId) ? selectedNodeIds : [nodeId];
+    if (action === "copy-link") {
+      copyDesignLink({ pageId: current.activePageId, nodeId });
+      return;
+    }
+    if (action === "copy-reference") {
+      copyAgentReference(nodeId);
+      return;
+    }
     if (action === "flip-horizontal" || action === "flip-vertical")
       commitDocument(
         flipDesignSelection(current, ids, action === "flip-horizontal" ? "horizontal" : "vertical"),
@@ -3078,23 +3275,13 @@ function DesignEditor({
     environmentId: project.environmentId,
     cwd: project.workspaceRoot,
   }));
-  const searchForDocument = (nextDocumentId: string) => ({
-    documentId: nextDocumentId,
-    ...(syncTarget
-      ? {
-          environmentId: syncTarget.environmentId,
-          cwd: syncTarget.cwd,
-          relativePath: syncTarget.relativePath.replace(/[^/]+$/u, `${nextDocumentId}.json`),
-        }
-      : {}),
-  });
   const openDocument = (value: string | null) => {
     if (!value) return;
-    void navigate({ to: "/design", search: searchForDocument(value) });
+    void navigate({ to: "/design", search: { documentId: value } });
   };
   const addDocument = () => {
-    void createDocument().then(
-      (next) => navigate({ to: "/design", search: searchForDocument(next.documentId) }),
+    void createDocument(syncTarget ?? undefined).then(
+      (next) => navigate({ to: "/design", search: { documentId: next.documentId } }),
       (error: unknown) =>
         setSyncMessage(error instanceof Error ? error.message : "Could not create the file."),
     );
@@ -3114,70 +3301,78 @@ function DesignEditor({
       setSyncMessage("Reconnect the source project to refresh this frame");
       return;
     }
-    let capture;
-    let materializedAssets;
-    if (
-      syncTarget &&
-      provenance.sourceThreadId !== undefined &&
-      provenance.sourceTabId !== undefined
-    ) {
-      const result = await captureServerDesignSnapshot({
-        environmentId: syncTarget.environmentId,
-        input: {
-          threadId: ThreadId.make(provenance.sourceThreadId),
-          tabId: provenance.sourceTabId,
-        },
-      });
-      if (result._tag === "Success") capture = result.value;
-    }
-    if (!capture) {
-      setSyncMessage("Could not capture the source. Your design has been preserved.");
-      return;
-    }
+    const sourceThread = {
+      environmentId: syncTarget.environmentId,
+      threadId: ThreadId.make(provenance.sourceThreadId),
+    };
+    const tabId = provenance.sourceTabId;
     try {
-      materializedAssets = await materializePreviewAssets(capture);
-    } catch (error) {
-      setSyncMessage(
-        `${error instanceof Error ? error.message : "Could not collect source images."} Your design has been preserved.`,
+      const preview = readThreadPreviewState(sourceThread);
+      const capture =
+        previewBridge && preview.desktopByTabId[tabId]?.hasWebContents
+          ? await previewBridge.captureDesignSnapshot(
+              previewRuntimeTabId(sourceThread, preview.serverEpoch, tabId),
+            )
+          : await captureServerDesignSnapshot({
+              environmentId: sourceThread.environmentId,
+              input: { threadId: sourceThread.threadId, tabId },
+            }).then((result) => (result._tag === "Success" ? result.value : null));
+      if (!capture || capture.nodes.length === 0) {
+        setSyncMessage("Could not capture the source. Your design has been preserved.");
+        return;
+      }
+      const assets = await materializePreviewAssets(capture);
+      commitDocument(
+        refreshLinkedDesignDocument(documentRef.current, {
+          route: provenance.route,
+          sourceRevision: capture.sourceRevision ?? provenance.sourceRevision,
+          colorScheme: provenance.colorScheme,
+          viewportWidth: provenance.viewportWidth,
+          viewportHeight: provenance.viewportHeight,
+          ...(capture.browserEngine === undefined ? {} : { browserEngine: capture.browserEngine }),
+          ...(capture.stateFixture === undefined ? {} : { stateFixture: capture.stateFixture }),
+          capture,
+          assetIdsByNodeId: assets.assetIdsByNodeId,
+          assetMetadata: assets.assets,
+        }),
       );
-      return;
+      setSyncMessage(
+        capture.truncated
+          ? "Source refreshed with the first 10,000 layers; local geometry overrides were preserved"
+          : "Source refreshed; local geometry overrides were preserved",
+      );
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : "Could not refresh the source.");
     }
-    commitDocument(
-      refreshLinkedDesignDocument(documentRef.current, {
-        route: provenance.route,
-        sourceRevision: capture?.sourceRevision ?? provenance.sourceRevision,
-        colorScheme: provenance.colorScheme,
-        viewportWidth: provenance.viewportWidth,
-        viewportHeight: provenance.viewportHeight,
-        ...(capture?.browserEngine === undefined ? {} : { browserEngine: capture.browserEngine }),
-        ...(capture?.stateFixture === undefined ? {} : { stateFixture: capture.stateFixture }),
-        ...(capture === undefined ? {} : { capture }),
-        ...(materializedAssets === undefined
-          ? {}
-          : {
-              assetIdsByNodeId: materializedAssets.assetIdsByNodeId,
-              assetMetadata: materializedAssets.assets,
-            }),
-      }),
-    );
-    setSyncMessage(
-      capture?.truncated
-        ? "Source refreshed with the first 10,000 layers; local geometry overrides were preserved"
-        : "Source refreshed; local geometry overrides were preserved",
-    );
   };
   const connectProject = (value: string | null) => {
     const project = projectOptions.find((option) => option.value === value);
     if (!project) return;
-    void navigate({
-      to: "/design",
-      search: {
-        documentId: document.documentId,
-        environmentId: project.environmentId,
-        cwd: project.cwd,
-        relativePath: `.t3/design/${document.documentId}.json`,
-      },
-    });
+    const current = storage.records.find(
+      (record) => record.document.documentId === document.documentId,
+    );
+    const connection = designProjectConnection(
+      { environmentId: project.environmentId, cwd: project.cwd },
+      document.documentId,
+    );
+    void storage
+      .setLocation(document.documentId, { ...current?.location, project: connection })
+      .catch((error: unknown) =>
+        setSyncMessage(
+          error instanceof Error ? error.message : "Could not connect this file to the project.",
+        ),
+      );
+  };
+  const disconnectProject = async () => {
+    const folder = storage.records.find(
+      (record) => record.document.documentId === document.documentId,
+    )?.location?.folder;
+    try {
+      await storage.setLocation(document.documentId, folder ? { folder } : {});
+      await navigate({ to: "/design", search: { documentId: document.documentId } });
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : "Could not disconnect this file.");
+    }
   };
   const loadServerCopy = async () => {
     if (!serverDocument) return;
@@ -3235,6 +3430,12 @@ function DesignEditor({
       <MenuItem onClick={addDocument}>New design document</MenuItem>
       <MenuItem onClick={onOpenFile}>Open Design file…</MenuItem>
       <MenuItem onClick={onDownload}>Save a local copy…</MenuItem>
+      <MenuItem onClick={() => copyDesignLink()}>Copy file link</MenuItem>
+      {syncTarget ? (
+        <MenuItem onClick={() => copyAgentReference(selectedNodeId ?? undefined)}>
+          Copy reference for agent
+        </MenuItem>
+      ) : null}
       <MenuItem
         onClick={() => {
           setDocumentTitle(document.title);
@@ -3256,6 +3457,9 @@ function DesignEditor({
           </MenuItem>
           <MenuItem onClick={() => void pasteMarkup()}>Paste HTML…</MenuItem>
           <MenuItem onClick={() => setReactPasteOpen(true)}>Paste as React…</MenuItem>
+          {canImportDesignWebsite() ? (
+            <MenuItem onClick={() => setWebsiteImportOpen(true)}>Import website…</MenuItem>
+          ) : null}
         </MenuSubPopup>
       </MenuSub>
       <MenuSeparator />
@@ -3289,6 +3493,7 @@ function DesignEditor({
                   {syncing ? "Syncing…" : "Sync now"}
                 </MenuItem>
               </MenuGroup>
+              <MenuItem onClick={() => void disconnectProject()}>Disconnect project</MenuItem>
             </>
           ) : projectOptions.length > 0 ? (
             projectOptions.map((project) => (
@@ -3320,7 +3525,13 @@ function DesignEditor({
     >
       {shellIntegrated ? (
         <>
-          <span className="shrink-0 text-foreground/90">Design</span>
+          <Link
+            to="/design"
+            search={{}}
+            className="shrink-0 text-foreground/90 hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          >
+            Design
+          </Link>
           <span aria-hidden="true" className="shrink-0 text-muted-foreground/50">
             /
           </span>
@@ -3582,11 +3793,17 @@ function DesignEditor({
           event.defaultPrevented ||
           !(event.target instanceof HTMLElement) ||
           event.target.closest(
-            "input,textarea,select,[contenteditable=true],[role=menu],[role=dialog],[role=combobox]",
+            "input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=menu],[role=dialog],[role=combobox]",
           )
         )
           return;
-        if (flipShortcutAxis(event)) onCanvasKeyDown(event);
+        if (
+          flipShortcutAxis(event) ||
+          clipboardShortcut(event) ||
+          isAutoLayoutShortcut(event) ||
+          isBoldShortcut(event)
+        )
+          onCanvasKeyDown(event);
       }}
     >
       {shellIntegrated
@@ -3676,6 +3893,7 @@ function DesignEditor({
           onToggleVisibility={toggleNodeVisibility}
           onToggleLock={toggleNodeLock}
           onAction={layerAction}
+          canReferenceAgent={syncTarget !== null}
           onDropLayer={(nodeId, target, position) => {
             const current = documentRef.current;
             const siblings = target.parentId
@@ -3738,7 +3956,26 @@ function DesignEditor({
             if (placeImages(imageQueue, target)) setImageQueue([]);
           }}
           onBoolean={handleBoolean}
+          onLayerContextMenu={(nodeId, position) =>
+            showLayerReferenceMenu(position, syncTarget !== null, (action) =>
+              layerAction(nodeId, action),
+            )
+          }
           comments={document.comments ?? []}
+          initialCommentId={
+            initialPageId === undefined || initialPageId === document.activePageId
+              ? initialCommentId
+              : undefined
+          }
+          onCopyCommentLink={(commentId) =>
+            copyDesignLink({ pageId: document.activePageId, commentId })
+          }
+          {...(syncTarget
+            ? {
+                onCopyCommentReference: (commentId: string) =>
+                  copyAgentReference(undefined, commentId),
+              }
+            : {})}
           onAddComment={(point, parentId) => {
             const added = addDesignComment(documentRef.current, point, parentId);
             commitDocument(added.document);
@@ -3772,6 +4009,60 @@ function DesignEditor({
           <Inspector
             propertyLabels={propertyLabels}
             node={selectedNode}
+            componentControl={
+              selectedNodes.length === 1 &&
+              selectedNode &&
+              !isDesignNodeLocked(document, selectedNode.nodeId, selectedNodeMap) ? (
+                selectedNode.kind === "component" ? (
+                  <div className="border-b border-border/60 px-3 py-3">
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      onClick={() => {
+                        const current = documentRef.current;
+                        const next = addDesignComponentVariant(current, selectedNode.nodeId);
+                        if (next === current) return;
+                        commitDocument(next);
+                        const variant = next.nodes[current.nodes.length];
+                        if (variant) setSelectedNodeIds([variant.nodeId]);
+                      }}
+                    >
+                      Add variant
+                    </Button>
+                  </div>
+                ) : variantOptions.length > 1 ? (
+                  <div className="grid gap-1 border-b border-border/60 px-3 py-3 text-2xs text-muted-foreground">
+                    <span>Variant</span>
+                    <Select
+                      value={selectedNode.instanceOfNodeId}
+                      onValueChange={(value) => {
+                        if (!value || value === selectedNode.instanceOfNodeId) return;
+                        const current = documentRef.current;
+                        const next = setDesignInstanceVariant(current, selectedNode.nodeId, value);
+                        if (next === current) {
+                          setSyncMessage(
+                            "This variant cannot replace these layers. Insert it from Assets.",
+                          );
+                          return;
+                        }
+                        commitDocument(next);
+                      }}
+                    >
+                      <SelectTrigger size="xs" aria-label="Component variant">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectPopup>
+                        {variantOptions.map((variant) => (
+                          <SelectItem key={variant.nodeId} value={variant.nodeId}>
+                            {variant.name}
+                          </SelectItem>
+                        ))}
+                      </SelectPopup>
+                    </Select>
+                  </div>
+                ) : null
+              ) : null
+            }
             selectionCount={selectedNodes.length}
             selectedNodes={selectedNodes}
             onChangeMany={updateMany}
@@ -3848,6 +4139,20 @@ function DesignEditor({
           />
         )}
       </div>
+      {websiteImportOpen ? (
+        <DesignWebsiteImport
+          onClose={() => setWebsiteImportOpen(false)}
+          onImport={async (imported) => {
+            const saved = await storage.importDocument(
+              imported,
+              syncTarget
+                ? { environmentId: syncTarget.environmentId, cwd: syncTarget.cwd }
+                : undefined,
+            );
+            await navigate({ to: "/design", search: { documentId: saved.documentId } });
+          }}
+        />
+      ) : null}
       {reactPasteOpen ? (
         <DesignReactPasteDialog
           viewport={{

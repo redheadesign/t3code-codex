@@ -303,7 +303,12 @@ export function PreviewView({
     }
     let document;
     try {
-      document = await importDesignDocument(capturedDocument);
+      document = await importDesignDocument(
+        capturedDocument,
+        threadProject
+          ? { environmentId: threadRef.environmentId, cwd: threadProject.workspaceRoot }
+          : undefined,
+      );
     } catch {
       toastManager.add({
         type: "error",
@@ -315,16 +320,7 @@ export function PreviewView({
     }
     void navigate({
       to: "/design",
-      ...(threadProject
-        ? {
-            search: {
-              documentId: document.documentId,
-              environmentId: threadRef.environmentId,
-              cwd: threadProject.workspaceRoot,
-              relativePath: `.t3/design/${document.documentId}.json`,
-            },
-          }
-        : { search: { documentId: document.documentId } }),
+      search: { documentId: document.documentId },
     });
   };
 

@@ -977,6 +977,10 @@ export const DesktopPreviewNavigateInputSchema = Schema.Struct({
   url: Schema.String,
 });
 
+export const DesktopPreviewCaptureWebsiteInputSchema = Schema.Struct({
+  url: Schema.String.check(Schema.isMaxLength(8_192)),
+});
+
 export const DesktopPreviewConfigInputSchema = Schema.Struct({
   environmentId: EnvironmentId,
   /** Main must derive the partition to ensure its session has UA rewrites and permission handlers. */
@@ -1199,6 +1203,7 @@ export interface DesktopPreviewBridge {
     tabId: string,
   ) => Promise<DesktopPreviewScreenshotArtifact | PreviewCaptureFailureEncoded>;
   captureDesignSnapshot: (tabId: string) => Promise<DesktopPreviewDesignCapture>;
+  captureWebsiteDesignSnapshot?: (url: string) => Promise<DesktopPreviewDesignCapture>;
   revealArtifact: (path: string) => Promise<void>;
   copyArtifactToClipboard: (path: string) => Promise<void>;
   pictureInPicture: {

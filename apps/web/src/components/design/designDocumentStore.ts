@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 import { sha256 } from "@noble/hashes/sha2";
+import type { EnvironmentId } from "@t3tools/contracts";
 
 import {
   createInitialDesignDocument,
@@ -40,7 +41,26 @@ export type StoredDesignDocument = {
   readonly document: DesignDocument;
   readonly storageVersion: string;
   readonly trashedAt: string | null;
+  readonly location?: DesignFileLocation;
 };
+
+export type DesignProjectConnection = {
+  readonly environmentId: EnvironmentId;
+  readonly cwd: string;
+  readonly relativePath: string;
+};
+
+export type DesignFileLocation = {
+  readonly project?: DesignProjectConnection;
+  readonly folder?: string;
+};
+
+export function designProjectConnection(
+  project: Pick<DesignProjectConnection, "environmentId" | "cwd">,
+  documentId: string,
+): DesignProjectConnection {
+  return { ...project, relativePath: `.t3/design/${documentId}.json` };
+}
 
 export class DesignStorageConflictError extends Error {
   constructor() {
@@ -119,9 +139,8 @@ export function createDesignDocumentRepository({
             requestValue(transaction.objectStore(META).get("legacyFingerprint")),
           ]);
           const result = rawRecords.map((record) => ({
+            ...record,
             document: decodeDocument(record.document),
-            storageVersion: record.storageVersion,
-            trashedAt: record.trashedAt,
           }));
           if (!initialized || (legacy !== null && migratedFingerprint !== fingerprint)) {
             const documents =
@@ -164,6 +183,7 @@ export function createDesignDocumentRepository({
       document: DesignDocument,
       expectedVersion: string | null,
       trashedAt: string | null = null,
+      location?: DesignFileLocation,
     ): Promise<StoredDesignDocument> {
       const database = await openDatabase(databaseName);
       try {
@@ -178,7 +198,12 @@ export function createDesignDocumentRepository({
             transaction.abort();
             throw new DesignStorageConflictError();
           }
-          const next = { document, storageVersion: storageId(), trashedAt };
+          const next = {
+            document,
+            storageVersion: storageId(),
+            trashedAt,
+            ...(location ? { location } : {}),
+          };
           store.put(next, document.documentId);
           await done;
           return next;
@@ -252,14 +277,18 @@ export class DesignDocumentLibrary {
       });
     }
   };
-  setDocument = (document: DesignDocument) => {
+  setDocument = (document: DesignDocument, location?: DesignFileLocation) => {
     const existing = this.snapshot.records.find(
       (record) => record.document.documentId === document.documentId,
     );
     if (existing?.trashedAt) throw new Error("Restore this file before editing it.");
-    const record = existing
-      ? { ...existing, document }
-      : { document, storageVersion: "", trashedAt: null };
+    const record = {
+      storageVersion: "",
+      trashedAt: null,
+      ...existing,
+      document,
+      ...(location ? { location } : {}),
+    };
     this.publish({
       records: existing
         ? this.snapshot.records.map((item) => (item === existing ? record : item))
@@ -279,6 +308,7 @@ export class DesignDocumentLibrary {
             record.document,
             this.versions.get(id) ?? null,
             record.trashedAt,
+            record.location,
           );
           this.versions.set(id, saved.storageVersion);
         } catch (error) {
@@ -310,17 +340,29 @@ export class DesignDocumentLibrary {
     const record = this.snapshot.records.find((item) => item.document.documentId === id);
     if (record) this.enqueue(record);
   };
-  create = async () => {
-    return this.importDocument(createInitialDesignDocument());
+  create = async (project?: Pick<DesignProjectConnection, "environmentId" | "cwd">) => {
+    return this.importDocument(createInitialDesignDocument(), project);
   };
-  importDocument = async (source: DesignDocument) => {
+  importDocument = async (
+    source: DesignDocument,
+    project?: Pick<DesignProjectConnection, "environmentId" | "cwd">,
+  ) => {
     await this.load();
     if (this.snapshot.phase !== "ready")
       throw new Error(this.snapshot.loadError ?? "Could not open local Design files.");
     const document = localCopy(source);
-    this.setDocument(document);
+    this.setDocument(
+      document,
+      project ? { project: designProjectConnection(project, document.documentId) } : undefined,
+    );
     await this.flush();
     return document;
+  };
+  setLocation = async (id: string, location: DesignFileLocation) => {
+    const record = this.snapshot.records.find((item) => item.document.documentId === id);
+    if (!record) throw new Error("This file is unavailable.");
+    this.setDocument(record.document, location);
+    await this.flush();
   };
   recoverCopy = async (id: string) => {
     await this.queue;

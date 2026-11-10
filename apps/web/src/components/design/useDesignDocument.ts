@@ -2,7 +2,7 @@ import { useBlocker } from "@tanstack/react-router";
 import { useEffect, useSyncExternalStore } from "react";
 
 import type { DesignDocument } from "./designDocument";
-import { designDocumentLibrary } from "./designDocumentStore";
+import { designDocumentLibrary, type DesignProjectConnection } from "./designDocumentStore";
 
 export function useDesignDocument(documentId?: string) {
   const snapshot = useSyncExternalStore(
@@ -41,6 +41,7 @@ export function useDesignDocument(documentId?: string) {
     setDocument: designDocumentLibrary.setDocument,
     createDocument: designDocumentLibrary.create,
     importDocument: designDocumentLibrary.importDocument,
+    setLocation: designDocumentLibrary.setLocation,
     flush: designDocumentLibrary.flush,
     retry: designDocumentLibrary.retry,
     recoverCopy: designDocumentLibrary.recoverCopy,
@@ -49,6 +50,9 @@ export function useDesignDocument(documentId?: string) {
   };
 }
 
-export async function importDesignDocument(document: DesignDocument): Promise<DesignDocument> {
-  return designDocumentLibrary.importDocument(document);
+export async function importDesignDocument(
+  document: DesignDocument,
+  project?: Pick<DesignProjectConnection, "environmentId" | "cwd">,
+): Promise<DesignDocument> {
+  return designDocumentLibrary.importDocument(document, project);
 }

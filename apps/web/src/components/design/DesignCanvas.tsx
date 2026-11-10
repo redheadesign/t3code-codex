@@ -18,6 +18,8 @@ import {
   Undo2Icon,
   MessageCircleIcon,
   CheckIcon,
+  CodeIcon,
+  LinkIcon,
   Trash2Icon,
 } from "lucide-react";
 import {
@@ -119,7 +121,7 @@ type Gesture = {
   base: DesignDocument;
   ids: readonly string[];
   additive: boolean;
-  handle?: string;
+  handle?: ResizeHandle;
   pan: Point;
   points?: readonly Point[] | undefined;
   shift?: boolean;
@@ -142,6 +144,16 @@ type GradientDrag = {
   base: DesignDocument;
 };
 const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+type ResizeHandle = (typeof HANDLES)[number];
+const EDGE_HANDLES = ["n", "e", "s", "w"] as const;
+const CORNER_HANDLES = ["nw", "ne", "se", "sw"] as const;
+const resizeCursors = ["nwse-resize", "ns-resize", "nesw-resize", "ew-resize"] as const;
+
+function resizeCursor(handle: ResizeHandle, rotation: number) {
+  const index = HANDLES.indexOf(handle) + Math.round(rotation / 45);
+  return resizeCursors[((index % 4) + 4) % 4];
+}
+
 const rotationCursor = `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M18 8a7 7 0 1 0 1 7M18 3v5h-5" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 8a7 7 0 1 0 1 7M18 3v5h-5" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>')}") 12 12, crosshair`;
 const positions = {
   nw: [0, 0],
@@ -285,11 +297,15 @@ export function DesignCanvas({
   onDropImages,
   onPlaceAllImages,
   onBoolean,
+  onLayerContextMenu,
   comments = [],
+  initialCommentId,
   onAddComment,
   onUpdateComment,
   onResolveComment,
   onDeleteComment,
+  onCopyCommentLink,
+  onCopyCommentReference,
   propertyLabels = false,
   onPropertyLabels = () => undefined,
   rotationOrigin,
@@ -318,11 +334,15 @@ export function DesignCanvas({
   onDropImages?: (files: readonly File[], target: DesignImageTarget) => void;
   onPlaceAllImages?: (target: DesignImageTarget) => void;
   onBoolean?: (operation: "union" | "flatten" | "subtract" | "intersect" | "exclude") => void;
+  onLayerContextMenu?: (nodeId: string, position: Point) => void;
   comments?: readonly DesignComment[];
+  initialCommentId?: string | undefined;
   onAddComment?: (point: Point, parentId: string | null) => void;
   onUpdateComment?: (commentId: string, text: string) => void;
   onResolveComment?: (commentId: string, resolved: boolean) => void;
   onDeleteComment?: (commentId: string) => void;
+  onCopyCommentLink?: (commentId: string) => void;
+  onCopyCommentReference?: (commentId: string) => void;
   propertyLabels?: boolean;
   onPropertyLabels?: (value: boolean) => void;
   rotationOrigin: DesignRotationOrigin | null;
@@ -335,12 +355,17 @@ export function DesignCanvas({
   const surface = useRef<HTMLDivElement>(null);
   const guideSequence = useRef(0);
   const [zoom, setZoom] = useState(1);
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState(initialCommentId ?? null);
   const [pan, setPan] = useState({ x: 56, y: 56 });
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
-  const [initialTarget] = useState(() =>
-    bounds(document, selected.length ? selected : nodeForPage(document).map((node) => node.nodeId)),
-  );
+  const [initialTarget] = useState(() => {
+    const comment = comments.find((item) => item.commentId === initialCommentId);
+    if (comment) return { x: comment.x - 12, y: comment.y - 32, width: 260, height: 160 };
+    return bounds(
+      document,
+      selected.length ? selected : nodeForPage(document).map((node) => node.nodeId),
+    );
+  });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Measure the mounted surface for opening camera fit and keep culling in sync with its observed size.
   useLayoutEffect(() => {
     const element = surface.current;
@@ -454,6 +479,10 @@ export function DesignCanvas({
     shown,
     tool === "scale" ? designScalableRoots(shown, selected).map((node) => node.nodeId) : selected,
   );
+  const handleSize = 10 / zoom;
+  const canResize =
+    (activeTool === "select" || activeTool === "scale") &&
+    selected.some((id) => !isDesignNodeLocked(shown, id));
   const pageGeometry = designCanvasGeometry(shown);
   const sceneNodes = pageGeometry.nodes;
   const geometry = pageGeometry.entries;
@@ -525,7 +554,7 @@ export function DesignCanvas({
     event: PointerEvent,
     kind: Gesture["kind"],
     ids: readonly string[],
-    handle?: string,
+    handle?: ResizeHandle,
   ) => {
     if (event.button !== 0 && event.button !== 1) return;
     event.preventDefault();
@@ -927,7 +956,7 @@ export function DesignCanvas({
     if (
       !(target instanceof HTMLElement) ||
       target.closest(
-        "input,textarea,select,[contenteditable=true],[role=combobox],[role=dialog],[role=menu],[role=listbox]",
+        "input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=combobox],[role=dialog],[role=menu],[role=listbox]",
       )
     )
       return;
@@ -1163,6 +1192,9 @@ export function DesignCanvas({
         data-design-surface=""
         tabIndex={0}
         aria-label="Canvas editing surface"
+        style={{
+          cursor: box && gesture?.handle ? resizeCursor(gesture.handle, box.rotation) : undefined,
+        }}
         className={cn(
           "absolute inset-0 touch-none overflow-hidden outline-none",
           activeTool === "hand"
@@ -1171,10 +1203,23 @@ export function DesignCanvas({
               ? "cursor-default"
               : "cursor-crosshair",
         )}
+        onContextMenu={(event) => {
+          if (!onLayerContextMenu || !(event.target instanceof Element)) return;
+          if (event.target.closest("input,textarea,[contenteditable]:not([contenteditable=false])"))
+            return;
+          const nodeId = event.target
+            .closest("[data-design-node]")
+            ?.getAttribute("data-design-node");
+          if (!nodeId) return;
+          event.preventDefault();
+          onLayerContextMenu(nodeId, { x: event.clientX, y: event.clientY });
+        }}
         onKeyDown={(event) => {
           if (
             event.target instanceof HTMLElement &&
-            event.target.closest("input,textarea,select,[contenteditable=true],[role=combobox]")
+            event.target.closest(
+              "input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=combobox]",
+            )
           )
             return;
           if (event.code === "Space") {
@@ -1367,6 +1412,30 @@ export function DesignCanvas({
                     rows={3}
                   />
                   <div className="mt-1 flex items-center justify-end gap-1 border-t border-border pt-1">
+                    {onCopyCommentLink ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Copy comment link"
+                        title="Copy comment link"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={() => onCopyCommentLink(comment.commentId)}
+                      >
+                        <LinkIcon />
+                      </Button>
+                    ) : null}
+                    {onCopyCommentReference ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Copy comment reference for agent"
+                        title="Copy comment reference for agent"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={() => onCopyCommentReference(comment.commentId)}
+                      >
+                        <CodeIcon />
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon-xs"
@@ -1507,26 +1576,40 @@ export function DesignCanvas({
                   strokeWidth={1 / zoom}
                 />
               </svg>
-              {selected.some((id) => !isDesignNodeLocked(shown, id))
-                ? HANDLES.map((handle) => (
+              {canResize
+                ? [...EDGE_HANDLES, ...CORNER_HANDLES].map((handle) => (
                     <button
                       key={handle}
                       type="button"
                       aria-label={`${tool === "scale" ? "Scale" : "Resize"} ${handle}`}
-                      className="pointer-events-auto absolute size-2 -translate-x-1/2 -translate-y-1/2 border border-primary bg-background"
+                      className="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center focus-visible:outline-2 focus-visible:outline-primary"
                       style={{
                         left: `${positions[handle][0]}%`,
                         top: `${positions[handle][1]}%`,
-                        transform: `scale(${1 / zoom})`,
+                        width:
+                          handle === "n" || handle === "s"
+                            ? Math.max(box.width, handleSize)
+                            : handleSize,
+                        height:
+                          handle === "e" || handle === "w"
+                            ? Math.max(box.height, handleSize)
+                            : handleSize,
+                        cursor: resizeCursor(handle, box.rotation),
                       }}
                       onPointerDown={(event) =>
                         start(event, tool === "scale" ? "scale" : "resize", selected, handle)
                       }
-                    />
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none size-2 shrink-0 border border-primary bg-background"
+                        style={{ transform: `scale(${1 / zoom})` }}
+                      />
+                    </button>
                   ))
                 : null}
-              {tool !== "scale" && selected.some((id) => !isDesignNodeLocked(shown, id))
-                ? (["nw", "ne", "se", "sw"] as const).map((handle) => (
+              {canResize && tool !== "scale"
+                ? CORNER_HANDLES.map((handle) => (
                     <button
                       key={handle}
                       type="button"

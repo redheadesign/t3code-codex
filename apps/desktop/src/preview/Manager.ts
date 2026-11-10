@@ -226,6 +226,12 @@ const DESIGN_CAPTURE_SCRIPT = `(() => {
   return { url: location.href, title: document.title, browserEngine: 'chromium', sourceRevision: document.documentElement.getAttribute('data-t3-source-revision') || undefined, stateFixture: location.href, viewportWidth: innerWidth, viewportHeight: innerHeight, truncated: truncated || undefined, nodes };
 })()`;
 const decodeDesignCapture = Schema.decodeUnknownEffect(DesktopPreviewDesignCaptureSchema);
+
+function isWebsiteCaptureUrl(value: string): boolean {
+  if (!URL.canParse(value)) return false;
+  const url = new URL(value);
+  return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+}
 const requestRecordingCaptureExpression = (tabId: string): string =>
   `globalThis[${JSON.stringify(DESKTOP_PREVIEW_RECORDING_CAPTURE_TRIGGER)}]?.(${JSON.stringify(tabId)}) === true`;
 const DEFAULT_ANNOTATION_THEME: DesktopPreviewAnnotationTheme = {
@@ -2548,6 +2554,74 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     );
   });
 
+  const captureWebsiteDesignSnapshot = Effect.fn("PreviewManager.captureWebsiteDesignSnapshot")(
+    function* (rawUrl: string) {
+      const context = { operation: "captureWebsiteDesignSnapshot" };
+      const url = yield* attempt(context, () => {
+        const url = normalizePreviewUrl(rawUrl);
+        if (!isWebsiteCaptureUrl(url))
+          throw new Error("Enter an HTTP or HTTPS URL without credentials");
+        return url;
+      });
+      return yield* Effect.acquireUseRelease(
+        attempt(
+          context,
+          () =>
+            new BrowserWindow({
+              width: 1366,
+              height: 900,
+              useContentSize: true,
+              show: false,
+              webPreferences: {
+                partition: "t3-design-website-import",
+                sandbox: true,
+                contextIsolation: true,
+                nodeIntegration: false,
+                webviewTag: false,
+                backgroundThrottling: false,
+              },
+            }),
+        ),
+        (window) =>
+          Effect.gen(function* () {
+            const capture = yield* attemptPromise(context, async () => {
+              const contents = window.webContents;
+              const session = contents.session;
+              session.setPermissionCheckHandler(() => false);
+              session.setPermissionRequestHandler((_contents, _permission, respond) =>
+                respond(false),
+              );
+              const blockDownload = (event: Electron.Event) => event.preventDefault();
+              session.on("will-download", blockDownload);
+              window.once("closed", () => session.off("will-download", blockDownload));
+              contents.setAudioMuted(true);
+              contents.setWindowOpenHandler(() => ({ action: "deny" }));
+              contents.on("will-frame-navigate", (event) => {
+                if (!isWebsiteCaptureUrl(event.url)) event.preventDefault();
+              });
+              contents.on("will-redirect", (event) => {
+                if (!isWebsiteCaptureUrl(event.url)) event.preventDefault();
+              });
+              await window.loadURL(url);
+              if (!isWebsiteCaptureUrl(contents.getURL()))
+                throw new Error("Unsupported website URL");
+              return contents.executeJavaScript(
+                `Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 1000))]).then(() => ${DESIGN_CAPTURE_SCRIPT})`,
+              );
+            });
+            return yield* decodeDesignCapture(capture);
+          }).pipe(
+            Effect.timeout("25 seconds"),
+            Effect.mapError((cause) => new PreviewOperationError({ ...context, cause })),
+          ),
+        (window) =>
+          Effect.sync(() => {
+            if (!window.isDestroyed()) window.destroy();
+          }),
+      );
+    },
+  );
+
   const capturePreviewFrame = Effect.fn("PreviewManager.capturePreviewFrame")(function* (
     tabId: string,
   ) {
@@ -3406,6 +3480,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     cancelPickElement,
     captureScreenshot,
     captureDesignSnapshot,
+    captureWebsiteDesignSnapshot,
     closeTab,
     copyArtifactToClipboard,
     createTab,
@@ -3662,6 +3737,9 @@ export class PreviewManager extends Context.Service<
     readonly captureDesignSnapshot: (
       tabId: string,
     ) => Effect.Effect<DesktopPreviewDesignCapture, PreviewManagerError>;
+    readonly captureWebsiteDesignSnapshot: (
+      url: string,
+    ) => Effect.Effect<DesktopPreviewDesignCapture, PreviewManagerError>;
     readonly revealArtifact: (path: string) => Effect.Effect<void, PreviewManagerError>;
     readonly copyArtifactToClipboard: (path: string) => Effect.Effect<void, PreviewManagerError>;
     readonly openPictureInPicture: (tabId: string) => Effect.Effect<void, PreviewManagerError>;
@@ -3810,6 +3888,7 @@ export const make = Effect.gen(function* PreviewManagerMake() {
     cancelPickElement: operations.cancelPickElement,
     captureScreenshot: operations.captureScreenshot,
     captureDesignSnapshot: operations.captureDesignSnapshot,
+    captureWebsiteDesignSnapshot: operations.captureWebsiteDesignSnapshot,
     revealArtifact: operations.revealArtifact,
     copyArtifactToClipboard: operations.copyArtifactToClipboard,
     openPictureInPicture: operations.openPictureInPicture,

@@ -57,13 +57,18 @@ import type { OlderSettledScope } from "@t3tools/client-runtime/state/threads";
 import {
   CheckIcon,
   ChevronDownIcon,
+  DownloadIcon,
   FolderIcon,
   ListFilterIcon,
   PlusIcon,
+  SearchIcon,
   SettingsIcon,
   SquarePenIcon,
+  XIcon,
 } from "lucide-react";
 import {
+  lazy,
+  Suspense,
   useEffect,
   useLayoutEffect,
   useReducer,
@@ -150,10 +155,16 @@ import {
 import { environmentPresentations } from "../state/presentation";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { environmentProjects } from "../state/projects";
+import { agentSessionImport } from "../state/agentSessions";
 import { threadEnvironment } from "../state/threads";
 import { useOlderSettledShelf, useOlderSettledShelfGrowth } from "../state/olderSettledShelf";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
-import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
+import { useAtomCommand } from "../state/use-atom-command";
+import {
+  readEnvironmentScope,
+  useEnvironmentScope,
+  useEnvironmentsWithScope,
+} from "../state/session";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { canShareWithGuestAtom } from "./chat/guestShareAvailability";
 import { openGuestShareDialog } from "./chat/guestShareDialogState";
@@ -244,9 +255,19 @@ import {
   useComboboxFilter,
 } from "./ui/combobox";
 import { SidebarContent, SidebarGroup, SidebarMenuButton, useSidebar } from "./ui/sidebar";
-import { T3Wordmark } from "./T3Wordmark";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "./ui/input-group";
+import {
+  Menu,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuTrigger,
+} from "./ui/menu";
 import { SidebarChromeFooter } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
+import { SidebarThreadSearch } from "./sidebar/SidebarThreadSearch";
 import { TooltipProvider } from "./ui/tooltip";
 import { composerDraftHasUserContent, DraftId, useComposerDraftStore } from "../composerDraftStore";
 import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
@@ -265,6 +286,12 @@ import {
   SidebarSectionHeader,
   SidebarSectionPlaceholder,
 } from "./sidebar/SidebarListMarkers";
+
+const AgentProjectImportDialog = lazy(() =>
+  import("./onboarding/WelcomeWizard").then((module) => ({
+    default: module.AgentProjectImportDialog,
+  })),
+);
 
 function sameSidebarProviderEntries(
   left: ReadonlyMap<string, SidebarProviderEntry>,
@@ -920,6 +947,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const delegatedUnderParent = useDelegatedUnderParent();
   const router = useRouter();
   const { isMobile, setOpenMobile } = useSidebar();
+  const [threadSearch, setThreadSearch] = useState("");
+  const [projectImportOpen, setProjectImportOpen] = useState(false);
+  const threadSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const isSearchingThreads = threadSearch.trim().length > 0;
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
   const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
@@ -944,6 +975,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
+  const importAgentSessions = useAtomCommand(agentSessionImport, { reportFailure: false });
+  const pendingAgentImports = useRef(new Set<string>());
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{
     path: string;
   }>({
@@ -1092,6 +1125,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   // loaded. The stored keys are left alone, so the scope returns with its project.
   // An archived project's scope reads as all projects, matching the menu.
   const scopeGroups = pickableProjectGroups(projectGroups);
+  const agentImportEnvironments = useEnvironmentsWithScope(
+    scopeGroups,
+    AuthOrchestrationOperateScope,
+  );
   const archivedProjectKeys = new Set(
     projectGroups.filter((project) => project.archived).map((project) => project.projectKey),
   );
@@ -1275,6 +1312,53 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     if (isMobile) setOpenMobile(false);
     void handleNewThread(scopeProjectRef(group.environmentId, group.id));
   });
+  const importProjectSessions = async (group: SidebarProjectSnapshot) => {
+    if (
+      pendingAgentImports.current.has(group.projectKey) ||
+      !readEnvironmentScope(group.environmentId, AuthOrchestrationOperateScope)
+    ) {
+      return;
+    }
+    pendingAgentImports.current.add(group.projectKey);
+    const toastId = toastManager.add({
+      type: "loading",
+      title: "Importing agent sessions",
+      description: group.displayName,
+    });
+    try {
+      const result = await importAgentSessions({
+        environmentId: group.environmentId,
+        input: { projectId: group.id, expectedWorkspaceRoot: group.workspaceRoot },
+      });
+      if (result._tag === "Success") {
+        const { importedCount, skippedCount } = result.value;
+        const imported = importedCount.toLocaleString();
+        const skipped = skippedCount.toLocaleString();
+        toastManager.update(toastId, {
+          type: skippedCount > 0 ? "warning" : "success",
+          title:
+            importedCount === 0
+              ? "No new sessions imported"
+              : `Imported ${imported} ${importedCount === 1 ? "session" : "sessions"}`,
+          description:
+            skippedCount > 0
+              ? `Could not import ${skipped} ${skippedCount === 1 ? "session" : "sessions"}`
+              : group.displayName,
+        });
+      } else if (isAtomCommandInterrupted(result)) {
+        toastManager.close(toastId);
+      } else {
+        const error = squashAtomCommandFailure(result);
+        toastManager.update(toastId, {
+          type: "error",
+          title: "Could not import agent sessions",
+          description: error instanceof Error ? error.message : group.displayName,
+        });
+      }
+    } finally {
+      pendingAgentImports.current.delete(group.projectKey);
+    }
+  };
   const handleProjectFolderContextMenu = useStableCallback(
     (group: SidebarProjectSnapshot, position: { x: number; y: number }) => {
       void (async () => {
@@ -3064,53 +3148,119 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   );
   return (
     <>
+      {projectImportOpen ? (
+        <Suspense fallback={null}>
+          <AgentProjectImportDialog
+            environmentIds={connectedEnvironmentIds}
+            onClose={() => setProjectImportOpen(false)}
+          />
+        </Suspense>
+      ) : null}
       <ThreadContextDragGhost />
       <SidebarContent
         ref={sidebarContentRef}
         className="min-h-full"
         scrollFade={false}
         fixedHeader={
-          <div className="flex flex-col gap-2 border-b border-sidebar-border/70 px-2 py-2">
-            <div className="flex h-8 items-center gap-1.5 px-2 text-sm font-medium text-sidebar-foreground">
-              <T3Wordmark aria-label="T3" className="h-3.5 w-auto shrink-0" />
-              <span>Code</span>
-            </div>
-            {projectSidebarEnabled ? (
-              <div className="flex items-center gap-1">
-                <SidebarMenuButton
-                  aria-label="New thread"
-                  className="min-w-0 flex-1"
-                  disabled={projects.length === 0}
-                  onClick={handleNewThreadClick}
-                  size="default"
-                  tooltip={
-                    newThreadShortcutLabel ? `New thread (${newThreadShortcutLabel})` : "New thread"
-                  }
-                >
-                  <SquarePenIcon />
-                  <span className="truncate">New thread</span>
-                </SidebarMenuButton>
-                <SidebarThreadHeader
-                  showProjectScope
-                  projectScope={projectScopeControl}
-                  showActions={false}
-                  onSearch={() => openCommandPalette()}
-                  searchShortcutLabel={shortcutLabelForCommand(
-                    keybindings,
-                    "commandPalette.toggle",
-                  )}
-                  onNewProject={openAddProjectCommandPalette}
-                  onNewThread={handleNewThreadClick}
-                  newThreadDisabled={projects.length === 0}
-                  newThreadShortcutLabel={newThreadShortcutLabel}
-                  showProjectPickerHint={!legacySidebarEnabled && projectGroups.length > 0}
-                />
-              </div>
-            ) : (
+          <div className="flex flex-col gap-1.5 border-b border-sidebar-border/70 px-2 py-2">
+            <SidebarThreadHeader
+              onNewProject={openAddProjectCommandPalette}
+              importSessions={
+                <Menu>
+                  <MenuTrigger
+                    render={
+                      <SidebarHeaderIconButton
+                        label="Import agent sessions"
+                        disabled={connectedEnvironmentIds.length === 0}
+                      />
+                    }
+                  >
+                    <DownloadIcon />
+                  </MenuTrigger>
+                  <MenuPopup align="end">
+                    <MenuItem onClick={() => setProjectImportOpen(true)}>
+                      <DownloadIcon />
+                      Import projects…
+                    </MenuItem>
+                    {scopeGroups.length > 0 ? (
+                      <MenuGroup>
+                        <MenuSeparator />
+                        <MenuGroupLabel>Import into an existing project</MenuGroupLabel>
+                        {scopeGroups.map((group) => (
+                          <MenuItem
+                            key={group.projectKey}
+                            disabled={!agentImportEnvironments.has(group.environmentId)}
+                            onClick={() => void importProjectSessions(group)}
+                          >
+                            <ProjectFavicon project={group} className="size-4 shrink-0" />
+                            <span className="min-w-0 wrap-anywhere">{group.displayName}</span>
+                            {showProjectEnvironments ? (
+                              <ProjectEnvironmentBadge
+                                group={group}
+                                primaryEnvironmentId={primaryEnvironmentId}
+                                machineByEnvironmentId={environmentMachineById}
+                              />
+                            ) : null}
+                          </MenuItem>
+                        ))}
+                      </MenuGroup>
+                    ) : null}
+                  </MenuPopup>
+                </Menu>
+              }
+              onArchive={() => {
+                setThreadSearch("");
+                if (isMobile) setOpenMobile(false);
+                void router.navigate({ to: "/settings/archived" });
+              }}
+            />
+            <InputGroup variant="ghost">
+              <InputGroupAddon>
+                <SearchIcon aria-hidden="true" />
+              </InputGroupAddon>
+              <InputGroupInput
+                ref={threadSearchInputRef}
+                aria-label="Search threads"
+                placeholder="Search threads"
+                value={threadSearch}
+                onChange={(event) => {
+                  setThreadSearch(event.currentTarget.value);
+                  scrollSidebarToTop(sidebarContentRef.current);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Escape" || !threadSearch || event.nativeEvent.isComposing)
+                    return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setThreadSearch("");
+                }}
+              />
+              {threadSearch ? (
+                <InputGroupAddon align="inline-end">
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="ghost-muted"
+                    aria-label="Clear thread search"
+                    onClick={() => {
+                      setThreadSearch("");
+                      threadSearchInputRef.current?.focus();
+                    }}
+                  >
+                    <XIcon />
+                  </Button>
+                </InputGroupAddon>
+              ) : null}
+            </InputGroup>
+            <div className="flex items-center gap-1">
               <SidebarMenuButton
                 aria-label="New thread"
+                className="min-w-0 flex-1"
                 disabled={projects.length === 0}
-                onClick={handleNewThreadClick}
+                onClick={(event) => {
+                  setThreadSearch("");
+                  handleNewThreadClick(event);
+                }}
                 size="default"
                 tooltip={
                   newThreadShortcutLabel ? `New thread (${newThreadShortcutLabel})` : "New thread"
@@ -3119,11 +3269,23 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 <SquarePenIcon />
                 <span>New thread</span>
               </SidebarMenuButton>
-            )}
+              {projectSidebarEnabled ? projectScopeControl : null}
+            </div>
           </div>
         }
       >
-        <SidebarGroup className="flex-1" role="presentation">
+        {isSearchingThreads ? (
+          <SidebarThreadSearch
+            query={threadSearch}
+            activeThreadRef={routeThreadRef}
+            onPick={() => {
+              setThreadSearch("");
+              clearSelection();
+              if (isMobile) setOpenMobile(false);
+            }}
+          />
+        ) : null}
+        <SidebarGroup className={cn("flex-1", isSearchingThreads && "hidden")} role="presentation">
           <TooltipProvider
             key="sidebar-thread-tooltips-150"
             delay={150}

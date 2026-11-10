@@ -252,6 +252,8 @@ export const DesignNode = Schema.Struct({
   typography: Schema.optional(DesignTypography),
   interactions: Schema.optional(Schema.Array(DesignInteraction)),
   componentId: Schema.optional(Schema.String),
+  componentSetId: Schema.optional(Schema.String),
+  componentSlotId: Schema.optional(Schema.String),
   instanceOfNodeId: Schema.optional(Schema.String),
   instanceScale: Schema.optional(Schema.Number),
   overrides: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
@@ -847,6 +849,8 @@ function inheritDesignNodeUpdates(
               "instanceScale",
               "instanceOfNodeId",
               "componentId",
+              "componentSetId",
+              "componentSlotId",
             ].includes(key) &&
             !(node.kind === "instance" && (key === "x" || key === "y")) &&
             !Object.hasOwn(changes.get(id) ?? {}, key) &&
@@ -1097,6 +1101,7 @@ export function deleteDesignNodes(
 export function duplicateDesignNodes(
   document: DesignDocument,
   nodeIds: ReadonlyArray<string>,
+  variant?: { setId: string; name: string; x: number },
 ): DesignDocument {
   const roots = selectionRoots(document, nodeIds);
   if (!roots.length) return document;
@@ -1114,13 +1119,23 @@ export function duplicateDesignNodes(
     ...(node.componentId && ids.has(node.componentId)
       ? { componentId: ids.get(node.componentId)! }
       : {}),
-    name: `${node.name} copy`,
+    name: variant ? (rootIds.has(node.nodeId) ? variant.name : node.name) : `${node.name} copy`,
     parentId: node.parentId === null ? null : (ids.get(node.parentId) ?? node.parentId),
     childIds: node.childIds.flatMap((id) => ids.get(id) ?? []),
-    x: node.x + (rootIds.has(node.nodeId) ? 24 : 0),
-    y: node.y + (rootIds.has(node.nodeId) ? 24 : 0),
+    x: rootIds.has(node.nodeId) ? (variant?.x ?? node.x + 24) : node.x,
+    y: node.y + (!variant && rootIds.has(node.nodeId) ? 24 : 0),
+    ...(variant
+      ? {
+          componentSlotId: node.componentSlotId ?? node.nodeId,
+          ...(rootIds.has(node.nodeId) ? { componentSetId: variant.setId } : {}),
+          interactions: node.interactions?.map((interaction) => ({
+            ...interaction,
+            targetNodeId: ids.get(interaction.targetNodeId ?? "") ?? interaction.targetNodeId,
+          })),
+        }
+      : {}),
   }));
-  return recordOperation(
+  return recordOperations(
     {
       ...document,
       pages: document.pages.map((page) => ({
@@ -1131,11 +1146,30 @@ export function duplicateDesignNodes(
         ...document.nodes.map((node) => ({
           ...node,
           childIds: node.childIds.flatMap((id) => (rootIds.has(id) ? [id, ids.get(id)!] : [id])),
+          ...(variant && ids.has(node.nodeId)
+            ? {
+                componentSlotId: node.componentSlotId ?? node.nodeId,
+                ...(rootIds.has(node.nodeId) ? { componentSetId: variant.setId } : {}),
+              }
+            : {}),
         })),
         ...copies,
       ],
     },
-    { kind: "add-node", nodeId: copies[0]!.nodeId },
+    [
+      { kind: "add-node", nodeId: copies[0]!.nodeId },
+      ...(variant
+        ? originals.flatMap((node) => {
+            const fields = [
+              ...(node.componentSlotId ? [] : ["componentSlotId"]),
+              ...(rootIds.has(node.nodeId) && !node.componentSetId ? ["componentSetId"] : []),
+            ];
+            return fields.length
+              ? [{ kind: "update-node" as const, nodeId: node.nodeId, fields }]
+              : [];
+          })
+        : []),
+    ],
   );
 }
 
@@ -1333,6 +1367,44 @@ function componentContains(
   return false;
 }
 
+export function designComponentVariants(
+  document: DesignDocument,
+  componentNodeId: string,
+): readonly DesignNode[] {
+  const source = document.nodes.find(
+    (node) => node.kind === "component" && node.nodeId === componentNodeId,
+  );
+  if (!source?.componentSetId) return [];
+  return document.nodes.filter(
+    (node) => node.kind === "component" && node.componentSetId === source.componentSetId,
+  );
+}
+
+export function addDesignComponentVariant(
+  document: DesignDocument,
+  componentNodeId: string,
+): DesignDocument {
+  const source = document.nodes.find(
+    (node) => node.kind === "component" && node.nodeId === componentNodeId,
+  );
+  if (!source || isDesignNodeLocked(document, source.nodeId)) return document;
+  const variants = designComponentVariants(document, componentNodeId);
+  const names = new Set(variants.map((node) => node.name));
+  let number = Math.max(variants.length + 1, 2);
+  while (names.has(`Variant ${number}`)) number++;
+  const right = Math.max(
+    source.x + source.width,
+    ...variants
+      .filter((node) => node.parentId === source.parentId)
+      .map((node) => node.x + node.width),
+  );
+  return duplicateDesignNodes(document, [componentNodeId], {
+    setId: source.componentSetId ?? source.nodeId,
+    name: `Variant ${number}`,
+    x: right + 24,
+  });
+}
+
 export function addInstanceNode(
   document: DesignDocument,
   componentNodeId?: string,
@@ -1390,6 +1462,8 @@ export function addInstanceNode(
     instanceOfNodeId: node.nodeId,
     instanceScale: 1,
     componentId: component.nodeId,
+    componentSetId: undefined,
+    componentSlotId: undefined,
     overrides: {},
     ...(index === 0
       ? {
@@ -1416,6 +1490,123 @@ export function addInstanceNode(
       ],
     },
     { kind: "add-node", nodeId: rootId },
+  );
+}
+
+export function setDesignInstanceVariant(
+  document: DesignDocument,
+  nodeId: string,
+  componentNodeId: string,
+): DesignDocument {
+  const nodes = new Map(document.nodes.map((node) => [node.nodeId, node]));
+  const instance = nodes.get(nodeId);
+  if (
+    instance?.kind !== "instance" ||
+    !instance.instanceOfNodeId ||
+    instance.instanceOfNodeId === componentNodeId ||
+    isDesignNodeLocked(document, nodeId, nodes)
+  )
+    return document;
+  const target = designComponentVariants(document, instance.instanceOfNodeId).find(
+    (candidate) => candidate.nodeId === componentNodeId,
+  );
+  if (
+    !target ||
+    nodeAncestry(nodes, instance.parentId ?? "").some(
+      (ancestor) =>
+        ancestor.kind === "instance" ||
+        (ancestor.kind === "component" && componentContains(nodes, target.nodeId, ancestor.nodeId)),
+    )
+  )
+    return document;
+
+  const currentChildren = descendants(document, nodeId);
+  const targetChildren = descendants(document, target.nodeId);
+  const targetSlots = new Map(
+    targetChildren.map((node) => [node.componentSlotId ?? node.nodeId, node]),
+  );
+  if (
+    currentChildren.length !== targetChildren.length ||
+    targetSlots.size !== targetChildren.length
+  )
+    return document;
+  const pairs = [{ current: instance, source: target }];
+  const targetIds = new Map([[target.nodeId, instance.nodeId]]);
+  for (const current of currentChildren) {
+    const currentSource = nodes.get(current.instanceOfNodeId ?? "");
+    const source =
+      currentSource && targetSlots.get(currentSource.componentSlotId ?? currentSource.nodeId);
+    if (!source || source.kind !== current.kind || targetIds.has(source.nodeId)) return document;
+    targetIds.set(source.nodeId, current.nodeId);
+    pairs.push({ current, source });
+  }
+
+  const replacements = new Map<string, DesignNode>();
+  const changes = new Map<string, Partial<DesignNode>>();
+  for (const { current, source } of pairs) {
+    const isRoot = current === instance;
+    const scale = current.instanceScale ?? 1;
+    const previousOverrides = current.overrides ?? {};
+    const overrideValues = Object.fromEntries(
+      Object.entries(current).filter(([field]) => previousOverrides[field] === true),
+    );
+    const next: DesignNode = {
+      ...(scale === 1 ? source : scaleDesignMetrics(source, scale)),
+      interactions: source.interactions?.map((interaction) => ({
+        ...interaction,
+        targetNodeId: targetIds.get(interaction.targetNodeId ?? "") ?? interaction.targetNodeId,
+      })),
+      ...overrideValues,
+      ...(isRoot
+        ? {
+            x: current.x,
+            y: current.y,
+            name: current.name,
+            rotation: current.rotation,
+            flipX: current.flipX,
+            flipY: current.flipY,
+            locked: current.locked,
+          }
+        : {}),
+      nodeId: current.nodeId,
+      kind: current.kind,
+      parentId: isRoot ? current.parentId : targetIds.get(source.parentId!)!,
+      childIds: source.childIds.flatMap((id) => targetIds.get(id) ?? []),
+      componentId: target.nodeId,
+      componentSetId: undefined,
+      componentSlotId: undefined,
+      instanceOfNodeId: source.nodeId,
+      instanceScale: scale,
+      overrides: previousOverrides,
+    };
+    const fields = new Set([...Object.keys(current), ...Object.keys(next)] as Array<
+      keyof DesignNode
+    >);
+    changes.set(
+      current.nodeId,
+      Object.fromEntries(
+        [...fields]
+          .filter((field) => JSON.stringify(current[field]) !== JSON.stringify(next[field]))
+          .map((field) => [field, next[field]]),
+      ),
+    );
+    replacements.set(current.nodeId, next);
+  }
+  return recordOperations(
+    {
+      ...document,
+      nodes: inheritDesignNodeUpdates(
+        document.nodes.map((node) => replacements.get(node.nodeId) ?? node),
+        changes,
+      ),
+    },
+    [...changes]
+      .filter(([, change]) => Object.keys(change).length > 0)
+      .map(([nodeId, change]) => ({
+        kind: "update-node",
+        nodeId,
+        fields: Object.keys(change),
+      })),
   );
 }
 
@@ -1522,6 +1713,59 @@ export function groupDesignNodes(
   const roots = selectionRoots(document, nodeIds).filter(
     (node) => !isDesignNodeLocked(document, node.nodeId),
   );
+  return wrapDesignNodes(document, roots);
+}
+
+function inferAutoLayout(nodes: readonly DesignNode[]) {
+  const xs = nodes.map((node) => node.x + node.width / 2);
+  const ys = nodes.map((node) => node.y + node.height / 2);
+  const row =
+    nodes.length < 2 || Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys);
+  const position = row ? "x" : "y";
+  const size = row ? "width" : "height";
+  const ordered = [...nodes].sort((left, right) => left[position] - right[position]);
+  const gaps = ordered.slice(1).map((node, index) => {
+    const previous = ordered[index]!;
+    return Math.max(0, node[position] - previous[position] - previous[size]);
+  });
+  const layoutModel: DesignLayoutModel = {
+    kind: "auto-layout",
+    direction: row ? "row" : "column",
+    gap: gaps.length ? Math.round(gaps.reduce((total, gap) => total + gap, 0) / gaps.length) : 0,
+  };
+  return { ordered, layoutModel };
+}
+
+export function applyDesignAutoLayout(
+  document: DesignDocument,
+  nodeIds: readonly string[],
+): { document: DesignDocument; nodeId: string } | null {
+  const roots = selectionRoots(document, nodeIds);
+  const [root] = roots;
+  if (!root || roots.some((node) => isDesignNodeLocked(document, node.nodeId))) return null;
+  if (roots.length === 1 && !root.section && ["frame", "group", "component"].includes(root.kind)) {
+    if (root.layoutModel && root.layoutModel.kind !== "absolute")
+      return { document, nodeId: root.nodeId };
+    const byId = new Map(document.nodes.map((node) => [node.nodeId, node]));
+    const children = root.childIds.flatMap((id) => byId.get(id) ?? []);
+    const { ordered, layoutModel } = inferAutoLayout(children);
+    const next = updateDesignNode(document, root.nodeId, {
+      ...(root.kind === "group" ? { kind: "frame" } : {}),
+      childIds: ordered.map((node) => node.nodeId),
+      layoutModel: { ...root.layoutModel, ...layoutModel },
+    });
+    return { document: next, nodeId: root.nodeId };
+  }
+  const { ordered, layoutModel } = inferAutoLayout(roots);
+  const next = wrapDesignNodes(document, ordered, layoutModel);
+  return next === document ? null : { document: next, nodeId: next.nodes.at(-1)!.nodeId };
+}
+
+function wrapDesignNodes(
+  document: DesignDocument,
+  roots: readonly DesignNode[],
+  autoLayout?: DesignLayoutModel,
+): DesignDocument {
   if (!roots.length || roots.some((node) => node.parentId !== roots[0]!.parentId)) return document;
   const corners = roots.flatMap((node) => {
     const matrix = designNodeMatrix(node);
@@ -1534,12 +1778,12 @@ export function groupDesignNodes(
   });
   const x = Math.min(...corners.map((point) => point.x));
   const y = Math.min(...corners.map((point) => point.y));
-  const nodeId = nextNodeId(document, "group");
+  const nodeId = nextNodeId(document, autoLayout ? "frame" : "group");
   const group: DesignNode = {
     ...roots[0]!,
     nodeId,
-    kind: "group",
-    name: "Group",
+    kind: autoLayout ? "frame" : "group",
+    name: autoLayout ? "Auto layout" : "Group",
     clipContent: false,
     x,
     y,
@@ -1551,7 +1795,8 @@ export function groupDesignNodes(
     text: null,
     paint: {},
     opacity: 1,
-    layoutModel: { kind: "absolute" },
+    layoutModel: autoLayout ?? { kind: "absolute" },
+    ...(autoLayout ? { layoutSizing: { width: "hug", height: "hug" }, section: false } : {}),
     overrides: {},
     rotation: 0,
     flipX: false,
@@ -1580,9 +1825,26 @@ export function groupDesignNodes(
           : page,
       ),
       nodes: [
-        ...document.nodes.map((node) =>
+        ...document.nodes.map((node): DesignNode =>
           grouped.has(node.nodeId)
-            ? { ...node, parentId: nodeId, x: node.x - x, y: node.y - y }
+            ? {
+                ...node,
+                parentId: nodeId,
+                x: node.x - x,
+                y: node.y - y,
+                ...(autoLayout && node.layoutSizing
+                  ? {
+                      layoutSizing: {
+                        ...node.layoutSizing,
+                        width:
+                          node.layoutSizing.width === "fill" ? "fixed" : node.layoutSizing.width,
+                        height:
+                          node.layoutSizing.height === "fill" ? "fixed" : node.layoutSizing.height,
+                        position: "flow",
+                      },
+                    }
+                  : {}),
+              }
             : node.nodeId === group.parentId
               ? { ...node, childIds: replace(node.childIds) }
               : node,
@@ -1747,7 +2009,7 @@ function descendantsFrom(
   });
 }
 
-function nodeAncestry(
+export function nodeAncestry(
   nodes: ReadonlyMap<string, DesignNode>,
   nodeId: string,
 ): readonly DesignNode[] {

@@ -5,6 +5,7 @@ import {
   DesktopPreviewConfigInputSchema,
   DesktopPreviewNavigateInputSchema,
   DesktopPreviewRecordingArtifactSchema,
+  DesktopPreviewCaptureWebsiteInputSchema,
   DesktopPreviewRecordingSaveInputSchema,
   DesktopPreviewRegisterWebviewInputSchema,
   DesktopPreviewScreenshotArtifactSchema,
@@ -407,6 +408,16 @@ const captureDesignSnapshot = DesktopIpc.makeIpcMethod({
   }),
 });
 
+const captureWebsiteDesignSnapshot = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.PREVIEW_CAPTURE_WEBSITE_CHANNEL,
+  payload: DesktopPreviewCaptureWebsiteInputSchema,
+  result: DesktopPreviewDesignCaptureSchema,
+  handler: Effect.fn("desktop.ipc.preview.captureWebsiteDesignSnapshot")(function* ({ url }) {
+    const manager = yield* PreviewManager.PreviewManager;
+    return yield* manager.captureWebsiteDesignSnapshot(url);
+  }),
+});
+
 const copyArtifactToClipboard = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.PREVIEW_COPY_ARTIFACT_CHANNEL,
   payload: DesktopPreviewArtifactInputSchema,
@@ -453,6 +464,7 @@ export const methods = [
   cancelPickElement,
   captureScreenshot,
   captureDesignSnapshot,
+  captureWebsiteDesignSnapshot,
   revealArtifact,
   copyArtifactToClipboard,
   openPictureInPicture,

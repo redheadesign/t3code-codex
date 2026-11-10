@@ -1,9 +1,11 @@
+import { EnvironmentId } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
 
 import { createInitialDesignDocument, updateDesignNode } from "./designDocument";
 import {
   createDesignDocumentRepository,
   DesignDocumentLibrary,
+  designProjectConnection,
   DesignStorageConflictError,
 } from "./designDocumentStore";
 
@@ -152,11 +154,20 @@ it("rejects a stale writer and recovers its latest edits without overwriting the
   expect(second.getSnapshot().errors.size).toBe(0);
 });
 
-it("retains deleted files and their operations across restart and restores them", async () => {
+it("retains deleted files, their operations, and their folder across restart and restores them", async () => {
   await using fixture = repositoryFixture();
   const library = new DesignDocumentLibrary(fixture.repository);
   await library.load();
-  const document = updateDesignNode(library.getSnapshot().records[0]!.document, "text-welcome", {
+  const initial = library.getSnapshot().records[0]!.document;
+  const location = {
+    project: designProjectConnection(
+      { environmentId: EnvironmentId.make("design-host"), cwd: "/workspace" },
+      initial.documentId,
+    ),
+    folder: "Screens / Checkout",
+  };
+  await library.setLocation(initial.documentId, location);
+  const document = updateDesignNode(initial, "text-welcome", {
     text: "Keep me",
   });
   library.setDocument(document);
@@ -165,7 +176,11 @@ it("retains deleted files and their operations across restart and restores them"
   await restarted.load();
   expect(restarted.getSnapshot().records[0]!.trashedAt).not.toBeNull();
   await restarted.setTrashed(document.documentId, false);
-  expect((await fixture.repository.load())[0]).toMatchObject({ document, trashedAt: null });
+  expect((await fixture.repository.load())[0]).toMatchObject({
+    document,
+    trashedAt: null,
+    location,
+  });
 });
 
 it("keeps unreadable legacy data intact instead of silently creating a blank file", async () => {
