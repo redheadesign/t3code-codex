@@ -59,12 +59,15 @@ NodeChildProcess.execFileSync(
   { stdio: "inherit" },
 );
 
-await waitForResources({
-  baseDir: desktopDir,
-  files: requiredFiles,
-  tcpHost: devServer.hostname,
-  tcpPort: port,
-});
+const waitForDevResources = () =>
+  waitForResources({
+    baseDir: desktopDir,
+    files: requiredFiles,
+    tcpHost: devServer.hostname,
+    tcpPort: port,
+  });
+
+await waitForDevResources();
 
 const childEnv = { ...process.env };
 delete childEnv.ELECTRON_RUN_AS_NODE;
@@ -199,10 +202,17 @@ function scheduleRestart() {
     restartQueue = restartQueue
       .catch(() => undefined)
       .then(async () => {
+        // A pack starts by cleaning its output. A watch event can arrive before the new main exists.
+        await waitForDevResources();
+        if (shuttingDown) return;
         await stopApp();
+        await waitForDevResources();
         if (!shuttingDown) {
           startApp();
         }
+      })
+      .catch((error) => {
+        if (!shuttingDown) console.error(error);
       });
   }, restartDebounceMs);
 }

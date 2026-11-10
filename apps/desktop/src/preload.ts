@@ -44,12 +44,16 @@ try {
 // oxlint-disable-next-line t3code/no-global-process-runtime -- Electron exposes the client platform in its sandboxed preload process.
 const clientPlatform = process.platform;
 
-if (clientPlatform === "darwin") {
+if (clientPlatform === "darwin" || clientPlatform === "win32") {
   // Native buttons ignore Chromium zoom; reserve native points even after reload.
+  const isWindows = clientPlatform === "win32";
+  const insetVariable = isWindows
+    ? "--desktop-window-right-controls-inset"
+    : "--desktop-window-controls-inset";
   const syncWindowControlInset = () => {
     document.documentElement.style.setProperty(
-      "--desktop-window-controls-inset",
-      `${90 / webFrame.getZoomFactor()}px`,
+      insetVariable,
+      `${(isWindows ? 144 : 90) / webFrame.getZoomFactor()}px`,
     );
   };
   window.addEventListener("DOMContentLoaded", syncWindowControlInset, { once: true });

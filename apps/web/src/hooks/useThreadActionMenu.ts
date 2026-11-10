@@ -137,6 +137,7 @@ export function useThreadActionMenu(input: {
       const items = buildThreadActionMenuItems({
         canOperate: readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope),
         canFind: onFind !== undefined,
+        canOpenTask: configLoaded && thread.lineage?.sideChat !== true,
         branch: thread.branch ?? null,
         projectFilter: null,
         isPinned: thread.pinnedAt != null,
@@ -193,6 +194,16 @@ export function useThreadActionMenu(input: {
       switch (action) {
         case "find":
           onFind?.(threadRef);
+          return;
+        case "open-task":
+          void router.navigate({
+            to: "/tasks",
+            search: {
+              environmentId: thread.environmentId,
+              projectId: thread.projectId,
+              threadId: threadRef.threadId,
+            },
+          });
           return;
         case "project-settings": {
           const project = projects.find(

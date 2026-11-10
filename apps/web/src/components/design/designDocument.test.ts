@@ -18,6 +18,7 @@ import {
   addTextNode,
   applyDesignAutoLayout,
   createInitialDesignDocument,
+  createDesignComponentFromSelection,
   descendants,
   DesignDocument,
   nodeForPage,
@@ -712,6 +713,34 @@ describe("Design document IR", () => {
     const pastedRoot = nodeForPage(pasted).at(-1)!;
     expect(pastedRoot.kind).toBe("frame");
     expect(pastedRoot.instanceOfNodeId).toBeUndefined();
+  });
+
+  it("builds a reusable component from existing layers without moving their visual bounds", () => {
+    let original = addTextNode(createInitialDesignDocument(), "frame-home");
+    const secondId = original.nodes.at(-1)!.nodeId;
+    original = reorderDesignNode(original, secondId, "down");
+    const parent = original.nodes.find((node) => node.nodeId === "frame-home")!;
+    const [first, second] = parent.childIds;
+    const component = createDesignComponentFromSelection(original, [second!, first!])!;
+    const main = component.document.nodes.find((node) => node.nodeId === component.nodeId);
+    expect(main).toMatchObject({
+      kind: "component",
+      componentId: component.nodeId,
+      childIds: parent.childIds,
+    });
+    for (const id of parent.childIds) {
+      expect(designWorldBounds(component.document, id)).toEqual(designWorldBounds(original, id));
+    }
+    const withInstance = addInstanceNode(component.document, component.nodeId);
+    const instance = withInstance.nodes.find((node) => node.kind === "instance")!;
+    const detached = detachDesignInstance(withInstance, instance.nodeId);
+    expect(detached.nodes.find((node) => node.nodeId === instance.nodeId)).toMatchObject({
+      kind: "frame",
+      instanceOfNodeId: undefined,
+    });
+    expect(createDesignComponentFromSelection(original, ["frame-home"])?.nodeId).toBe("frame-home");
+    const locked = updateDesignNode(original, first!, { locked: true });
+    expect(createDesignComponentFromSelection(locked, parent.childIds)).toBeNull();
   });
 
   it("changes compatible component variants without losing local overrides or layer links", () => {

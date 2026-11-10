@@ -176,11 +176,13 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --workspace-chrome-height: var(--workspace-topbar-height);
   --workspace-controls-top: env(titlebar-area-y, 0px);
   --workspace-controls-left: calc(env(titlebar-area-x, 0px) + 0.75rem);
-  --workspace-controls-right: calc(
-    100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px) + 0.75rem
-  );
+  --workspace-controls-right: var(--workspace-native-controls-inset);
   --workspace-native-controls-inset: calc(
-    100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px) + 0.75rem
+    max(
+        var(--workspace-native-controls-min, 0px),
+        100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px)
+      ) +
+      0.75rem
   );
 }
 
@@ -1930,6 +1932,8 @@ body {
 
 .electron-windows {
   --desktop-window-right-resize-inset: 6px;
+  /* The titlebar rectangle may be empty while Electron updates window geometry. */
+  --workspace-native-controls-min: var(--desktop-window-right-controls-inset, 144px);
 }
 
 /* App-chrome grain. Baked into each surface's own background (behind

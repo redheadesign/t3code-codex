@@ -1,9 +1,11 @@
 # Design files
 
 Open **Design** from the left navigation to see your files and their previews.
-Connected files appear under their project. Use a file’s menu to move it into a
-folder. In Preview, **Open in Canvas** captures the current screen as a new
-editable file. Application behavior stays in the source code.
+Choose a project when you create a document, or keep it in **Local files**. Drag
+a local file onto a project or one of its folders to connect it. Use **Move to
+folder** in the file’s menu to do the same without dragging. In Preview, **Open in
+Canvas** captures the current screen as a new editable file. Application behavior
+stays in the source code.
 
 Design files save automatically on this device, in the browser profile running
 T3 Code. You can work without a server. Open the menu beside the document name
@@ -15,11 +17,12 @@ open an independent copy. Keep a downloaded copy before clearing browser data.
 **Recently deleted**. Deleting a local file does not delete an exported file or a
 copy saved in a project.
 
-To share changes through a project, open **Project connection** in the document
-menu, connect the file to a project, and use **Sync now** in that submenu. Local
-saving and project sync have separate statuses. If another window
-changes the same local file, your unsaved edits stay open: save a recovery copy
-before leaving. If a local write fails, retry it or download the recovery file.
+To share a design with agents, connect it through **Project connection** if it
+is still local. Add a description from the document menu and use **Sync** in the
+editor. The file card shows **Needs sync** while the latest
+changes are local. If another window changes the same local file, save a recovery
+copy of your unsaved edits before leaving. If a local write fails, retry it or
+download the recovery file.
 
 Copy a file, layer or comment link to reopen it in the same Design library. To
 share a reference with a project agent, sync the file and use **Copy reference
@@ -41,6 +44,9 @@ to copy and paste them. `Ctrl+B` toggles bold on selected text layers. On macOS,
 use `⌘` for these shortcuts. Press `Shift+A` to add auto layout to a frame or wrap
 selected layers from the same parent in a frame.
 
+Hold `Ctrl` or `⌘` over the canvas to see the outline of the nested layer under
+the pointer. Click while holding the key to select that layer.
+
 Use **Scale** (`K`) to resize a selection and its contents proportionally, including
 text, strokes and spacing. Drag a selection handle or enter a multiplier or dimension;
 the anchor point chooses which part stays in place. Ordinary resize keeps nested
@@ -50,6 +56,8 @@ For playback settings, deselect layers and open **Prototype**. A custom viewport
 changes the playback window without resizing your design layers. **Present** runs
 the prototype; Escape closes an open overlay first, then returns to the editor.
 
+Right-click a selection and choose **Create component** to reuse it in **Assets**.
+Right-click an instance and choose **Detach instance** to edit it independently.
 Select a main component and choose **Add variant** to duplicate its layers into
 a variant you can edit and insert from **Assets**. On an instance, use **Variant**
 to switch between definitions with matching layers and keep your local overrides.

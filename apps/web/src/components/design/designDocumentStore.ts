@@ -4,6 +4,7 @@ import type { EnvironmentId } from "@t3tools/contracts";
 
 import {
   createInitialDesignDocument,
+  describeDesignDocument,
   DESIGN_DOCUMENTS_STORAGE_KEY,
   DesignDocument,
   DesignDocuments,
@@ -21,7 +22,7 @@ function storageId() {
   ).join("-");
 }
 
-function localCopy(document: DesignDocument): DesignDocument {
+function resetSyncState(document: DesignDocument): DesignDocument {
   const pendingOperations = document.pendingOperations.map((operation, index) => ({
     ...operation,
     operationId: `op-${index + 1}`,
@@ -29,12 +30,15 @@ function localCopy(document: DesignDocument): DesignDocument {
   }));
   return {
     ...document,
-    documentId: `design-document-${storageId()}`,
     revision: pendingOperations.length,
     pendingOperations,
     conflicts: [],
     syncState: "local",
   };
+}
+
+function localCopy(document: DesignDocument): DesignDocument {
+  return { ...resetSyncState(document), documentId: `design-document-${storageId()}` };
 }
 
 export type StoredDesignDocument = {
@@ -52,6 +56,7 @@ export type DesignProjectConnection = {
 
 export type DesignFileLocation = {
   readonly project?: DesignProjectConnection;
+  readonly previousProject?: DesignProjectConnection;
   readonly folder?: string;
 };
 
@@ -340,8 +345,14 @@ export class DesignDocumentLibrary {
     const record = this.snapshot.records.find((item) => item.document.documentId === id);
     if (record) this.enqueue(record);
   };
-  create = async (project?: Pick<DesignProjectConnection, "environmentId" | "cwd">) => {
-    return this.importDocument(createInitialDesignDocument(), project);
+  create = async (
+    project?: Pick<DesignProjectConnection, "environmentId" | "cwd">,
+    description = "",
+  ) => {
+    return this.importDocument(
+      describeDesignDocument(createInitialDesignDocument(), description),
+      project,
+    );
   };
   importDocument = async (
     source: DesignDocument,
@@ -361,7 +372,17 @@ export class DesignDocumentLibrary {
   setLocation = async (id: string, location: DesignFileLocation) => {
     const record = this.snapshot.records.find((item) => item.document.documentId === id);
     if (!record) throw new Error("This file is unavailable.");
-    this.setDocument(record.document, location);
+    const previous = record.location?.project ?? record.location?.previousProject;
+    const next = location.project;
+    const changesSyncTarget =
+      next &&
+      (next.environmentId !== previous?.environmentId ||
+        next.cwd !== previous.cwd ||
+        next.relativePath !== previous.relativePath);
+    this.setDocument(
+      changesSyncTarget ? resetSyncState(record.document) : record.document,
+      !next && previous ? { ...location, previousProject: previous } : location,
+    );
     await this.flush();
   };
   recoverCopy = async (id: string) => {

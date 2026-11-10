@@ -48,6 +48,7 @@ import {
   addFrameNode,
   addImageNode,
   addVectorPath,
+  designNodeWorldFrame,
   designWorldToLocal,
   designInsertionParent,
   isDesignNodeVisible,
@@ -353,6 +354,8 @@ export function DesignCanvas({
   showTools?: boolean;
 }) {
   const surface = useRef<HTMLDivElement>(null);
+  const pointerTarget = useRef<Element | null>(null);
+  const [deepHoverId, setDeepHoverId] = useState<string | null>(null);
   const guideSequence = useRef(0);
   const [zoom, setZoom] = useState(1);
   const [editingCommentId, setEditingCommentId] = useState(initialCommentId ?? null);
@@ -486,6 +489,10 @@ export function DesignCanvas({
   const pageGeometry = designCanvasGeometry(shown);
   const sceneNodes = pageGeometry.nodes;
   const geometry = pageGeometry.entries;
+  const deepHover =
+    deepHoverId && !gesture && activeTool === "select" && !selected.includes(deepHoverId)
+      ? designNodeWorldFrame(shown, deepHoverId, sceneNodes)
+      : null;
   const rotationIds = selected.filter((id) => !isDesignNodeLocked(shown, id, sceneNodes));
   const rotationBox =
     rotationIds.length === selected.length ? box : designSelectionFrame(shown, rotationIds);
@@ -612,6 +619,22 @@ export function DesignCanvas({
     parentId: frameAtPoint(point)?.nodeId ?? null,
   });
   const startNode = (event: PointerEvent, nodeId: string) => {
+    if (event.button !== 0) return;
+    if ((event.ctrlKey || event.metaKey) && activeTool === "select") {
+      const hitId = deepTargetId(event.target);
+      if (hitId)
+        onSelect(
+          event.shiftKey
+            ? selected.includes(hitId)
+              ? selected.filter((id) => id !== hitId)
+              : [...selected, hitId]
+            : [hitId],
+        );
+      event.preventDefault();
+      event.stopPropagation();
+      surface.current?.focus({ preventScroll: true });
+      return;
+    }
     if (event.shiftKey) {
       onSelect(
         selected.includes(nodeId) ? selected.filter((id) => id !== nodeId) : [...selected, nodeId],
@@ -629,8 +652,17 @@ export function DesignCanvas({
     }
     start(event, "move", ids);
   };
+  const deepTargetId = (target: EventTarget | null) => {
+    if (!(target instanceof Element) || !surface.current?.contains(target)) return null;
+    const id = target.closest("[data-design-node]")?.getAttribute("data-design-node");
+    return id && !isDesignNodeLocked(document, id, sceneNodes) ? id : null;
+  };
   const move = (event: PointerEvent) => {
     const point = localPoint(event);
+    pointerTarget.current = event.target instanceof Element ? event.target : null;
+    setDeepHoverId(
+      !gesture && (event.ctrlKey || event.metaKey) ? deepTargetId(event.target) : null,
+    );
     if (imagePlacement) setPlacementCursor(point);
     if (tool === "pen") setPenHover(worldPoint(point));
     if (penDrag && activeTool === "pen") {
@@ -1052,6 +1084,25 @@ export function DesignCanvas({
       fit(event.code === "Digit1" ? nodeForPage(document).map((node) => node.nodeId) : selected);
     }
   });
+  const updateDeepHover = useStableCallback((event: KeyboardEvent) => {
+    if (event.key !== "Control" && event.key !== "Meta") return;
+    setDeepHoverId(event.ctrlKey || event.metaKey ? deepTargetId(pointerTarget.current) : null);
+  });
+  const resetDeepHover = useStableCallback(() => {
+    pointerTarget.current = null;
+    setDeepHoverId(null);
+  });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Modifier previews follow the pointer even when the canvas does not have keyboard focus.
+  useEffect(() => {
+    window.addEventListener("keydown", updateDeepHover);
+    window.addEventListener("keyup", updateDeepHover);
+    window.addEventListener("blur", resetDeepHover);
+    return () => {
+      window.removeEventListener("keydown", updateDeepHover);
+      window.removeEventListener("keyup", updateDeepHover);
+      window.removeEventListener("blur", resetDeepHover);
+    };
+  }, [updateDeepHover, resetDeepHover]);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Tool shortcuts belong to this editor's DOM scope and are removed with the canvas.
   useEffect(() => {
     const element =
@@ -1270,6 +1321,7 @@ export function DesignCanvas({
         }}
         onBlur={() => setSpace(false)}
         onPointerDown={(event) => {
+          if (event.button !== 0 && event.button !== 1) return;
           if (event.button === 1 || activeTool === "hand") start(event, "pan", []);
           else if (activeTool === "image") start(event, "place-image", []);
           else if (activeTool === "measure") start(event, "measure", []);
@@ -1305,6 +1357,7 @@ export function DesignCanvas({
         }}
         onPointerMove={move}
         onPointerLeave={() => {
+          resetDeepHover();
           if (!gesture) setPlacementCursor(null);
         }}
         onPointerUp={finish}
@@ -1554,6 +1607,30 @@ export function DesignCanvas({
                 />
               ))}
             </svg>
+          ) : null}
+          {deepHover ? (
+            <div
+              data-design-deep-hover={deepHoverId}
+              aria-hidden="true"
+              className="pointer-events-none absolute"
+              style={{
+                left: deepHover.x,
+                top: deepHover.y,
+                width: deepHover.width,
+                height: deepHover.height,
+                transform: `rotate(${deepHover.rotation}deg)`,
+              }}
+            >
+              <svg className="absolute inset-0 size-full overflow-visible">
+                <rect
+                  width="100%"
+                  height="100%"
+                  fill="none"
+                  stroke="var(--primary)"
+                  strokeWidth={1 / zoom}
+                />
+              </svg>
+            </div>
           ) : null}
           {box ? (
             <div

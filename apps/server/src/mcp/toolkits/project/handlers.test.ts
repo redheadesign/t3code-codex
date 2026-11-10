@@ -35,10 +35,12 @@ import * as ManagedProjectFolders from "../../../project/ManagedProjectFolders.t
 import * as PeerForwarding from "../../../peer/PeerForwarding.ts";
 import * as GitVcsDriver from "../../../vcs/GitVcsDriver.ts";
 import * as VcsProcess from "../../../vcs/VcsProcess.ts";
+import * as WorkspaceEntries from "../../../workspace/WorkspaceEntries.ts";
+import * as WorkspaceFileSystem from "../../../workspace/WorkspaceFileSystem.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import * as ProjectHandlers from "./handlers.ts";
-import { ProjectToolkit } from "./tools.ts";
+import { ProjectDesignToolkit, ProjectToolkit } from "./tools.ts";
 
 const clientLaunchHarness = (input: {
   readonly runtimeModeCeiling: RuntimeMode;
@@ -173,6 +175,74 @@ const clientLaunchHarness = (input: {
   );
   return { projectId, modelSelection, projectDefaults, dependencies: layerDependencies };
 };
+
+it.effect("lists linked Design packages with their context and keeps links for large files", () =>
+  Effect.gen(function* () {
+    const harness = clientLaunchHarness({ runtimeModeCeiling: "full-access", launched: [] });
+    const path = ".t3/design/home.json";
+    const largePath = ".t3/design/gallery.json";
+    const reads: string[] = [];
+    const dependencies = Layer.mergeAll(
+      harness.dependencies,
+      Layer.mock(WorkspaceEntries.WorkspaceEntries)({
+        list: ({ directoryPath }) => {
+          expect(directoryPath).toBe(".t3/design");
+          return Effect.succeed({
+            entries: [
+              { kind: "file", path },
+              { kind: "file", path: largePath },
+              { kind: "file", path: ".t3/design/broken.json" },
+              { kind: "file", path: ".t3/other.json" },
+            ],
+            truncated: false,
+          });
+        },
+      }),
+      Layer.mock(WorkspaceFileSystem.WorkspaceFileSystem)({
+        readFile: ({ relativePath }) => {
+          reads.push(relativePath);
+          const contents =
+            relativePath === path
+              ? JSON.stringify({
+                  documentId: "home",
+                  snapshot: JSON.stringify({ title: "Home", description: "Desktop navigation" }),
+                })
+              : "{";
+          return Effect.succeed({
+            relativePath,
+            contents,
+            byteLength: Buffer.byteLength(contents),
+            truncated: relativePath === largePath,
+          });
+        },
+      }),
+    );
+    const toolkit = yield* ProjectDesignToolkit.pipe(
+      Effect.provide(
+        McpToolAccess.HandlersLayer.layer(ProjectHandlers.designLayer).pipe(
+          Layer.provide(dependencies),
+        ),
+      ),
+    );
+    const result = yield* toolkit
+      .handle("t3_project_design_list", { projectId: harness.projectId })
+      .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies));
+    expect(reads.toSorted()).toEqual([".t3/design/broken.json", largePath, path]);
+    expect(result.at(-1)?.result).toEqual({
+      workspaceRoot: "/projects/client-target",
+      documents: [
+        { documentId: "gallery", relativePath: largePath },
+        {
+          documentId: "home",
+          relativePath: path,
+          title: "Home",
+          description: "Desktop navigation",
+        },
+      ],
+      nextCursor: null,
+    });
+  }),
+);
 
 it.effect(
   "a client launches with the project's default model and mode, capped at its ceiling",

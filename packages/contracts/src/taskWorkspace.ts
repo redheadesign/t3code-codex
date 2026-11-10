@@ -35,7 +35,7 @@ export const TaskWorkspaceComment = Schema.Struct({
   author: TrimmedNonEmptyString,
   body: LongText,
   createdAt: IsoDateTime,
-  source: Schema.Literals(["jira", "agent", "system"]),
+  source: Schema.Literals(["jira", "agent", "system", "user"]),
 });
 export type TaskWorkspaceComment = typeof TaskWorkspaceComment.Type;
 
@@ -204,6 +204,50 @@ export const TaskWorkspaceConnection = Schema.Struct({
 });
 export type TaskWorkspaceConnection = typeof TaskWorkspaceConnection.Type;
 
+export const TaskWorkspaceBoardStatus = Schema.Literals([
+  "backlog",
+  "todo",
+  "inProgress",
+  "review",
+  "done",
+]);
+export type TaskWorkspaceBoardStatus = typeof TaskWorkspaceBoardStatus.Type;
+
+export const TaskWorkspaceBoardActivity = Schema.Struct({
+  id: Id,
+  kind: Schema.Literals(["created", "updated", "linked", "claimed", "released"]),
+  author: Id,
+  description: LongText,
+  createdAt: IsoDateTime,
+});
+
+export const TaskWorkspaceBoardTask = Schema.Struct({
+  id: Id,
+  title: Id,
+  description: LongText,
+  status: TaskWorkspaceBoardStatus,
+  threadId: Schema.NullOr(ThreadId),
+  claim: Schema.NullOr(Schema.Struct({ owner: Id, claimedAt: IsoDateTime })),
+  blockedBy: Schema.Array(Id).check(Schema.isMaxLength(100)),
+  comments: Schema.Array(TaskWorkspaceComment),
+  activity: Schema.Array(TaskWorkspaceBoardActivity),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export type TaskWorkspaceBoardTask = typeof TaskWorkspaceBoardTask.Type;
+
+export const TaskWorkspaceProjectWiki = Schema.Struct({
+  content: LongText,
+  updatedAt: Schema.NullOr(IsoDateTime),
+});
+
+export const TaskWorkspaceBoard = Schema.Struct({
+  revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  tasks: Schema.Array(TaskWorkspaceBoardTask),
+  wiki: TaskWorkspaceProjectWiki,
+});
+export type TaskWorkspaceBoard = typeof TaskWorkspaceBoard.Type;
+
 export const TaskWorkspaceSnapshot = Schema.Struct({
   revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   configured: Schema.Boolean,
@@ -213,6 +257,7 @@ export const TaskWorkspaceSnapshot = Schema.Struct({
   tasks: Schema.Array(TaskWorkspaceTask),
   lastSyncedAt: Schema.NullOr(IsoDateTime),
   error: Schema.NullOr(Schema.String),
+  board: Schema.optional(TaskWorkspaceBoard),
 });
 export type TaskWorkspaceSnapshot = typeof TaskWorkspaceSnapshot.Type;
 
@@ -222,6 +267,7 @@ export const TaskWorkspaceReadInput = Schema.Struct({
   workspaceRoot: TrimmedNonEmptyString,
   assignee: Schema.optional(Schema.String),
   sprintId: Schema.optional(Schema.String),
+  localOnly: Schema.optional(Schema.Boolean),
 });
 export type TaskWorkspaceReadInput = typeof TaskWorkspaceReadInput.Type;
 
@@ -260,7 +306,29 @@ export const TaskWorkspacePublishVariant = Schema.Struct({
 });
 export const TaskWorkspaceSync = Schema.Struct({});
 
+export const TaskWorkspaceBoardCommand = Schema.Union([
+  Schema.TaggedStruct("createLocalTask", {
+    title: Id,
+    description: LongText,
+    status: Schema.optional(TaskWorkspaceBoardStatus),
+  }),
+  Schema.TaggedStruct("updateLocalTask", {
+    taskId: Id,
+    title: Schema.optional(Id),
+    description: Schema.optional(LongText),
+    status: Schema.optional(TaskWorkspaceBoardStatus),
+    blockedBy: Schema.optional(TaskWorkspaceBoardTask.fields.blockedBy),
+  }),
+  Schema.TaggedStruct("openLocalTask", { taskId: Id }),
+  Schema.TaggedStruct("commentLocalTask", { taskId: Id, body: LongText }),
+  Schema.TaggedStruct("claimLocalTask", { taskId: Id, owner: Id }),
+  Schema.TaggedStruct("releaseLocalTask", { taskId: Id }),
+  Schema.TaggedStruct("updateProjectWiki", { content: LongText }),
+]);
+export type TaskWorkspaceBoardCommand = typeof TaskWorkspaceBoardCommand.Type;
+
 export const TaskWorkspaceCommand = Schema.Union([
+  TaskWorkspaceBoardCommand,
   Schema.TaggedStruct("sync", TaskWorkspaceSync.fields),
   Schema.TaggedStruct("configureJira", TaskWorkspaceConfigureJira.fields),
   Schema.TaggedStruct("saveDraft", TaskWorkspaceSaveDraft.fields),

@@ -36,6 +36,8 @@ import * as ManagedProjectFolders from "../../../project/ManagedProjectFolders.t
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as SourceControlRepositoryService from "../../../sourceControl/SourceControlRepositoryService.ts";
 import * as GitVcsDriver from "../../../vcs/GitVcsDriver.ts";
+import * as WorkspaceEntries from "../../../workspace/WorkspaceEntries.ts";
+import * as WorkspaceFileSystem from "../../../workspace/WorkspaceFileSystem.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
 const shared = {
@@ -71,6 +73,35 @@ const ProjectReadTool = Tool.make("t3_project_read", {
     environmentId: OrchestratorMcpEnvironmentTarget,
     projectId: ProjectId,
   }),
+})
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false);
+const ProjectDesignListTool = Tool.make("t3_project_design_list", {
+  ...shared,
+  description:
+    "List design files synced to a project's .t3/design directory with paths and available descriptions. Omit projectId to use your thread's project. Canvas-only drafts appear after syncing them to the project.",
+  parameters: Schema.Struct({
+    environmentId: OrchestratorMcpEnvironmentTarget,
+    projectId: Schema.optional(ProjectId),
+    cursor: Schema.optional(NonNegativeInt),
+  }),
+  success: Schema.Struct({
+    workspaceRoot: Schema.String,
+    documents: Schema.Array(
+      Schema.Struct({
+        documentId: Schema.String,
+        relativePath: Schema.String,
+        title: Schema.optional(Schema.String),
+        description: Schema.optional(Schema.String),
+      }),
+    ),
+    nextCursor: Schema.NullOr(NonNegativeInt),
+  }),
+  dependencies: [
+    ...shared.dependencies,
+    WorkspaceEntries.WorkspaceEntries,
+    WorkspaceFileSystem.WorkspaceFileSystem,
+  ],
 })
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false);
@@ -187,3 +218,5 @@ export const ProjectToolkit = Toolkit.make(
   ProjectDeleteTool,
   ProjectCloneTool,
 );
+
+export const ProjectDesignToolkit = Toolkit.make(ProjectDesignListTool);

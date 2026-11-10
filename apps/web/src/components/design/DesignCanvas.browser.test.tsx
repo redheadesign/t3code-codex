@@ -58,6 +58,33 @@ function CanvasHarness({
   );
 }
 
+it("previews the nested layer while Control is held and selects it without editing the document", async () => {
+  const commit = vi.fn();
+  await using screen = await render(<CanvasHarness commit={commit} />, { router: "/design" });
+  const nested = screen.getByRole("button", { name: "Welcome heading", exact: true });
+  await expect.element(nested).toBeVisible();
+  await act(() =>
+    nested.element().dispatchEvent(new PointerEvent("pointermove", { bubbles: true })),
+  );
+  await userEvent.keyboard("{Control>}");
+  await vi.waitFor(() =>
+    expect(
+      screen.container.querySelector('[data-design-deep-hover="text-welcome"]'),
+    ).not.toBeNull(),
+  );
+  await userEvent.keyboard("{/Control}");
+  await vi.waitFor(() =>
+    expect(screen.container.querySelector("[data-design-deep-hover]")).toBeNull(),
+  );
+  await act(() =>
+    nested
+      .element()
+      .dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, ctrlKey: true, button: 0 })),
+  );
+  await expect.element(nested).toHaveAttribute("aria-pressed", "true");
+  expect(commit).not.toHaveBeenCalled();
+});
+
 it("changes ruler and pixel views without changing the design or consuming text input shortcuts", async () => {
   const commit = vi.fn();
   await using screen = await render(<CanvasHarness commit={commit} />, { router: "/design" });

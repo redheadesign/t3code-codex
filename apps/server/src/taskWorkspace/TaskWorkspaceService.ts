@@ -9,6 +9,7 @@ import * as Semaphore from "effect/Semaphore";
 
 import {
   TaskWorkspaceCommandInput,
+  TaskWorkspaceBoardCommand,
   TaskWorkspaceError,
   TaskWorkspaceReadInput,
   TaskWorkspaceSnapshot,
@@ -39,6 +40,7 @@ type WorkspaceFileSystemService = WorkspaceFileSystem.WorkspaceFileSystem["Servi
 type JiraClient = ReturnType<typeof createJiraClient>;
 const decodeSnapshot = Schema.decodeUnknownSync(TaskWorkspaceSnapshot);
 const isTaskWorkspaceError = Schema.is(TaskWorkspaceError);
+const isBoardCommand = Schema.is(TaskWorkspaceBoardCommand);
 
 /** Optional host integrations. The default service remains useful in local-only mode. */
 export interface TaskWorkspaceAdapters {
@@ -121,7 +123,7 @@ export class TaskWorkspaceService extends Context.Service<
 
 const now = () => DateTime.formatIso(DateTime.nowUnsafe());
 
-const emptySnapshot = (): TaskWorkspaceSnapshot => ({
+export const emptyTaskWorkspaceSnapshot = (): TaskWorkspaceSnapshot => ({
   revision: 0,
   configured: false,
   connection: { configured: false, url: null, username: null, secretConfigured: false, projectKeys: [] },
@@ -614,7 +616,7 @@ export function makeTaskWorkspaceService(
                   Effect.flatMap((legacy) =>
                     legacy.exists !== false
                       ? decodeStored(legacy.contents, "legacy")
-                      : Effect.succeed(emptySnapshot()),
+                      : Effect.succeed(emptyTaskWorkspaceSnapshot()),
                   ),
                 ),
         ),
@@ -936,6 +938,7 @@ export function makeTaskWorkspaceService(
         message: "Task workspace changed. Reload before applying this command.",
       });
     const command: TaskWorkspaceCommand = input.command;
+    if (isBoardCommand(command)) return yield* taskError("command", "Use the local task board for this command.");
     switch (command._tag) {
       case "sync": {
         const synced = yield* sync(input, snapshot);

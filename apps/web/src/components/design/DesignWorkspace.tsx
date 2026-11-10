@@ -62,6 +62,7 @@ import {
 } from "../ui/menu";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 import { Switch } from "../ui/switch";
 import { Checkbox } from "../ui/checkbox";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
@@ -78,11 +79,15 @@ import {
   addAssetMeta,
   pasteDesignNodes,
   renameDesignDocument,
+  describeDesignDocument,
+  DESIGN_DESCRIPTION_LIMIT,
   setPrototypeStartFrame,
   updatePrototypeSettings,
   removeDesignAsset,
   replaceDesignAsset,
   addComponentNode,
+  canCreateDesignComponent,
+  createDesignComponentFromSelection,
   addDesignComponentVariant,
   designComponentVariants,
   setDesignInstanceVariant,
@@ -137,7 +142,7 @@ import {
   portableDesignSelection,
 } from "./designClipboard";
 import { DesignCanvas, type DesignTool } from "./DesignCanvas";
-import { DesignGallery } from "./DesignGallery";
+import { DesignGallery, NewDesignDocumentDialog } from "./DesignGallery";
 import { canImportDesignWebsite, DesignWebsiteImport } from "./DesignWebsiteImport";
 import { DesignScalePanel } from "./DesignScalePanel";
 import { DesignNumberField } from "./DesignNumberField";
@@ -200,16 +205,22 @@ const DESIGN_SIDEBAR_WIDTH = "w-(--design-sidebar-width)";
 const decodeDesignDocument = Schema.decodeUnknownSync(DesignDocumentSchema);
 const decodeDesignAssetPayloads = Schema.decodeUnknownSync(Schema.Array(DesignAssetPayload));
 
-function showLayerReferenceMenu(
+function showLayerMenu(
   position: { x: number; y: number },
-  canReferenceAgent: boolean,
+  options: { canReferenceAgent: boolean; canCreateComponent: boolean; canDetachInstance: boolean },
   onAction: (action: string) => void,
 ) {
   void ensureLocalApi()
     .contextMenu.show(
       [
         { id: "copy-link", label: "Copy layer link" },
-        ...(canReferenceAgent ? [{ id: "copy-reference", label: "Copy reference for agent" }] : []),
+        ...(options.canReferenceAgent
+          ? [{ id: "copy-reference", label: "Copy reference for agent" }]
+          : []),
+        ...(options.canCreateComponent
+          ? [{ id: "create-component", label: "Create component" }]
+          : []),
+        ...(options.canDetachInstance ? [{ id: "detach", label: "Detach instance" }] : []),
       ],
       position,
     )
@@ -265,6 +276,7 @@ function LayerRow({
   onToggleLock,
   onRename,
   onAction,
+  onContextMenu,
   canReferenceAgent,
   onDropLayer,
   locked,
@@ -281,6 +293,7 @@ function LayerRow({
   onToggleLock: () => void;
   onRename: (name: string) => void;
   onAction: (action: string) => void;
+  onContextMenu: (position: { x: number; y: number }) => void;
   canReferenceAgent: boolean;
   onDropLayer: (id: string, position: "before" | "inside" | "after") => void;
   locked: boolean;
@@ -315,7 +328,7 @@ function LayerRow({
       draggable={!renaming && !locked}
       onContextMenu={(event) => {
         event.preventDefault();
-        showLayerReferenceMenu({ x: event.clientX, y: event.clientY }, canReferenceAgent, onAction);
+        onContextMenu({ x: event.clientX, y: event.clientY });
       }}
       onDragStart={(event) =>
         event.dataTransfer.setData("application/x-t3-design-layer", node.nodeId)
@@ -521,6 +534,10 @@ function LayerRow({
               <MenuItem disabled={locked} onClick={() => onAction("detach")}>
                 Detach instance
               </MenuItem>
+            ) : node.kind !== "component" && !node.section && !node.slice ? (
+              <MenuItem disabled={locked} onClick={() => onAction("create-component")}>
+                Create component
+              </MenuItem>
             ) : null}
             <MenuItem disabled={locked} onClick={() => onAction("delete")}>
               Delete
@@ -634,6 +651,7 @@ function LayersPanel({
   onToggleVisibility,
   onToggleLock,
   onAction,
+  onContextMenu,
   canReferenceAgent,
   onDropLayer,
   onPageRename,
@@ -658,6 +676,7 @@ function LayersPanel({
   onToggleVisibility: (nodeId: string) => void;
   onToggleLock: (nodeId: string) => void;
   onAction: (nodeId: string, action: string) => void;
+  onContextMenu: (nodeId: string, position: { x: number; y: number }) => void;
   canReferenceAgent: boolean;
   onDropLayer: (
     nodeId: string,
@@ -739,6 +758,7 @@ function LayersPanel({
       onToggleLock={() => onToggleLock(node.nodeId)}
       onRename={(name) => onRename(node.nodeId, name)}
       onAction={(action) => onAction(node.nodeId, action)}
+      onContextMenu={(position) => onContextMenu(node.nodeId, position)}
       canReferenceAgent={canReferenceAgent}
       onDropLayer={(id, position) => onDropLayer(id, node, position)}
     />
@@ -2268,6 +2288,9 @@ export function DesignWorkspace({
   const storage = useDesignDocument(documentId);
   const navigate = useNavigate();
   const [showTrash, setShowTrash] = useState(false);
+  const [newDocument, setNewDocument] = useState<{
+    project: DesignProjectConnection | null;
+  } | null>(null);
   const [showWebsiteImport, setShowWebsiteImport] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -2421,6 +2444,7 @@ export function DesignWorkspace({
             initialNodeId={nodeId}
             initialCommentId={commentId}
             onOpenTrash={() => setShowTrash(true)}
+            onCreate={() => setNewDocument({ project: syncTarget ?? project ?? null })}
             onOpenFile={() => fileInput.current?.click()}
             onDownload={() => run(() => downloadFile(document))}
             onTrash={() =>
@@ -2443,12 +2467,7 @@ export function DesignWorkspace({
               </Button>
             ) : null
           }
-          onCreate={() =>
-            run(async () => {
-              const file = await storage.createDocument();
-              await openDocument(file.documentId);
-            })
-          }
+          onCreate={() => setNewDocument({ project: null })}
           onOpen={() => fileInput.current?.click()}
           onTrash={() => setShowTrash(true)}
           onMove={(id, location) => run(() => storage.setLocation(id, location))}
@@ -2480,6 +2499,20 @@ export function DesignWorkspace({
           }}
         />
       ) : null}
+      {newDocument ? (
+        <NewDesignDocumentDialog
+          project={newDocument.project}
+          working={working}
+          onClose={() => setNewDocument(null)}
+          onCreate={(project, description) =>
+            run(async () => {
+              const file = await storage.createDocument(project, description);
+              setNewDocument(null);
+              await openDocument(file.documentId);
+            })
+          }
+        />
+      ) : null}
       {trashDialog}
     </div>
   );
@@ -2493,6 +2526,7 @@ function DesignEditor({
   initialPageId,
   initialNodeId,
   initialCommentId,
+  onCreate,
   onOpenTrash,
   onOpenFile,
   onDownload,
@@ -2505,12 +2539,13 @@ function DesignEditor({
   readonly initialPageId: string | undefined;
   readonly initialNodeId: string | undefined;
   readonly initialCommentId: string | undefined;
+  readonly onCreate: () => void;
   readonly onOpenTrash: () => void;
   readonly onOpenFile: () => void;
   readonly onDownload: () => void;
   readonly onTrash: () => void;
 }) {
-  const { setDocument, documents, createDocument } = storage;
+  const { setDocument, documents } = storage;
   const navigate = useNavigate();
   const router = useRouter();
   const [referencePageId, setReferencePageId] = useState(() => {
@@ -2604,6 +2639,7 @@ function DesignEditor({
   const [syncing, setSyncing] = useState(false);
   const [renamingDocument, setRenamingDocument] = useState(false);
   const [documentTitle, setDocumentTitle] = useState(document.title);
+  const [descriptionDraft, setDescriptionDraft] = useState<string | null>(null);
   const cancelDocumentRename = useRef(false);
   const [presenting, setPresenting] = useState<string | null>(null);
   const documentRef = useRef(document);
@@ -3004,7 +3040,31 @@ function DesignEditor({
       commitDocument(ungroupDesignNode(current, nodeId));
       setSelectedNodeIds([]);
     }
+    if (action === "create-component") {
+      const next = createDesignComponentFromSelection(current, ids);
+      if (!next) {
+        setSyncMessage("Select unlocked layers with the same parent to create a component.");
+        return;
+      }
+      commitDocument(next.document);
+      setSelectedNodeIds([next.nodeId]);
+    }
     if (action === "detach") commitDocument(detachDesignInstance(current, nodeId));
+  };
+  const layerContextMenu = (nodeId: string, position: { x: number; y: number }) => {
+    const current = documentRef.current;
+    const node = current.nodes.find((candidate) => candidate.nodeId === nodeId);
+    if (!node) return;
+    const ids = selectedNodeIds.includes(nodeId) ? selectedNodeIds : [nodeId];
+    showLayerMenu(
+      position,
+      {
+        canReferenceAgent: syncTarget !== null,
+        canCreateComponent: canCreateDesignComponent(current, ids),
+        canDetachInstance: node.kind === "instance" && !isDesignNodeLocked(current, nodeId),
+      },
+      (action) => layerAction(nodeId, action),
+    );
   };
   const toggleNodeVisibility = (nodeId: string) => {
     const node = documentRef.current.nodes.find((candidate) => candidate.nodeId === nodeId);
@@ -3279,13 +3339,6 @@ function DesignEditor({
     if (!value) return;
     void navigate({ to: "/design", search: { documentId: value } });
   };
-  const addDocument = () => {
-    void createDocument(syncTarget ?? undefined).then(
-      (next) => navigate({ to: "/design", search: { documentId: next.documentId } }),
-      (error: unknown) =>
-        setSyncMessage(error instanceof Error ? error.message : "Could not create the file."),
-    );
-  };
   const linkSource = () => {
     if (!syncTarget || !document.provenance?.sourceThreadId || !document.provenance.sourceTabId) {
       setSyncMessage("Open this screen in Canvas from its connected Preview to link the source");
@@ -3427,7 +3480,7 @@ function DesignEditor({
         </MenuSubPopup>
       </MenuSub>
       <MenuSeparator />
-      <MenuItem onClick={addDocument}>New design document</MenuItem>
+      <MenuItem onClick={onCreate}>New design document</MenuItem>
       <MenuItem onClick={onOpenFile}>Open Design file…</MenuItem>
       <MenuItem onClick={onDownload}>Save a local copy…</MenuItem>
       <MenuItem onClick={() => copyDesignLink()}>Copy file link</MenuItem>
@@ -3444,6 +3497,9 @@ function DesignEditor({
         }}
       >
         Rename document
+      </MenuItem>
+      <MenuItem onClick={() => setDescriptionDraft(document.description ?? "")}>
+        Edit description…
       </MenuItem>
       <MenuSub>
         <MenuSubTrigger>Import</MenuSubTrigger>
@@ -3893,6 +3949,7 @@ function DesignEditor({
           onToggleVisibility={toggleNodeVisibility}
           onToggleLock={toggleNodeLock}
           onAction={layerAction}
+          onContextMenu={layerContextMenu}
           canReferenceAgent={syncTarget !== null}
           onDropLayer={(nodeId, target, position) => {
             const current = documentRef.current;
@@ -3956,11 +4013,7 @@ function DesignEditor({
             if (placeImages(imageQueue, target)) setImageQueue([]);
           }}
           onBoolean={handleBoolean}
-          onLayerContextMenu={(nodeId, position) =>
-            showLayerReferenceMenu(position, syncTarget !== null, (action) =>
-              layerAction(nodeId, action),
-            )
-          }
+          onLayerContextMenu={layerContextMenu}
           comments={document.comments ?? []}
           initialCommentId={
             initialPageId === undefined || initialPageId === document.activePageId
@@ -4153,6 +4206,54 @@ function DesignEditor({
           }}
         />
       ) : null}
+      <Dialog
+        open={descriptionDraft !== null}
+        onOpenChange={(open) => {
+          if (!open) setDescriptionDraft(null);
+        }}
+      >
+        <DialogPopup>
+          <DialogHeader>
+            <DialogTitle>Edit description</DialogTitle>
+            <DialogDescription>
+              Describe what this file contains so collaborators and agents can find the right
+              design.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel>
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (descriptionDraft === null) return;
+                commitDocument(describeDesignDocument(documentRef.current, descriptionDraft));
+                setDescriptionDraft(null);
+              }}
+            >
+              <Textarea
+                autoFocus
+                aria-label="Description"
+                value={descriptionDraft ?? ""}
+                maxLength={DESIGN_DESCRIPTION_LIMIT}
+                onChange={(event) => setDescriptionDraft(event.target.value)}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setDescriptionDraft(null)}
+                >
+                  Cancel
+                </Button>
+                <Button size="sm" type="submit">
+                  Save description
+                </Button>
+              </div>
+            </form>
+          </DialogPanel>
+        </DialogPopup>
+      </Dialog>
       {reactPasteOpen ? (
         <DesignReactPasteDialog
           viewport={{

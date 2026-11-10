@@ -23,6 +23,8 @@ import * as Repositories from "../../../sourceControl/SourceControlRepositorySer
 import * as GitVcsDriver from "../../../vcs/GitVcsDriver.ts";
 import * as ServerSettings from "../../../serverSettings.ts";
 import * as ProviderRegistry from "../../../provider/ProviderRegistry.ts";
+import * as WorkspaceEntries from "../../../workspace/WorkspaceEntries.ts";
+import * as WorkspaceFileSystem from "../../../workspace/WorkspaceFileSystem.ts";
 import * as DateTime from "effect/DateTime";
 import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
@@ -30,7 +32,7 @@ import { resolveRuntimeMode } from "../../delegatedTaskModes.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import { newCommandId, readCaller, resolveProjectId, unavailable } from "../../threadAccess.ts";
-import { ProjectToolkit } from "./tools.ts";
+import { ProjectDesignToolkit, ProjectToolkit } from "./tools.ts";
 
 const isAboveCeilingError = Schema.is(OrchestratorRuntimeModeAboveCeilingError);
 
@@ -81,6 +83,92 @@ const access = Effect.gen(function* () {
   yield* readCaller();
   return yield* Project.ProjectService;
 });
+
+const designPackageName = /^\.t3\/design\/([\w-]+)\.json$/;
+const designPackageMetadata = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({
+      documentId: Schema.String,
+      snapshot: Schema.optional(
+        Schema.fromJsonString(
+          Schema.Struct({
+            title: Schema.optional(Schema.String),
+            description: Schema.optional(Schema.String),
+          }),
+        ),
+      ),
+    }),
+  ),
+);
+
+export const designLayer = McpToolAccess.toLayer(ProjectDesignToolkit, {
+  t3_project_design_list: McpToolAccess.reads((input) =>
+    Effect.gen(function* () {
+      const context = yield* readCaller();
+      const projectId = yield* resolveProjectId(context, input.projectId);
+      const projects = yield* Project.ProjectService;
+      const project = yield* projects.getById(projectId).pipe(Effect.mapError(unavailable));
+      if (Option.isNone(project)) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message: "The project was not found.",
+        });
+      }
+
+      const cwd = project.value.workspaceRoot;
+      const entries = yield* WorkspaceEntries.WorkspaceEntries;
+      const fileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
+      const listing = yield* entries.list({ cwd, directoryPath: ".t3/design" }).pipe(
+        Effect.catchTags({
+          WorkspaceEntriesReadDirectoryError: (error) =>
+            typeof error.cause === "object" &&
+            error.cause !== null &&
+            "code" in error.cause &&
+            error.cause.code === "ENOENT"
+              ? Effect.succeed({ entries: [], truncated: false })
+              : Effect.fail(error),
+        }),
+        Effect.mapError(unavailable),
+      );
+      const paths = listing.entries
+        .filter((entry) => entry.kind === "file" && designPackageName.test(entry.path))
+        .map((entry) => entry.path)
+        .toSorted();
+      const cursor = input.cursor ?? 0;
+      const page = paths.slice(cursor, cursor + 25);
+      const documents = yield* Effect.forEach(
+        page,
+        (relativePath) =>
+          Effect.gen(function* () {
+            const documentId = designPackageName.exec(relativePath)?.[1];
+            if (documentId === undefined) return undefined;
+            const file = yield* fileSystem.readFile({ cwd, relativePath }).pipe(Effect.option);
+            if (Option.isNone(file)) return undefined;
+            const reference = { documentId, relativePath };
+            // Large packages may embed assets; still return their reference when the preview is truncated.
+            if (file.value.truncated) return reference;
+            const metadata = designPackageMetadata(file.value.contents);
+            if (Option.isNone(metadata) || metadata.value.documentId !== documentId)
+              return undefined;
+            const title = metadata.value.snapshot?.title?.trim().slice(0, 200);
+            const description = metadata.value.snapshot?.description?.trim().slice(0, 1000);
+            return {
+              ...reference,
+              ...(title ? { title } : {}),
+              ...(description ? { description } : {}),
+            };
+          }),
+        { concurrency: 4 },
+      );
+      return {
+        workspaceRoot: cwd,
+        documents: documents.filter((document) => document !== undefined),
+        nextCursor: cursor + page.length < paths.length ? cursor + page.length : null,
+      };
+    }),
+  ),
+});
+
 export const layer = McpToolAccess.toLayer(ProjectToolkit, {
   t3_thread_launch: McpToolAccess.startsThreads(
     (input) => input,

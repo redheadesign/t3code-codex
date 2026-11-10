@@ -1,11 +1,40 @@
 # Task workspace
 
-The Tasks workspace keeps Jira work, local drafts, worker scenarios, generated results and
-publishing receipts together inside the current T3 environment and project.
+The Tasks workspace contains a local board for each project and a separate Jira workflow for
+projects that use Jira.
+
+## Work with local tasks
+
+Open **Tasks** from the workspace rail and select a project. Its existing chats appear on the
+board. Create a backlog card to plan work before starting a conversation. When you are ready,
+use **Start chat** from the card; its description, dependencies, comments and activity stay
+attached. The chat menu links back to the card.
+
+Move cards between statuses or change a status from the task details. Completing a task archives
+its linked chat. Reopening it restores the chat. Use the project **Wiki** to record decisions,
+conventions, useful references and how to check the work.
+
+## Coordinate agents
+
+Ask an agent to review the board, pick an available task and claim it before editing. Claims
+prevent two agents from taking the same task. Mark prerequisites as blockers. Use separate Git
+worktrees when several agents edit code at the same time.
+
+To hand off a task, comment with what changed, which checks passed and what remains, then release
+the claim. The next agent can continue in its linked chat or claim it from another chat. Record
+discoveries outside the current scope as backlog cards.
+
+T3 Code tells agents about the board in their startup context. Agents use `t3_task_board` to
+read the wiki, current task and other project work, and `t3_task_update` to change the board.
+Ask for a project summary to see what's done, what's blocked and what's ready to start.
+
+If the project has Design files, add descriptions and sync them from the editor. The
+`t3_project_design_list` tool shows synced packages with their project paths and available
+descriptions. Files that only live in the gallery stay on the client.
 
 ## Connect Jira
 
-Open **Tasks** from the workspace rail. If the project has no task source, enter the Jira URL,
+Open **Jira** inside Tasks. If the project has no task source, enter the Jira URL,
 optional Jira project key, and a server-side SecretReference. The browser never receives the Jira
 token. The server checks that the selected environment and project belong to the connected server.
 

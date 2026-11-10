@@ -360,6 +360,7 @@ export const DesignDocument = Schema.Struct({
   version: Schema.Literal(1),
   documentId: Schema.String,
   title: Schema.String,
+  description: Schema.optional(Schema.String),
   pages: Schema.Array(DesignPage),
   nodes: Schema.Array(DesignNode),
   activePageId: Schema.String,
@@ -388,6 +389,7 @@ export const DesignDocuments = Schema.Array(DesignDocument);
 export type DesignDocuments = typeof DesignDocuments.Type;
 
 export const DESIGN_DOCUMENTS_STORAGE_KEY = "t3code:design:documents:v1";
+export const DESIGN_DESCRIPTION_LIMIT = 500;
 
 const now = () => new Date().toISOString();
 
@@ -907,6 +909,7 @@ export function restoreDesignContent(
       activePageId: previous.activePageId,
       guides: previous.guides,
       title: previous.title,
+      description: previous.description,
       provenance: previous.provenance,
       comments: previous.comments,
     },
@@ -1716,6 +1719,56 @@ export function groupDesignNodes(
   return wrapDesignNodes(document, roots);
 }
 
+function designComponentRoots(document: DesignDocument, nodeIds: readonly string[]) {
+  const roots = selectionRoots(document, nodeIds);
+  const [first] = roots;
+  if (!first) return null;
+  const nodes = new Map(document.nodes.map((node) => [node.nodeId, node]));
+  if (
+    roots.some(
+      (node) =>
+        node.parentId !== first.parentId ||
+        node.kind === "component" ||
+        node.kind === "instance" ||
+        node.section ||
+        node.slice ||
+        isDesignNodeLocked(document, node.nodeId, nodes),
+    ) ||
+    nodeAncestry(nodes, first.nodeId).some((node) => node.kind === "instance")
+  )
+    return null;
+  const siblings = first.parentId
+    ? nodes.get(first.parentId)?.childIds
+    : document.pages.find((page) => page.pageId === document.activePageId)?.nodeIds;
+  const selected = new Set(roots.map((node) => node.nodeId));
+  const ordered = siblings?.flatMap((id) => (selected.has(id) ? (nodes.get(id) ?? []) : [])) ?? [];
+  return ordered.length === roots.length ? ordered : null;
+}
+
+export function canCreateDesignComponent(document: DesignDocument, nodeIds: readonly string[]) {
+  return designComponentRoots(document, nodeIds) !== null;
+}
+
+export function createDesignComponentFromSelection(
+  document: DesignDocument,
+  nodeIds: readonly string[],
+) {
+  const roots = designComponentRoots(document, nodeIds);
+  if (!roots) return null;
+  const first = roots[0]!;
+  if (roots.length === 1 && (first.kind === "frame" || first.kind === "group")) {
+    return {
+      document: updateDesignNode(document, first.nodeId, {
+        kind: "component",
+        componentId: first.nodeId,
+      }),
+      nodeId: first.nodeId,
+    };
+  }
+  const next = wrapDesignNodes(document, roots, undefined, true);
+  return { document: next, nodeId: next.nodes.at(-1)!.nodeId };
+}
+
 function inferAutoLayout(nodes: readonly DesignNode[]) {
   const xs = nodes.map((node) => node.x + node.width / 2);
   const ys = nodes.map((node) => node.y + node.height / 2);
@@ -1765,6 +1818,7 @@ function wrapDesignNodes(
   document: DesignDocument,
   roots: readonly DesignNode[],
   autoLayout?: DesignLayoutModel,
+  component = false,
 ): DesignDocument {
   if (!roots.length || roots.some((node) => node.parentId !== roots[0]!.parentId)) return document;
   const corners = roots.flatMap((node) => {
@@ -1778,12 +1832,19 @@ function wrapDesignNodes(
   });
   const x = Math.min(...corners.map((point) => point.x));
   const y = Math.min(...corners.map((point) => point.y));
-  const nodeId = nextNodeId(document, autoLayout ? "frame" : "group");
+  const kind = component ? "component" : autoLayout ? "frame" : "group";
+  const nodeId = nextNodeId(document, kind);
   const group: DesignNode = {
     ...roots[0]!,
     nodeId,
-    kind: autoLayout ? "frame" : "group",
-    name: autoLayout ? "Auto layout" : "Group",
+    kind,
+    name: component
+      ? roots.length === 1
+        ? roots[0]!.name
+        : "Component"
+      : autoLayout
+        ? "Auto layout"
+        : "Group",
     clipContent: false,
     x,
     y,
@@ -1803,7 +1864,9 @@ function wrapDesignNodes(
     flipY: false,
     aspectRatioLocked: false,
     effects: [],
-    componentId: undefined,
+    componentId: component ? nodeId : undefined,
+    componentSetId: undefined,
+    componentSlotId: undefined,
     instanceOfNodeId: undefined,
     assetId: null,
     vector: undefined,
@@ -2805,6 +2868,18 @@ export function renameDesignDocument(document: DesignDocument, title: string): D
   return recordOperation(
     { ...document, title: title.trim() },
     { kind: "update-node", nodeId: null, fields: ["title"] },
+  );
+}
+
+export function describeDesignDocument(
+  document: DesignDocument,
+  description: string,
+): DesignDocument {
+  const next = description.trim().slice(0, DESIGN_DESCRIPTION_LIMIT) || undefined;
+  if (next === document.description) return document;
+  return recordOperation(
+    { ...document, description: next },
+    { kind: "update-node", nodeId: null, fields: ["description"] },
   );
 }
 

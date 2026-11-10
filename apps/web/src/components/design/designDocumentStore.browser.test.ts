@@ -8,6 +8,7 @@ import {
   designProjectConnection,
   DesignStorageConflictError,
 } from "./designDocumentStore";
+import { applyDesignSyncResult } from "./designSync";
 
 function repositoryFixture(legacy: string | null = null) {
   const databaseName = `design-store-test-${Array.from(crypto.getRandomValues(new Uint32Array(4))).join("-")}`;
@@ -158,7 +159,12 @@ it("retains deleted files, their operations, and their folder across restart and
   await using fixture = repositoryFixture();
   const library = new DesignDocumentLibrary(fixture.repository);
   await library.load();
-  const initial = library.getSnapshot().records[0]!.document;
+  const initial = await library.create(undefined, "Checkout screen and empty state");
+  expect(
+    library
+      .getSnapshot()
+      .records.find((record) => record.document.documentId === initial.documentId)?.location,
+  ).toBeUndefined();
   const location = {
     project: designProjectConnection(
       { environmentId: EnvironmentId.make("design-host"), cwd: "/workspace" },
@@ -174,12 +180,64 @@ it("retains deleted files, their operations, and their folder across restart and
   await library.setTrashed(document.documentId, true);
   const restarted = new DesignDocumentLibrary(fixture.repository);
   await restarted.load();
-  expect(restarted.getSnapshot().records[0]!.trashedAt).not.toBeNull();
+  expect(
+    restarted
+      .getSnapshot()
+      .records.find((record) => record.document.documentId === initial.documentId)?.trashedAt,
+  ).not.toBeNull();
   await restarted.setTrashed(document.documentId, false);
-  expect((await fixture.repository.load())[0]).toMatchObject({
+  expect(
+    (await fixture.repository.load()).find(
+      (record) => record.document.documentId === initial.documentId,
+    ),
+  ).toMatchObject({
     document,
     trashedAt: null,
     location,
+  });
+});
+
+it("keeps the sync revision when reconnecting the same project and rebases for a different project", async () => {
+  await using fixture = repositoryFixture();
+  const library = new DesignDocumentLibrary(fixture.repository);
+  const firstProject = { environmentId: EnvironmentId.make("design-host"), cwd: "/first" };
+  const first = await library.create(firstProject, "Project brief");
+  const synced = applyDesignSyncResult(first, {
+    _tag: "accepted",
+    documentId: first.documentId,
+    revision: first.revision,
+    acceptedOperationIds: first.pendingOperations.map(({ operationId }) => operationId),
+  });
+  library.setDocument(synced);
+  await library.setLocation(first.documentId, {});
+  const restarted = new DesignDocumentLibrary(fixture.repository);
+  await restarted.load();
+  const originalConnection = designProjectConnection(firstProject, first.documentId);
+  await restarted.setLocation(first.documentId, { project: originalConnection });
+  expect(
+    restarted
+      .getSnapshot()
+      .records.find((record) => record.document.documentId === first.documentId)?.document,
+  ).toEqual(synced);
+  const pending = updateDesignNode(synced, "text-welcome", { text: "Latest design" });
+  restarted.setDocument(pending);
+  const otherConnection = designProjectConnection(
+    { ...firstProject, cwd: "/other" },
+    first.documentId,
+  );
+  await restarted.setLocation(first.documentId, { project: otherConnection });
+  expect(
+    (await fixture.repository.load()).find(
+      (record) => record.document.documentId === first.documentId,
+    ),
+  ).toMatchObject({
+    location: { project: otherConnection },
+    document: {
+      revision: 1,
+      syncState: "local",
+      pendingOperations: [{ operationId: "op-1", baseRevision: 0 }],
+      nodes: pending.nodes,
+    },
   });
 });
 

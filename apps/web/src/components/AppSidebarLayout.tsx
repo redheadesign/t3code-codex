@@ -143,7 +143,7 @@ function WorkspaceGlobalChrome() {
         )}
         style={{
           left: `calc(0.25rem + 1px + ${chromeSidebarWidth})`,
-          right: "0px",
+          right: "var(--workspace-native-controls-inset)",
         }}
       >
         {project ? <ProjectFavicon project={project} className="size-4 shrink-0" /> : null}
@@ -195,8 +195,11 @@ function WorkspaceGlobalChrome() {
       />
       {designPage ? (
         <div
-          className="pointer-events-auto absolute inset-y-0 right-5 z-40 flex min-w-0 items-center ps-2 text-sm"
-          style={{ left: `calc(0.25rem + 1px + ${chromeSidebarWidth})` }}
+          className="pointer-events-auto absolute inset-y-0 z-40 flex min-w-0 items-center ps-2 text-sm"
+          style={{
+            left: `calc(0.25rem + 1px + ${chromeSidebarWidth})`,
+            right: "max(1.25rem, var(--workspace-native-controls-inset))",
+          }}
           data-design-chrome-actions=""
         />
       ) : null}

@@ -41,6 +41,9 @@ import { SourceControlRepositoryService } from "../sourceControl/SourceControlRe
 import { GitVcsDriver } from "../vcs/GitVcsDriver.ts";
 import { VcsStatusBroadcaster } from "../vcs/VcsStatusBroadcaster.ts";
 import { buildCodexAdditionalContext } from "./CodexDeveloperInstructions.ts";
+import { TaskBoardService } from "../taskWorkspace/TaskBoardService.ts";
+import { WorkspaceEntries } from "../workspace/WorkspaceEntries.ts";
+import { WorkspaceFileSystem } from "../workspace/WorkspaceFileSystem.ts";
 import { DocumentText } from "./DocumentText.ts";
 import { ProviderRegistry } from "./ProviderRegistry.ts";
 import budget from "./agentContextBudget.json" with { type: "json" };
@@ -77,6 +80,9 @@ const toolHandlerServices = Layer.mergeAll(
   Layer.mock(ThreadLaunchService)({}),
   Layer.mock(ThreadManagementService)({}),
   Layer.mock(ThreadSearch)({}),
+  Layer.mock(TaskBoardService)({}),
+  Layer.mock(WorkspaceEntries)({}),
+  Layer.mock(WorkspaceFileSystem)({}),
   Layer.mock(VcsStatusBroadcaster)({}),
 ).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)));
 

@@ -7,11 +7,12 @@ import {
   LinkIcon,
   MoreHorizontalIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+import { cn } from "../../lib/utils";
 import { ensureLocalApi } from "../../localApi";
-import { useProjects } from "../../state/entities";
+import { ProjectFavicon, type ProjectFaviconProject } from "../ProjectFavicon";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -23,13 +24,112 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
+import { Textarea } from "../ui/textarea";
 import { DesignSceneNode } from "./DesignScene";
+import {
+  designFileProjectKey,
+  DesignFileProjectPicker,
+  useDesignFileProjects,
+} from "./DesignFileProjectPicker";
 import { designAgentReference } from "./designAgentReference";
-import type { DesignDocument } from "./designDocument";
-import type { DesignFileLocation, StoredDesignDocument } from "./designDocumentStore";
+import { DESIGN_DESCRIPTION_LIMIT, type DesignDocument } from "./designDocument";
+import {
+  designProjectConnection,
+  type DesignProjectConnection,
+  type DesignFileLocation,
+  type StoredDesignDocument,
+} from "./designDocumentStore";
 
 const previewNodeLimit = 180;
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const designFileDragType = "application/x-t3-design-file";
+
+type DesignProjectTarget = Pick<DesignProjectConnection, "environmentId" | "cwd">;
+type GalleryGroup = {
+  title: string;
+  project?: ProjectFaviconProject;
+  connection?: DesignProjectTarget;
+  folders: Map<string, StoredDesignDocument[]>;
+};
+
+export function NewDesignDocumentDialog({
+  project,
+  working,
+  onCreate,
+  onClose,
+}: {
+  readonly project: DesignProjectTarget | null;
+  readonly working: boolean;
+  readonly onCreate: (project: DesignProjectTarget | undefined, description: string) => void;
+  readonly onClose: () => void;
+}) {
+  const projects = useDesignFileProjects();
+  const [projectKey, setProjectKey] = useState(() =>
+    project ? designFileProjectKey(project) : "local",
+  );
+  const [description, setDescription] = useState("");
+  const connection =
+    projects.get(projectKey)?.connection ??
+    (project && projectKey === designFileProjectKey(project) ? project : undefined);
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !working) onClose();
+      }}
+    >
+      <DialogPopup>
+        <DialogHeader>
+          <DialogTitle>New design document</DialogTitle>
+          <DialogDescription>
+            Choose a project or keep the file in Local files. Use Sync in the editor to share the
+            file with agents.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogPanel>
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (projectKey === "local" || connection) onCreate(connection, description);
+            }}
+          >
+            <DesignFileProjectPicker
+              projects={projects}
+              value={projectKey}
+              onChange={setProjectKey}
+            />
+            <Textarea
+              aria-label="Description"
+              placeholder="Description (optional)"
+              value={description}
+              maxLength={DESIGN_DESCRIPTION_LIMIT}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                size="sm"
+                type="button"
+                variant="secondary"
+                disabled={working}
+                onClick={onClose}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                type="submit"
+                disabled={working || (projectKey !== "local" && !connection)}
+              >
+                Create document
+              </Button>
+            </div>
+          </form>
+        </DialogPanel>
+      </DialogPopup>
+    </Dialog>
+  );
+}
 
 function DesignThumbnail({ document }: { readonly document: DesignDocument }) {
   const preview = useRef<HTMLDivElement>(null);
@@ -116,16 +216,23 @@ function DesignThumbnail({ document }: { readonly document: DesignDocument }) {
 
 function DesignFileCard({
   record,
+  group,
+  working,
   onCopy,
   onMove,
+  onDragging,
 }: {
   readonly record: StoredDesignDocument;
+  readonly group: GalleryGroup;
+  readonly working: boolean;
   readonly onCopy: () => void;
   readonly onMove: () => void;
+  readonly onDragging: (id: string | null) => void;
 }) {
   const { document } = record;
   const date = new Date(document.updatedAt);
   const project = record.location?.project;
+  const needsSync = document.syncState !== "synced" || document.pendingOperations.length > 0;
   const { copyToClipboard: copyReference } = useCopyToClipboard({ target: "Design reference" });
   const copyAgentReference = () => {
     if (!project) return;
@@ -133,7 +240,7 @@ function DesignFileCard({
       designAgentReference({
         relativePath: project.relativePath,
         documentId: document.documentId,
-        needsSync: document.syncState !== "synced" || document.pendingOperations.length > 0,
+        needsSync,
       }),
     );
   };
@@ -161,15 +268,40 @@ function DesignFileCard({
       <Link
         to="/design"
         search={{ documentId: document.documentId }}
+        draggable={!working}
+        onDragStart={(event) => {
+          event.dataTransfer.setData(designFileDragType, document.documentId);
+          event.dataTransfer.effectAllowed = "move";
+          onDragging(document.documentId);
+        }}
+        onDragEnd={() => onDragging(null)}
         className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring hover:[&>div]:border-foreground/40"
       >
         <DesignThumbnail document={document} />
         <div className="mt-2 min-w-0 pe-9">
           <p className="wrap-break-word text-sm font-medium">{document.title}</p>
-          {Number.isFinite(date.getTime()) ? (
-            <time className="text-xs text-muted-foreground" dateTime={document.updatedAt}>
-              {dateFormat.format(date)}
-            </time>
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            {project ? (
+              <span className="flex min-w-0 items-center gap-1.5">
+                {group.project ? (
+                  <ProjectFavicon project={group.project} className="size-3" />
+                ) : (
+                  <FolderIcon className="size-3 shrink-0" aria-hidden="true" />
+                )}
+                <span className="wrap-anywhere">{group.title}</span>
+              </span>
+            ) : null}
+            {Number.isFinite(date.getTime()) ? (
+              <time className="shrink-0" dateTime={document.updatedAt}>
+                {dateFormat.format(date)}
+              </time>
+            ) : null}
+            {project && needsSync ? <span>Needs sync</span> : null}
+          </div>
+          {document.description ? (
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+              {document.description}
+            </p>
           ) : null}
         </div>
       </Link>
@@ -225,47 +357,122 @@ export function DesignGallery({
   readonly onMove: (id: string, location: DesignFileLocation) => void;
 }) {
   const router = useRouter();
-  const projects = useProjects();
+  const projects = useDesignFileProjects();
   const { copyToClipboard } = useCopyToClipboard({ target: "Design file link" });
   const [query, setQuery] = useState("");
   const [moving, setMoving] = useState<StoredDesignDocument | null>(null);
+  const [moveProject, setMoveProject] = useState("local");
   const [folder, setFolder] = useState("");
-  const groups = new Map<string, { title: string; folders: Map<string, StoredDesignDocument[]> }>();
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const dragRecord = records.find((record) => record.document.documentId === dragging);
+  const groups = new Map<string, GalleryGroup>();
   const term = query.trim().toLocaleLowerCase();
   for (const record of records) {
     if (record.trashedAt !== null) continue;
     const project = record.location?.project;
     const folder = record.location?.folder ?? "";
+    const key = project ? designFileProjectKey(project) : "local";
+    const liveProject = projects.get(key)?.project;
     const title = project
-      ? (projects.find(
-          (item) =>
-            item.environmentId === project.environmentId && item.workspaceRoot === project.cwd,
-        )?.title ??
-        project.cwd.split(/[\\/]/u).filter(Boolean).at(-1) ??
-        project.cwd)
+      ? (liveProject?.title ?? project.cwd.split(/[\\/]/u).filter(Boolean).at(-1) ?? project.cwd)
       : "Local files";
-    if (term && !`${title} ${folder} ${record.document.title}`.toLocaleLowerCase().includes(term))
+    if (
+      term &&
+      !`${title} ${folder} ${record.document.title} ${record.document.description ?? ""}`
+        .toLocaleLowerCase()
+        .includes(term)
+    )
       continue;
-    const key = project ? JSON.stringify([project.environmentId, project.cwd]) : "local";
-    const group = groups.get(key) ?? { title, folders: new Map() };
+    const group = groups.get(key) ?? {
+      title,
+      ...(project ? { connection: project } : {}),
+      ...(liveProject ? { project: liveProject } : {}),
+      folders: new Map(),
+    };
     const files = group.folders.get(folder) ?? [];
     files.push(record);
     group.folders.set(folder, files);
     groups.set(key, group);
   }
 
+  if (dragRecord && !dragRecord.location?.project) {
+    for (const [key, { project, connection }] of projects) {
+      if (!groups.has(key))
+        groups.set(key, { title: project.title, project, connection, folders: new Map() });
+    }
+  }
+
+  const move = (
+    record: StoredDesignDocument,
+    target: DesignProjectTarget | undefined,
+    folder: string,
+  ) => {
+    const id = record.document.documentId;
+    const project = record.location?.project ?? (target && designProjectConnection(target, id));
+    onMove(id, { ...(project ? { project } : {}), ...(folder ? { folder } : {}) });
+  };
+
+  const dragFile = (id: string | null) => {
+    setDragging(id);
+    setDropTarget(null);
+  };
+
+  const dropProps = (key: string, group: GalleryGroup, folder: string) => {
+    const sourceProject = dragRecord?.location?.project;
+    const sourceKey = sourceProject ? designFileProjectKey(sourceProject) : "local";
+    const target = JSON.stringify([key, folder]);
+    const acceptsDrop =
+      !working &&
+      dragRecord &&
+      dragRecord.trashedAt === null &&
+      (!sourceProject || sourceKey === key) &&
+      (sourceKey !== key || (dragRecord.location?.folder ?? "") !== folder);
+    return {
+      active: acceptsDrop && dropTarget === target,
+      events: {
+        onDragOver(event: DragEvent<HTMLElement>) {
+          if (!event.dataTransfer.types.includes(designFileDragType)) return;
+          event.stopPropagation();
+          if (!acceptsDrop) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+          setDropTarget(target);
+        },
+        onDragLeave(event: DragEvent<HTMLElement>) {
+          if (
+            event.relatedTarget instanceof Node &&
+            event.currentTarget.contains(event.relatedTarget)
+          )
+            return;
+          setDropTarget((current) => (current === target ? null : current));
+        },
+        onDrop(event: DragEvent<HTMLElement>) {
+          if (!event.dataTransfer.types.includes(designFileDragType)) return;
+          event.stopPropagation();
+          if (
+            !acceptsDrop ||
+            event.dataTransfer.getData(designFileDragType) !== dragRecord.document.documentId
+          )
+            return;
+          event.preventDefault();
+          dragFile(null);
+          move(dragRecord, group.connection, folder);
+        },
+      },
+    };
+  };
+
   const moveFile = () => {
     if (!moving) return;
+    const target = projects.get(moveProject)?.connection;
+    if (!moving.location?.project && moveProject !== "local" && !target) return;
     const nextFolder = folder
       .split("/")
       .map((segment) => segment.trim())
       .filter(Boolean)
       .join(" / ");
-    const project = moving.location?.project;
-    onMove(moving.document.documentId, {
-      ...(project ? { project } : {}),
-      ...(nextFolder ? { folder: nextFolder } : {}),
-    });
+    move(moving, target, nextFolder);
     setMoving(null);
   };
   return (
@@ -311,45 +518,78 @@ export function DesignGallery({
               : "Create or open a design document to get started."}
           </p>
         ) : (
-          [...groups].map(([key, group]) => (
-            <section key={key} className="space-y-4 border-t border-border pt-5">
-              <h2 className="text-base font-semibold">{group.title}</h2>
-              {[...group.folders].map(([folder, files]) => (
-                <div key={folder} className="space-y-3">
-                  {folder ? (
-                    <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <FolderIcon className="size-4" aria-hidden="true" />
-                      {folder}
-                    </h3>
+          [...groups].map(([key, group]) => {
+            const rootDrop = dropProps(key, group, "");
+            return (
+              <section
+                key={key}
+                className={cn(
+                  "space-y-4 rounded-sm border-t border-border pt-5",
+                  rootDrop.active && "outline-2 -outline-offset-2 outline-primary",
+                )}
+                {...rootDrop.events}
+              >
+                <h2 className="flex items-center gap-2 text-base font-semibold">
+                  {group.project ? (
+                    <ProjectFavicon project={group.project} className="size-4" />
                   ) : null}
-                  <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),1fr))] gap-x-5 gap-y-6">
-                    {files.map((record) => (
-                      <DesignFileCard
-                        key={record.document.documentId}
-                        record={record}
-                        onCopy={() => {
-                          const location = router.buildLocation({
-                            to: "/design",
-                            search: { documentId: record.document.documentId },
-                          });
-                          copyToClipboard(
-                            new URL(
-                              router.history.createHref(location.publicHref),
-                              window.location.href,
-                            ).href,
-                          );
-                        }}
-                        onMove={() => {
-                          setMoving(record);
-                          setFolder(record.location?.folder ?? "");
-                        }}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </section>
-          ))
+                  {group.title}
+                </h2>
+                {[...group.folders].map(([folder, files]) => {
+                  const folderDrop = folder ? dropProps(key, group, folder) : null;
+                  return (
+                    <div
+                      key={folder}
+                      className={cn(
+                        "space-y-3 rounded-sm",
+                        folderDrop?.active && "outline-2 -outline-offset-2 outline-primary",
+                      )}
+                      {...folderDrop?.events}
+                    >
+                      {folder ? (
+                        <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <FolderIcon className="size-4" aria-hidden="true" />
+                          {folder}
+                        </h3>
+                      ) : null}
+                      <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),1fr))] gap-x-5 gap-y-6">
+                        {files.map((record) => (
+                          <DesignFileCard
+                            key={record.document.documentId}
+                            record={record}
+                            group={group}
+                            working={working}
+                            onDragging={dragFile}
+                            onCopy={() => {
+                              const location = router.buildLocation({
+                                to: "/design",
+                                search: { documentId: record.document.documentId },
+                              });
+                              copyToClipboard(
+                                new URL(
+                                  router.history.createHref(location.publicHref),
+                                  window.location.href,
+                                ).href,
+                              );
+                            }}
+                            onMove={() => {
+                              setMoving(record);
+                              setMoveProject(
+                                record.location?.project
+                                  ? designFileProjectKey(record.location.project)
+                                  : "local",
+                              );
+                              setFolder(record.location?.folder ?? "");
+                            }}
+                          />
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </section>
+            );
+          })
         )}
       </div>
       <Dialog
@@ -374,6 +614,13 @@ export function DesignGallery({
                 moveFile();
               }}
             >
+              {!moving?.location?.project && projects.size > 0 ? (
+                <DesignFileProjectPicker
+                  projects={projects}
+                  value={moveProject}
+                  onChange={setMoveProject}
+                />
+              ) : null}
               <Input
                 autoFocus
                 aria-label="Folder path"
@@ -382,7 +629,7 @@ export function DesignGallery({
                 onChange={(event) => setFolder(event.target.value)}
               />
               <div className="flex justify-end gap-2">
-                <Button size="sm" variant="secondary" onClick={() => setMoving(null)}>
+                <Button size="sm" type="button" variant="secondary" onClick={() => setMoving(null)}>
                   Cancel
                 </Button>
                 <Button size="sm" type="submit" disabled={working}>

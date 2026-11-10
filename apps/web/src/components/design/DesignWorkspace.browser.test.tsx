@@ -1,3 +1,4 @@
+import { EnvironmentId } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
@@ -12,9 +13,52 @@ import {
   updatePrototypeSettings,
 } from "./designDocument";
 import { DesignPresentation } from "./DesignPresentation";
+import { DesignGallery } from "./DesignGallery";
+import { designProjectConnection } from "./designDocumentStore";
 import { DesignWorkspace } from "./DesignWorkspace";
 import { createDesignDocumentFromMarkup } from "./previewToDesign";
 import { serializeDesignFile } from "./designAssetPackage";
+
+it("moves an unlinked Design file into a project folder using a stable document path", async () => {
+  const project = { environmentId: EnvironmentId.make("design-host"), cwd: "/workspace/Project" };
+  const local = { ...createInitialDesignDocument(), documentId: "local", title: "Unlinked file" };
+  const linked = { ...createInitialDesignDocument(), documentId: "linked", title: "Linked file" };
+  const folder = "Checkout";
+  const move = vi.fn();
+  await using screen = await render(
+    <DesignGallery
+      records={[
+        { document: local, storageVersion: "local", trashedAt: null },
+        {
+          document: linked,
+          storageVersion: "linked",
+          trashedAt: null,
+          location: { project: designProjectConnection(project, linked.documentId), folder },
+        },
+      ]}
+      unavailable={false}
+      working={false}
+      onCreate={() => undefined}
+      onOpen={() => undefined}
+      onTrash={() => undefined}
+      onMove={move}
+    />,
+    { router: "/design" },
+  );
+  const source = screen.getByRole("link", { name: /Unlinked file/u });
+  const target = screen.getByRole("heading", { name: folder, exact: true });
+  await expect.element(target).toBeVisible();
+  const dataTransfer = new DataTransfer();
+  const dragEvent = (type: string) =>
+    new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer });
+  await act(() => source.element().dispatchEvent(dragEvent("dragstart")));
+  await act(() => target.element().dispatchEvent(dragEvent("dragover")));
+  await act(() => target.element().dispatchEvent(dragEvent("drop")));
+  expect(move).toHaveBeenCalledExactlyOnceWith(local.documentId, {
+    project: designProjectConnection(project, local.documentId),
+    folder,
+  });
+});
 
 it("moves and resets a rotation origin while rotating and undoing around the same point", async () => {
   await resetDesignStorage();

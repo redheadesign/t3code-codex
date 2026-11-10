@@ -1519,7 +1519,7 @@ function unavailableState(
   );
 }
 
-function TaskMobileNavigation({
+export function TaskMobileNavigation({
   environmentId,
   projectId,
 }: {
@@ -1850,11 +1850,11 @@ export function TasksWorkspace({ target }: { target: TaskWorkspaceSearch }) {
             statusOptions={statusOptions}
             onEnvironmentChange={(value) => {
               setAssigneeFilter("");
-              void navigate({ to: "/tasks", search: { environmentId: value } });
+              void navigate({ to: "/tasks", search: { environmentId: value, view: "jira" } });
             }}
             onProjectChange={(value) => {
               setAssigneeFilter("");
-              void navigate({ to: "/tasks", search: { environmentId, projectId: value } });
+              void navigate({ to: "/tasks", search: { environmentId, projectId: value, view: "jira" } });
             }}
             onAssigneeChange={setAssigneeFilter}
             onStatusFilterChange={setStatusFilter}
@@ -1876,7 +1876,7 @@ export function TasksWorkspace({ target }: { target: TaskWorkspaceSearch }) {
             task={selectedTask}
             environmentId={environmentId}
             onCommand={runCommand}
-            onBack={() => void navigate({ to: "/tasks", search: { environmentId, projectId } })}
+            onBack={() => void navigate({ to: "/tasks", search: { environmentId, projectId, view: "jira" } })}
             commandDisabled={commandPending || !canCommand}
             commandError={commandError}
             commandNotice={commandNotice}

@@ -7,6 +7,7 @@ export type ThreadActionMenuId =
   | "filter-by-project"
   | "turn-into-project"
   | "project-settings"
+  | "open-task"
   | "pin"
   | "unpin"
   | "settle"
@@ -70,6 +71,7 @@ export function buildDraftActionMenuItems(options: {
 export interface ThreadActionMenuState {
   readonly canOperate: boolean;
   readonly canFind?: boolean;
+  readonly canOpenTask?: boolean;
   readonly branch: string | null;
   readonly projectFilter: {
     readonly label: string;
@@ -103,6 +105,7 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
     "find",
     "new-thread-on-branch",
     "project-settings",
+    "open-task",
     "mark-unread",
     "share-guest",
     "copy",
@@ -119,6 +122,9 @@ export function buildThreadActionMenuItems(
   const items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> = [
     ...(state.canFind
       ? [{ id: "find" as const, label: "Find in thread", icon: "text-search" }]
+      : []),
+    ...(state.canOpenTask
+      ? [{ id: "open-task" as const, label: "Open linked task", icon: "circle-check" }]
       : []),
     ...(state.branch
       ? [

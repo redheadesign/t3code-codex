@@ -112,6 +112,7 @@ import {
   TaskWorkspaceError,
   SecretReference,
   type TaskWorkspaceConnection,
+  type TaskWorkspaceSnapshot,
 } from "@t3tools/contracts";
 import { applyDesignSyncRequest, type DesignServerState } from "@t3tools/shared/designSync";
 import {
@@ -140,7 +141,8 @@ import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts"
 import * as DocumentText from "./provider/DocumentText.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
-import { makeTaskWorkspaceService } from "./taskWorkspace/TaskWorkspaceService.ts";
+import { emptyTaskWorkspaceSnapshot, makeTaskWorkspaceService } from "./taskWorkspace/TaskWorkspaceService.ts";
+import { TaskBoardService, isBoardCommand } from "./taskWorkspace/TaskBoardService.ts";
 import { createJiraClient } from "./taskWorkspace/jiraClient.ts";
 import * as SecretRequests from "./secrets/SecretRequests.ts";
 import * as GuestShareService from "./guest/GuestShareService.ts";
@@ -1400,6 +1402,7 @@ export const layerWsRpc = (
   serverBrowser: ServerBrowser.ServerBrowser["Service"],
   reportProfiles: ServerBrowser.ProfileReporter,
   settingsClient: { readonly secretReferences: boolean },
+  taskBoard?: TaskBoardService["Service"],
 ) =>
   Layer.effectContext(
     Effect.gen(function* () {
@@ -3757,9 +3760,28 @@ export const layerWsRpc = (
         [WS_METHODS.scheduledTasksSubscribe]: (_input) =>
           scheduledTasks.subscribeList().pipe(Stream.map(withVisibleWebhookUrls)),
         [WS_METHODS.taskWorkspaceRead]: (input) =>
-          Stream.fromEffect(validateTaskWorkspaceScope(input).pipe(Effect.flatMap(taskWorkspace.read))),
+          Stream.fromEffect(
+            validateTaskWorkspaceScope(input).pipe(
+              Effect.flatMap((): Effect.Effect<TaskWorkspaceSnapshot, TaskWorkspaceError> =>
+                input.localOnly === true && taskBoard !== undefined
+                  ? taskBoard.read(input.projectId).pipe(
+                      Effect.map((board) => ({ ...emptyTaskWorkspaceSnapshot(), board })),
+                    )
+                  : taskWorkspace.read(input),
+              ),
+            ),
+          ),
         [WS_METHODS.taskWorkspaceCommand]: (input) =>
-          validateTaskWorkspaceScope(input).pipe(Effect.flatMap(taskWorkspace.command)),
+          validateTaskWorkspaceScope(input).pipe(
+            Effect.flatMap(() => {
+              const { command, projectId, revision } = input;
+              return taskBoard === undefined || !isBoardCommand(command)
+                ? taskWorkspace.command(input)
+                : taskBoard.command({ projectId, revision, command, actor: { name: "You", source: "user" } }).pipe(
+                    Effect.map((board) => ({ ...emptyTaskWorkspaceSnapshot(), board })),
+                  );
+            }),
+          ),
         [WS_METHODS.designRead]: (input) =>
           workspaceFileSystem.readFile({ ...input, allowMissing: true }).pipe(
             Effect.map((result) => ({
@@ -4937,6 +4959,7 @@ export const layer = Layer.unwrap(
     const peerLinks = yield* PeerLinks.PeerLinks;
     const peerLinkRequests = yield* PeerLinkRequests.PeerLinkRequests;
     const sql = yield* SqlClient.SqlClient;
+    const taskBoard = yield* TaskBoardService;
     return HttpRouter.add(
       "GET",
       "/ws",
@@ -5005,6 +5028,7 @@ export const layer = Layer.unwrap(
               serverBrowser,
               reportProfiles,
               readSettingsClient(url.value),
+              taskBoard,
             ).pipe(
               Layer.provideMerge(RpcSerialization.layerJson),
               // Handler-context reporters see only request defects, not server-wide defects.
