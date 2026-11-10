@@ -690,7 +690,9 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(ProcessDiagnostics.ProcessDiagnostics)({}),
   Layer.mock(ProcessResourceMonitor.ProcessResourceMonitor)({}),
   Layer.mock(ProjectCloneTracker.ProjectCloneTracker)({}),
-  Layer.mock(ProjectService.ProjectService)({}),
+  Layer.mock(ProjectService.ProjectService)({
+    listShells: () => Effect.succeed([]),
+  }),
   Layer.mock(ProjectSetupScriptRunner.ProjectSetupScriptRunner)({}),
   Layer.mock(ProjectStore.ProjectStoreV2)({}),
   Layer.mock(ProviderAuthService.ProviderAuthService)({}),
@@ -833,6 +835,7 @@ it.effect.each([
         }),
         Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({}),
         Layer.mock(ServerEnvironment.ServerEnvironment)({
+          getEnvironmentId: Effect.succeed(EnvironmentId.make("config-test")),
           getDescriptor: Effect.succeed({
             environmentId: EnvironmentId.make("config-test"),
             label: "Config test",
@@ -1064,6 +1067,7 @@ it.effect("on-demand clients get provider config without workspace snapshots", (
       }),
       Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({}),
       Layer.mock(ServerEnvironment.ServerEnvironment)({
+        getEnvironmentId: Effect.succeed(EnvironmentId.make("config-test")),
         getDescriptor: Effect.succeed({
           environmentId: EnvironmentId.make("config-test"),
           label: "Config test",

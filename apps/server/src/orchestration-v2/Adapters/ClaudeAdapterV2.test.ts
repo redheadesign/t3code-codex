@@ -86,7 +86,8 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import { PreviewControlsToolkit } from "../../mcp/toolkits/previewControls/tools.ts";
 import { HtmlToolkit } from "../../mcp/toolkits/html/tools.ts";
 import { EnvironmentToolkit } from "../../mcp/toolkits/environment/tools.ts";
-import { ProjectToolkit } from "../../mcp/toolkits/project/tools.ts";
+import { ProjectDesignToolkit, ProjectToolkit } from "../../mcp/toolkits/project/tools.ts";
+import { TaskBoardToolkit } from "../../mcp/toolkits/taskBoard/tools.ts";
 import { WorktreeToolkit } from "../../mcp/toolkits/worktree/tools.ts";
 import { ThreadToolkit } from "../../mcp/toolkits/thread/tools.ts";
 import { OrchestratorToolkit } from "../../mcp/toolkits/orchestrator/tools.ts";
@@ -568,12 +569,14 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
     assert.notEqual(rotatedKey, initialKey);
   });
 
-  it("matches the read-only allowlist to the orchestrator toolkit annotations", () => {
+  it("matches the read-only allowlist to the T3 toolkit annotations", () => {
     const readOnlyToolNames = [
       ...Object.values(OrchestratorToolkit.tools),
       ...Object.values(ThreadToolkit.tools),
       ...Object.values(WorktreeToolkit.tools),
       ...Object.values(ProjectToolkit.tools),
+      ...Object.values(ProjectDesignToolkit.tools),
+      ...Object.values(TaskBoardToolkit.tools),
       ...Object.values(EnvironmentToolkit.tools),
       ...Object.values(PreviewControlsToolkit.tools),
       ...Object.values(HtmlToolkit.tools),
