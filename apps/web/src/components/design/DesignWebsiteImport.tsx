@@ -70,6 +70,7 @@ export function DesignWebsiteImport({
           website: true,
           assetIdsByNodeId: assets.assetIdsByNodeId,
           assetMetadata: assets.assets,
+          models: assets.models,
         }),
       );
       if (capture.truncated) {
@@ -87,6 +88,28 @@ export function DesignWebsiteImport({
             "Linked images load from the original site when available.",
             "Изображения по ссылкам загрузятся, если доступны на сайте.",
           ),
+        });
+      }
+      if (capture.has3DContent) {
+        toastManager.add({
+          type: assets.models.length ? "success" : "warning",
+          title: assets.models.length
+            ? ui("3D models imported", "3D-модели добавлены")
+            : ui("3D is available on the original site", "3D доступно в оригинале"),
+          description: assets.models.length
+            ? ui(
+                "Select a 3D layer to edit it. Open the original site for its shaders and interactions.",
+                "Выберите 3D-слой для правки. Шейдеры и интерактивность доступны в оригинале.",
+              )
+            : capture.modelHostNodeIds?.length
+              ? ui(
+                  "Add your model to a 3D layer or open the original site in Present.",
+                  "Добавьте свою модель в 3D-слой или откройте «Оригинал» в режиме показа.",
+                )
+              : ui(
+                  "Open Original site in Present to see the live scene.",
+                  "В режиме показа откройте «Оригинал», чтобы посмотреть сцену.",
+                ),
         });
       }
       onClose();
@@ -110,8 +133,8 @@ export function DesignWebsiteImport({
           <DialogTitle>{ui("Import website", "Импорт сайта")}</DialogTitle>
           <DialogDescription>
             {ui(
-              "Capture the page as editable layers in a new design file.",
-              "Перенесите страницу слоями в новый макет.",
+              "Import editable layers and compatible 3D models into a new design file.",
+              "Перенесите слои страницы и совместимые 3D-модели в новый макет.",
             )}
           </DialogDescription>
         </DialogHeader>

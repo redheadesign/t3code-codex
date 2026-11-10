@@ -5,6 +5,7 @@ import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
 import {
   CloudUploadIcon,
+  BoxIcon,
   CodeXmlIcon,
   CopyIcon,
   ChevronDownIcon,
@@ -130,6 +131,8 @@ import {
   removeDesignComment,
   type DesignDocument,
   type DesignConflictRecord,
+  type DesignAssetMeta,
+  type DesignModelSettings,
   type DesignNode,
   type DesignPrototypeSettings,
 } from "./designDocument";
@@ -174,6 +177,12 @@ import { DesignPaintPanel } from "./DesignPaintPanel";
 import { DesignEffectsPanel } from "./DesignEffectsPanel";
 import { DesignReactPasteDialog } from "./DesignReactPasteDialog";
 import { DesignPresentation } from "./DesignPresentation";
+import { DesignModelEditor, designModelImportError } from "./DesignModelEditor";
+import {
+  DESIGN_MODEL_ACCEPT,
+  isDesignModelMime,
+  prepareDesignModelAsset,
+} from "./designModelAsset";
 import { DesignWidgetDialog, type DesignWidgetDraft } from "./DesignWidgetDialog";
 import { readDesignWidgetSource, type DesignWidgetSource } from "./designWidgetSource";
 import { DesignDocument as DesignDocumentSchema } from "./designDocument";
@@ -427,7 +436,9 @@ function LayerRow({
           aria-pressed={selected}
           onClick={(event) => onSelect(node.nodeId, event.shiftKey)}
         >
-          {node.kind === "frame" ? (
+          {node.scene3d ? (
+            <BoxIcon className="size-3.5 shrink-0" />
+          ) : node.kind === "frame" ? (
             <SquareDashedIcon className="size-3.5 shrink-0" />
           ) : node.kind === "text" ? (
             <TypeIcon className="size-3.5 shrink-0" />
@@ -681,6 +692,8 @@ function LayersPanel({
   onEditorKeyDown,
   onInsertComponent,
   onPlaceAsset,
+  onPlaceModel,
+  onImportModel,
   onReplaceAsset,
   onRemoveAsset,
   onImportAsset,
@@ -710,6 +723,8 @@ function LayersPanel({
   onEditorKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onInsertComponent: (nodeId: string) => void;
   onPlaceAsset: (assetId: string) => void;
+  onPlaceModel: (asset: DesignAssetMeta) => void;
+  onImportModel: () => void;
   onReplaceAsset: (assetId: string) => void;
   onRemoveAsset: (assetId: string) => void;
   onImportAsset: () => void;
@@ -733,6 +748,10 @@ function LayersPanel({
   const assetUses = new Map<string, number>();
   for (const node of document.nodes)
     if (node.assetId) assetUses.set(node.assetId, (assetUses.get(node.assetId) ?? 0) + 1);
+  const modelAssets = document.assets.filter((asset) => isDesignModelMime(asset.mimeType));
+  const matchingModels = modelAssets.filter((asset) =>
+    asset.name.toLocaleLowerCase().includes(assetQuery.trim().toLocaleLowerCase()),
+  );
   const layerRows = (() => {
     const query = layerQuery.trim().toLocaleLowerCase();
     if (!query) return rows;
@@ -992,6 +1011,7 @@ function LayersPanel({
         ) : (
           <div className="space-y-2">
             {assetQuery.trim() &&
+            matchingModels.length === 0 &&
             !document.assets.some(
               (asset) =>
                 asset.mimeType.startsWith("image/") &&
@@ -1041,6 +1061,41 @@ function LayersPanel({
                 )}
               </p>
             ) : null}
+            <div className="flex items-center justify-between px-2">
+              <p className="text-2xs text-muted-foreground">{ui("3D models", "3D-модели")}</p>
+              <Button
+                size="icon-xs"
+                variant="ghost-muted"
+                aria-label={ui("Import 3D model", "Импорт 3D-модели")}
+                onClick={onImportModel}
+              >
+                <PlusIcon />
+              </Button>
+            </div>
+            {matchingModels.map((asset) => (
+              <div key={asset.assetId} className="flex min-w-0 items-center px-1">
+                <div className="min-w-0 flex-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onPlaceModel(asset)}
+                    title={asset.name}
+                  >
+                    <BoxIcon /> <span className="truncate">{asset.name}</span>
+                  </Button>
+                </div>
+                {!assetUses.has(asset.assetId) ? (
+                  <Button
+                    size="icon-xs"
+                    variant="ghost-muted"
+                    aria-label={`${ui("Remove", "Удалить")} ${asset.name}`}
+                    onClick={() => onRemoveAsset(asset.assetId)}
+                  >
+                    <MinusIcon />
+                  </Button>
+                ) : null}
+              </div>
+            ))}
             <p className="px-2 text-2xs text-muted-foreground">
               {ui("Local components", "Компоненты файла")}
             </p>
@@ -2748,6 +2803,9 @@ function DesignEditor({
   const [descriptionDraft, setDescriptionDraft] = useState<string | null>(null);
   const cancelDocumentRename = useRef(false);
   const [presenting, setPresenting] = useState<string | null>(null);
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
+  const [importingModel, setImportingModel] = useState(false);
+  const modelInput = useRef<HTMLInputElement>(null);
   const [widgetDialog, setWidgetDialog] = useState<{
     node?: DesignNode;
     source?: DesignWidgetSource;
@@ -2770,6 +2828,55 @@ function DesignEditor({
     documentRef.current = next;
     if (referencePageId) setReferencePageId(undefined);
     setDocument(next);
+  };
+  const openModel = (asset: DesignAssetMeta) => {
+    const current = documentRef.current;
+    const added = addFrameNode(current);
+    const nodeId = added === current ? undefined : added.nodes.at(-1)?.nodeId;
+    if (!nodeId) return;
+    const withAsset = current.assets.some(({ assetId }) => assetId === asset.assetId)
+      ? added
+      : addAssetMeta(added, asset);
+    commitDocument(
+      updateDesignNode(withAsset, nodeId, {
+        name: asset.name,
+        assetId: asset.assetId,
+        scene3d: {},
+      }),
+    );
+    setSelectedNodeIds([nodeId]);
+    setEditingModelId(nodeId);
+  };
+  const importModel = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    setImportingModel(true);
+    try {
+      openModel(await prepareDesignModelAsset(file, file.name));
+      setSyncMessage(null);
+    } catch (error) {
+      setSyncMessage(designModelImportError(error, ui));
+    } finally {
+      setImportingModel(false);
+    }
+  };
+  const saveModel = (settings: DesignModelSettings, replacement: DesignAssetMeta | null) => {
+    if (!editingModelId) return;
+    const current = documentRef.current;
+    const node = current.nodes.find(({ nodeId }) => nodeId === editingModelId);
+    if (!node?.scene3d || isDesignNodeLocked(current, node.nodeId)) return;
+    const next =
+      replacement && !current.assets.some(({ assetId }) => assetId === replacement.assetId)
+        ? addAssetMeta(current, replacement)
+        : current;
+    commitDocument(
+      updateDesignNode(next, node.nodeId, {
+        scene3d: settings,
+        assetId: replacement?.assetId ?? node.assetId,
+      }),
+    );
+    setEditingModelId(null);
   };
   const openWidget = async (node: DesignNode | null) => {
     if (node?.prototypeWidget?.kind === "code" && node.assetId) {
@@ -2844,6 +2951,10 @@ function DesignEditor({
   const selectedNodeMap = new Map(document.nodes.map((node) => [node.nodeId, node]));
   const selectedNodes = selectedNodeIds.flatMap((id) => selectedNodeMap.get(id) ?? []);
   const selectedNode = selectedNodes[0] ?? null;
+  const editingModel = editingModelId ? selectedNodeMap.get(editingModelId) : undefined;
+  const modelAction = selectedNode?.scene3d
+    ? ui("Edit 3D scene", "Настроить 3D-сцену")
+    : ui("Add 3D model", "Добавить 3D-модель");
   const variantOptions =
     selectedNodes.length === 1 && selectedNode?.kind === "instance" && selectedNode.instanceOfNodeId
       ? designComponentVariants(document, selectedNode.instanceOfNodeId)
@@ -3917,6 +4028,30 @@ function DesignEditor({
               <Button
                 size={shellIntegrated ? "icon-sm" : "xs"}
                 variant={shellIntegrated ? "ghost-muted" : "secondary"}
+                aria-label={modelAction}
+                disabled={
+                  importingModel ||
+                  (selectedNode?.scene3d !== undefined &&
+                    isDesignNodeLocked(document, selectedNode.nodeId))
+                }
+                onClick={() => {
+                  if (selectedNode?.scene3d) setEditingModelId(selectedNode.nodeId);
+                  else modelInput.current?.click();
+                }}
+              >
+                <BoxIcon />
+                {!shellIntegrated ? "3D" : null}
+              </Button>
+            }
+          />
+          <TooltipPopup>{modelAction}</TooltipPopup>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                size={shellIntegrated ? "icon-sm" : "xs"}
+                variant={shellIntegrated ? "ghost-muted" : "secondary"}
                 aria-label={
                   selectedNode?.prototypeWidget
                     ? ui("Edit widget", "Настроить виджет")
@@ -3942,21 +4077,27 @@ function DesignEditor({
                 size={shellIntegrated ? "icon-sm" : "xs"}
                 variant={shellIntegrated ? "ghost-muted" : "secondary"}
                 aria-label={ui("Present", "Показ")}
-                disabled={!nodeForPage(document).some((node) => node.kind === "frame")}
+                disabled={
+                  !selectedNode?.scene3d &&
+                  !nodeForPage(document).some((node) => node.kind === "frame")
+                }
                 onClick={() => {
                   const selectedFrame = document.nodes.find(
-                    (node) => selectedNodeIds.includes(node.nodeId) && node.kind === "frame",
+                    (node) =>
+                      selectedNodeIds.includes(node.nodeId) &&
+                      (node.kind === "frame" || node.scene3d),
                   );
                   const startNodeId = document.pages.find(
                     (page) => page.pageId === document.activePageId,
                   )?.prototypeStartNodeId;
-                  const frame = selectedFrame?.prototypeWidget
-                    ? selectedFrame
-                    : (document.nodes.find(
-                        (node) => node.nodeId === startNodeId && node.kind === "frame",
-                      ) ??
-                      selectedFrame ??
-                      nodeForPage(document).find((node) => node.kind === "frame"));
+                  const frame =
+                    selectedFrame?.prototypeWidget || selectedFrame?.scene3d
+                      ? selectedFrame
+                      : (document.nodes.find(
+                          (node) => node.nodeId === startNodeId && node.kind === "frame",
+                        ) ??
+                        selectedFrame ??
+                        nodeForPage(document).find((node) => node.kind === "frame"));
                   if (frame) setPresenting(frame.nodeId);
                 }}
               >
@@ -4094,6 +4235,25 @@ function DesignEditor({
           onClose={() => setPresenting(null)}
         />
       ) : null}
+      <input
+        ref={modelInput}
+        type="file"
+        accept={DESIGN_MODEL_ACCEPT}
+        className="hidden"
+        aria-label={ui("3D model file", "Файл 3D-модели")}
+        onChange={(event) => void importModel(event)}
+      />
+      {editingModel?.scene3d ? (
+        <DesignModelEditor
+          key={editingModel.nodeId}
+          assetId={editingModel.assetId}
+          assets={document.assets.filter((asset) => isDesignModelMime(asset.mimeType))}
+          initial={editingModel.scene3d}
+          name={editingModel.name}
+          onSave={saveModel}
+          onClose={() => setEditingModelId(null)}
+        />
+      ) : null}
       {widgetDialog ? (
         <DesignWidgetDialog
           initial={
@@ -4161,6 +4321,10 @@ function DesignEditor({
           }}
           onEditorKeyDown={onCanvasKeyDown}
           onInsertComponent={insertInstance}
+          onPlaceModel={openModel}
+          onImportModel={() => {
+            if (!importingModel) modelInput.current?.click();
+          }}
           onPlaceAsset={(assetId) => {
             void stageAsset(assetId).catch((error: unknown) =>
               setSyncMessage(error instanceof Error ? error.message : "Could not place this image"),

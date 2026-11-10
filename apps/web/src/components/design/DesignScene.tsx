@@ -1,5 +1,5 @@
 import { useUiText } from "~/i18n";
-import { ImageOffIcon } from "lucide-react";
+import { BoxIcon, ImageOffIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import {
   isDesignNodeInFlow,
@@ -11,6 +11,7 @@ import {
 import { designEffectsSvg, designEffectsStyle } from "./designEffects";
 import { readDesignAsset } from "./designAssetStore";
 import { DesignWidgetPreview } from "./DesignWidgetPreview";
+import { DesignModelPlayback } from "./DesignModelPreview";
 import { designImageStyle, designImageBorderStyle } from "./designImage";
 import { designNodeCssTransform } from "./designGeometry";
 import { designTypographyStyle } from "./designTypography";
@@ -576,6 +577,24 @@ export function DesignSceneNode({
       ) : (
         visual
       )}
+      {node.scene3d && !outlines ? (
+        playWidgets && node.assetId ? (
+          <DesignModelPlayback
+            key={node.assetId}
+            assetId={node.assetId}
+            settings={node.scene3d}
+            label={node.name}
+          />
+        ) : (
+          <div className="pointer-events-none absolute inset-0 grid place-content-center gap-2 overflow-hidden bg-muted p-3 text-center text-sm text-muted-foreground">
+            <BoxIcon className="mx-auto size-5" />
+            <span>{ui("3D scene", "3D-сцена")}</span>
+            {node.assetId ? null : (
+              <span className="text-xs">{ui("Model not added", "Модель не добавлена")}</span>
+            )}
+          </div>
+        )
+      ) : null}
       {node.prototypeWidget && !outlines ? (
         playWidgets ? (
           <div

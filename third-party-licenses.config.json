@@ -1,6 +1,46 @@
 {
   "customNotices": [
     {
+      "bundles": ["web"],
+      "license": "Apache-2.0",
+      "name": "Draco",
+      "sourceUrl": "https://github.com/google/draco",
+      "generatedNotices": [
+        {
+          "licenseId": "Apache-2.0",
+          "preamble": ["The Draco glTF decoder is bundled from the three.js distribution."]
+        }
+      ]
+    },
+    {
+      "bundles": ["web"],
+      "license": "Apache-2.0",
+      "name": "Basis Universal",
+      "sourceUrl": "https://github.com/BinomialLLC/basis_universal",
+      "generatedNotices": [
+        {
+          "licenseId": "Apache-2.0",
+          "preamble": [
+            "The Basis Universal texture transcoder is bundled from the three.js distribution."
+          ]
+        }
+      ]
+    },
+    {
+      "bundles": ["web"],
+      "license": "MIT",
+      "name": "Meshoptimizer",
+      "sourceUrl": "https://github.com/zeux/meshoptimizer",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": [
+            "Copyright (C) 2016-2024, by Arseny Kapoulkine (arseny.kapoulkine@gmail.com)"
+          ]
+        }
+      ]
+    },
+    {
       "name": "opencode Office viewers",
       "bundles": ["web"],
       "license": "MIT",

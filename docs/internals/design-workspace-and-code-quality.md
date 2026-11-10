@@ -138,6 +138,14 @@ editor and in code exports. Present runs them on demand in an opaque iframe.
 The inline runner's document policy blocks external resource loads. Viewing the
 original site uses a separate sandbox and the snapshot's recorded URL.
 
+3D layers reference self-contained glTF assets through the same content hashes
+as other Design assets. View settings and overrides belong to the layer. This
+keeps copies independent and lets replacement preserve the layer's layout.
+Website capture can reuse an observed model resource when its bytes are portable.
+Where attribution is ambiguous, keep the models separate. The 3D renderer opens
+on demand and consumes model data through bundled decoders. Site code and shader
+graphs stay in the original runtime.
+
 ## Canvas to code pipeline
 
 Canvas export reads the same Design IR and uses a target adapter:

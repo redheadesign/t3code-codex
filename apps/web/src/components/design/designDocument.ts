@@ -229,6 +229,21 @@ const DesignPrototypeWidget = Schema.Union([
 ]);
 export type DesignPrototypeWidget = typeof DesignPrototypeWidget.Type;
 
+const modelEntryId = Schema.String.check(Schema.isMaxLength(256));
+const modelColor = Schema.String.check(Schema.isMaxLength(64));
+const DesignModelSettings = Schema.Struct({
+  background: Schema.optional(Schema.NullOr(modelColor)),
+  materialColors: Schema.optional(
+    Schema.Record(modelEntryId, modelColor).check(Schema.isMaxProperties(256)),
+  ),
+  hiddenLayers: Schema.optional(Schema.Array(modelEntryId).check(Schema.isMaxLength(256))),
+  animation: Schema.optional(Schema.NullOr(modelEntryId)),
+  camera: Schema.optional(Schema.NullOr(modelEntryId)),
+  zoom: Schema.optional(Schema.Number.check(Schema.isBetween({ minimum: 0.25, maximum: 4 }))),
+  rotation: Schema.optional(Schema.Number.check(Schema.isBetween({ minimum: -180, maximum: 180 }))),
+});
+export type DesignModelSettings = typeof DesignModelSettings.Type;
+
 export const DesignNode = Schema.Struct({
   nodeId: Schema.String,
   kind: DesignNodeKind,
@@ -248,6 +263,7 @@ export const DesignNode = Schema.Struct({
   motion: Schema.optional(DesignMotion),
   assetId: Schema.NullOr(Schema.String),
   prototypeWidget: Schema.optional(DesignPrototypeWidget),
+  scene3d: Schema.optional(DesignModelSettings),
   sourceUrl: Schema.optional(Schema.String),
   image: Schema.optional(
     Schema.Struct({

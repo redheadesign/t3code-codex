@@ -1,8 +1,9 @@
-export const DESIGN_CAPTURE_SCRIPT = `(() => {
+const captureDocument = `((website) => {
   const root = document.body;
   if (!root) return { url: location.href, title: document.title, browserEngine: 'chromium', sourceRevision: document.documentElement.getAttribute('data-t3-source-revision') || undefined, stateFixture: location.href, viewportWidth: innerWidth, viewportHeight: innerHeight, nodes: [] };
   const rootRect = root.getBoundingClientRect();
   const nodes = [];
+  const modelHosts = [];
   let truncated = false;
   let nextId = 0;
   const animationByTarget = new Map();
@@ -138,6 +139,10 @@ export const DESIGN_CAPTURE_SCRIPT = `(() => {
     const children = Array.from(element.children);
     const text = children.length === 0 ? (element.textContent || '').trim().slice(0, 10000) : null;
     const tag = element.tagName.toLowerCase();
+    if (website && modelHosts.length < 16 && rect.width > 1 && rect.height > 1 && style.visibility !== 'hidden' &&
+      (tag === 'model-viewer' || (tag === 'canvas' && /^three\\.js(?:\\s|$)/iu.test(element.getAttribute('data-engine') || '')))) {
+      modelHosts.push({ nodeId, tag, source: element.getAttribute('src') });
+    }
     const vectorPath = (() => {
       if (tag === 'path') return element.getAttribute('d') || undefined;
       if (tag === 'line') {
@@ -212,5 +217,98 @@ export const DESIGN_CAPTURE_SCRIPT = `(() => {
     for (const child of children) visit(child, nodeId);
   };
   for (const child of Array.from(root.children)) visit(child, null);
-  return { url: location.href, title: document.title, browserEngine: 'chromium', sourceRevision: document.documentElement.getAttribute('data-t3-source-revision') || undefined, stateFixture: location.href, viewportWidth: innerWidth, viewportHeight: innerHeight, truncated: truncated || undefined, nodes };
+  return { url: location.href, title: document.title, browserEngine: 'chromium', sourceRevision: document.documentElement.getAttribute('data-t3-source-revision') || undefined, stateFixture: location.href, viewportWidth: innerWidth, viewportHeight: innerHeight, truncated: truncated || undefined, nodes, ...(website ? { modelHosts } : {}) };
+})`;
+
+export const DESIGN_CAPTURE_SCRIPT = `${captureDocument}(false)`;
+
+export const DESIGN_WEBSITE_CAPTURE_SCRIPT = `(async () => {
+  const { modelHosts = [], ...snapshot } = ${captureDocument}(true);
+  const candidates = new Map();
+  const add = (rawUrl, hostId) => {
+    if (!rawUrl) return;
+    const url = URL.parse(rawUrl, document.baseURI);
+    if (!url || !/^https?:$/u.test(url.protocol) || url.username || url.password || url.href.length > 8192) return;
+    url.hash = '';
+    const hosts = candidates.get(url.href);
+    if (hosts) {
+      if (hostId && hosts.length < 16) hosts.push(hostId);
+    } else if (candidates.size < 8) {
+      candidates.set(url.href, hostId ? [hostId] : []);
+    }
+  };
+  for (const { source, nodeId } of modelHosts) add(source, nodeId);
+  const addResources = (entries) => {
+    for (const entry of entries) {
+      const url = URL.parse(entry.name);
+      if (url && (/\\.gl(?:b|tf)$/iu.test(url.pathname) || /^model\\/gltf(?:-binary|\\+json)$/iu.test(entry.contentType || ''))) {
+        add(url.href);
+      }
+    }
+  };
+  addResources(performance.getEntriesByType('resource'));
+  if (modelHosts.some(({ tag }) => tag === 'canvas') && !candidates.size) {
+    await new Promise((resolve) => {
+      const finish = () => {
+        observer.disconnect();
+        clearTimeout(timer);
+        resolve();
+      };
+      const observer = new PerformanceObserver((entries) => {
+        addResources(entries.getEntries());
+        if (candidates.size) finish();
+      });
+      const timer = setTimeout(finish, 1500);
+      observer.observe({ entryTypes: ['resource'] });
+    });
+  }
+  if (!modelHosts.length && !candidates.size) return snapshot;
+
+  const canvas = modelHosts.length === 1 && modelHosts[0].tag === 'canvas' && candidates.size === 1
+    ? modelHosts[0].nodeId : undefined;
+  const modelAssets = [];
+  let remaining = 8 * 1024 * 1024;
+  const signal = AbortSignal.timeout(4500);
+  for (const [url, hosts] of candidates) {
+    if (signal.aborted || remaining === 0 || modelAssets.length === 4) break;
+    try {
+      const response = await fetch(url, { credentials: 'omit', redirect: 'error', signal });
+      if (!response.ok || !response.body || Number(response.headers.get('content-length')) > remaining) {
+        await response.body?.cancel();
+        continue;
+      }
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of response.body) {
+        size += chunk.byteLength;
+        if (size > remaining) break;
+        chunks.push(chunk);
+      }
+      if (size < 12 || size > remaining) continue;
+      const bytes = new Uint8Array(size);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      const view = new DataView(bytes.buffer);
+      let mimeType;
+      if (view.getUint32(0, true) === 0x46546c67) {
+        if (view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== size) continue;
+        mimeType = 'model/gltf-binary';
+      } else {
+        const json = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+        if (json?.asset?.version !== '2.0') continue;
+        mimeType = 'model/gltf+json';
+      }
+      const filename = new URL(url).pathname.split('/').at(-1);
+      let name = filename || 'Model';
+      try { name = decodeURIComponent(name); } catch {}
+      modelAssets.push({ name: name.slice(0, 120), mimeType, base64: bytes.toBase64(), hostNodeIds: canvas ? [canvas] : hosts });
+      remaining -= size;
+    } catch {
+      // This asset remains part of the original website.
+    }
+  }
+  return { ...snapshot, has3DContent: true, modelHostNodeIds: modelHosts.map(({ nodeId }) => nodeId), modelAssets };
 })()`;

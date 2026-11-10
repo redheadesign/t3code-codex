@@ -64,8 +64,22 @@ to click and scroll inside it. To edit the code, return to the editor and select
 **Edit widget**. Code widgets are included in local copies and project sync.
 Use a hosted widget for examples that load external assets or libraries.
 
+### Reuse a 3D model
+
+Use **Add 3D model** next to **Present**, or choose a saved model in **Assets**.
+Canvas accepts GLB and glTF up to 8 MB with embedded textures and buffers.
+Select a 3D layer and open **Edit 3D scene** to orbit it, switch cameras, play
+an included animation, change colors, or hide objects. Replace the model from a
+file or **Assets** to keep the layer's position and size. Scene edits belong to the layer,
+so copies of the same model can have different looks. Use **Present → Run 3D**
+to view the saved scene alongside the rest of the prototype.
+
 **Import website** makes editable layers, keeps supported time-based animation
 keyframes, and adds reusable candidates from repeated layouts to **Assets**.
+It also looks for self-contained models loaded by the site. When Canvas can
+match a model to a 3D element, it places the model in that layer. If several
+models could belong to one element, the models are available separately and you
+can choose which one to place. An empty 3D layer keeps space for a replacement.
 If you need the site's own scrolling, scripts, or 3D, choose **Original site**
 in Present. When a site blocks embeds or needs a signed-in session, use **Open
 original**. Images that could not be copied stay linked to their source. Agents can use the synced design file to find captured component

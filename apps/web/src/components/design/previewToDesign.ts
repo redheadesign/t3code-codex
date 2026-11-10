@@ -152,6 +152,11 @@ function viewportSize(viewport: PreviewViewportSetting) {
     : { width: viewport.width, height: viewport.height };
 }
 
+interface CapturedDesignModel {
+  readonly asset: DesignAssetMeta;
+  readonly hostNodeIds: readonly string[];
+}
+
 export function createDesignDocumentFromPreview(input: {
   readonly url: string;
   readonly title: string;
@@ -163,6 +168,7 @@ export function createDesignDocumentFromPreview(input: {
   readonly capture?: DesktopPreviewDesignCapture;
   readonly assetIdsByNodeId?: ReadonlyMap<string, string>;
   readonly assetMetadata?: ReadonlyArray<DesignAssetMeta>;
+  readonly models?: ReadonlyArray<CapturedDesignModel>;
   readonly website?: boolean;
 }): DesignDocument {
   const document = createInitialDesignDocument();
@@ -202,8 +208,17 @@ export function createDesignDocumentFromPreview(input: {
     childIds.push(`preview-${captured.nodeId}`);
     childIdsByParent.set(captured.parentId, childIds);
   }
-  const nodes = input.capture.nodes.map((captured) => {
+  const models = input.website ? (input.models ?? []) : [];
+  const modelHostIds = new Set(input.website ? input.capture.modelHostNodeIds : []);
+  const modelsByHost = new Map(
+    models.flatMap(({ asset, hostNodeIds }) => hostNodeIds.map((id) => [id, asset] as const)),
+  );
+  const placedModels = new Set<string>();
+  const nodes = input.capture.nodes.map((captured): DesignNode => {
     const geometry = capturedGeometry.get(captured.nodeId)!;
+    const model = modelsByHost.get(captured.nodeId);
+    const scene = model !== undefined || modelHostIds.has(captured.nodeId);
+    if (model) placedModels.add(model.assetId);
     const source = captured.assetUrl;
     const websiteSource = input.website && source ? URL.parse(source) : null;
     const sourceUrl =
@@ -214,8 +229,9 @@ export function createDesignDocumentFromPreview(input: {
         !websiteSource.password)
         ? source
         : undefined;
-    const kind: DesignNode["kind"] =
-      captured.kind === "text"
+    const kind: DesignNode["kind"] = scene
+      ? "frame"
+      : captured.kind === "text"
         ? "text"
         : captured.kind === "image"
           ? "image"
@@ -225,7 +241,10 @@ export function createDesignDocumentFromPreview(input: {
     return {
       nodeId: `preview-${captured.nodeId}`,
       kind,
-      name: captured.name,
+      name:
+        scene && ["canvas", "model-viewer"].includes(captured.name)
+          ? (model?.name ?? "3D")
+          : captured.name,
       parentId: captured.parentId === null ? frameId : `preview-${captured.parentId}`,
       childIds: childIdsByParent.get(captured.nodeId) ?? [],
       x: geometry.x,
@@ -238,7 +257,7 @@ export function createDesignDocumentFromPreview(input: {
       fontSize: captured.fontSize,
       fontWeight: captured.fontWeight,
       opacity: captured.opacity,
-      clipContent: captured.clipContent,
+      clipContent: scene ? true : captured.clipContent,
       ...(captured.motion === undefined ? {} : { motion: captured.motion }),
       ...(captured.rotation === undefined ? {} : { rotation: captured.rotation }),
       ...(captured.flipX === undefined ? {} : { flipX: captured.flipX }),
@@ -253,7 +272,10 @@ export function createDesignDocumentFromPreview(input: {
               : parseDesignCssEffects(captured),
           }
         : {}),
-      assetId: input.assetIdsByNodeId?.get(captured.nodeId) ?? null,
+      assetId: scene
+        ? (model?.assetId ?? null)
+        : (input.assetIdsByNodeId?.get(captured.nodeId) ?? null),
+      ...(scene ? { scene3d: {} } : {}),
       ...(sourceUrl === undefined ? {} : { sourceUrl }),
       provenance,
       ...(captured.rotation === undefined ? {} : { rotation: captured.rotation }),
@@ -309,11 +331,40 @@ export function createDesignDocumentFromPreview(input: {
       resolvedHeight: input.capture.viewportHeight,
     },
   };
-  const capturedNodes = [frame, ...nodes];
+  const separateModels: DesignNode[] = [];
+  for (const { asset } of models) {
+    if (placedModels.has(asset.assetId)) continue;
+    const x = frame.x + frame.width + 48;
+    const y = frame.y + separateModels.length * 400;
+    separateModels.push({
+      ...frame,
+      nodeId: `frame-preview-model-${separateModels.length + 1}`,
+      name: asset.name,
+      x,
+      y,
+      width: 480,
+      height: 360,
+      childIds: [],
+      clipContent: true,
+      assetId: asset.assetId,
+      scene3d: {},
+      layoutModel: {
+        kind: "absolute",
+        resolvedX: x,
+        resolvedY: y,
+        resolvedWidth: 480,
+        resolvedHeight: 360,
+      },
+    });
+    placedModels.add(asset.assetId);
+  }
+  const capturedNodes = [frame, ...nodes, ...separateModels];
   return {
     ...base,
     title: input.capture.title || base.title,
-    pages: [{ ...base.pages[0]!, nodeIds: [frameId] }],
+    pages: [
+      { ...base.pages[0]!, nodeIds: [frameId, ...separateModels.map(({ nodeId }) => nodeId)] },
+    ],
     nodes:
       input.website && !input.capture.truncated
         ? collectReusableDesignComponents(capturedNodes, frameId)
@@ -328,6 +379,7 @@ export async function materializePreviewAssets(
   readonly assetIdsByNodeId: ReadonlyMap<string, string>;
   readonly assets: ReadonlyArray<DesignAssetMeta>;
   readonly unembeddedImages: number;
+  readonly models: ReadonlyArray<CapturedDesignModel>;
 }> {
   const { prepareDesignImage, readCapturedDesignImage } = await import("./designImage");
   const assetIds = new Map<string, string>();
@@ -360,7 +412,24 @@ export async function materializePreviewAssets(
       unembeddedImages++;
     }
   }
-  return { assetIdsByNodeId: assetIds, assets: [...assets.values()], unembeddedImages };
+  const models: CapturedDesignModel[] = [];
+  if (website && capture.modelAssets?.length) {
+    const { prepareDesignModelAsset } = await import("./designModelAsset");
+    for (const source of capture.modelAssets) {
+      try {
+        const bytes = Uint8Array.from(atob(source.base64), (char) => char.charCodeAt(0));
+        const asset = await prepareDesignModelAsset(
+          new Blob([bytes], { type: source.mimeType }),
+          source.name,
+        );
+        if (!assets.has(asset.assetId)) assets.set(asset.assetId, asset);
+        models.push({ asset, hostNodeIds: source.hostNodeIds });
+      } catch {
+        // Models with external dependencies remain available in the original site.
+      }
+    }
+  }
+  return { assetIdsByNodeId: assetIds, assets: [...assets.values()], unembeddedImages, models };
 }
 
 export function linkDesignDocument(document: DesignDocument): DesignDocument {

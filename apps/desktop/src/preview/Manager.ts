@@ -23,7 +23,11 @@ import type {
 } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { matchesKeybindingShortcut } from "@t3tools/shared/keybindings";
-import { DESIGN_CAPTURE_SCRIPT, normalizePreviewUrl } from "@t3tools/shared/preview";
+import {
+  DESIGN_CAPTURE_SCRIPT,
+  DESIGN_WEBSITE_CAPTURE_SCRIPT,
+  normalizePreviewUrl,
+} from "@t3tools/shared/preview";
 import {
   BrowserWindow,
   ClipboardItem,
@@ -2513,10 +2517,10 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
                 throw new Error("Unsupported website URL");
               return contents.executeJavaScriptInIsolatedWorld(DESIGN_WEBSITE_CAPTURE_WORLD_ID, [
                 {
-                  code: `Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 1000))]).then(() => ${DESIGN_CAPTURE_SCRIPT})`,
+                  code: `Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 1000))]).then(() => ${DESIGN_WEBSITE_CAPTURE_SCRIPT})`,
                 },
               ]);
-            }).pipe(Effect.timeout("25 seconds"));
+            }).pipe(Effect.timeout("31 seconds"));
             const snapshot = yield* decodeDesignCapture(capture);
             const inlineAssets = yield* attemptPromise(context, () =>
               captureWebsiteDesignAssets(

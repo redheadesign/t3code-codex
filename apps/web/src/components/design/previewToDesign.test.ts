@@ -231,6 +231,90 @@ describe("Preview to Design import", () => {
     ]);
   });
 
+  it("preserves the website layout for mapped 3D models and separates unmatched models", () => {
+    const asset = {
+      assetId: "sha256-hero",
+      name: "hero.glb",
+      mimeType: "model/gltf-binary",
+      size: 32,
+      createdAt: "2026-11-10T00:00:00.000Z",
+    };
+    const second = { ...asset, assetId: "sha256-spare", name: "spare.glb" };
+    const layer = {
+      nodeId: "canvas",
+      parentId: null,
+      kind: "group" as const,
+      name: "canvas",
+      text: null,
+      x: 12,
+      y: 16,
+      width: 400,
+      height: 200,
+      fill: null,
+      border: null,
+      fontFamily: null,
+      fontSize: null,
+      fontWeight: null,
+      lineHeight: null,
+      letterSpacing: null,
+      color: null,
+      opacity: 1,
+      borderRadius: 0,
+    };
+    const document = createDesignDocumentFromPreview({
+      url: "https://example.com/gallery",
+      title: "Gallery",
+      viewport: { _tag: "freeform", width: 800, height: 600 },
+      colorScheme: "light",
+      sourceRevision: "preview-3d",
+      website: true,
+      models: [
+        { asset, hostNodeIds: ["canvas"] },
+        { asset: second, hostNodeIds: [] },
+      ],
+      assetMetadata: [asset, second],
+      capture: {
+        url: "https://example.com/gallery",
+        title: "Gallery",
+        viewportWidth: 800,
+        viewportHeight: 600,
+        modelHostNodeIds: ["canvas", "procedural"],
+        nodes: [
+          layer,
+          { ...layer, nodeId: "procedural", y: 224 },
+          { ...layer, nodeId: "two-dimensional", y: 432 },
+        ],
+      },
+    });
+    expect(document.nodes[0]?.childIds).toEqual([
+      "preview-canvas",
+      "preview-procedural",
+      "preview-two-dimensional",
+    ]);
+    expect(document.nodes[1]).toMatchObject({
+      kind: "frame",
+      name: asset.name,
+      parentId: "frame-preview",
+      x: 12,
+      y: 16,
+      width: 400,
+      height: 200,
+      assetId: asset.assetId,
+      scene3d: {},
+    });
+    expect(document.pages[0]?.nodeIds).toEqual(["frame-preview", "frame-preview-model-1"]);
+    expect(document.nodes[2]).toMatchObject({ kind: "frame", assetId: null, scene3d: {}, y: 224 });
+    expect(document.nodes[3]).toMatchObject({ kind: "group", name: "canvas" });
+    expect(document.nodes[3]?.scene3d).toBeUndefined();
+    expect(document.nodes[4]).toMatchObject({
+      name: second.name,
+      parentId: null,
+      assetId: second.assetId,
+      scene3d: {},
+      provenance: { route: "https://example.com/gallery" },
+    });
+  });
+
   it("refreshes an unedited linked layer while preserving a local override", () => {
     const motion = {
       keyframes: [

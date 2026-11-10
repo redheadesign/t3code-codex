@@ -259,6 +259,18 @@ export const PreviewDesignCapture = Schema.Struct({
   viewportHeight: Schema.Number,
   truncated: Schema.optional(Schema.Boolean),
   nodes: Schema.Array(PreviewDesignNodeSnapshot),
+  has3DContent: Schema.optional(Schema.Boolean),
+  modelHostNodeIds: Schema.optional(Schema.Array(Schema.String).check(Schema.isMaxLength(16))),
+  modelAssets: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        name: Schema.String.check(Schema.isMaxLength(120)),
+        mimeType: Schema.Literals(["model/gltf-binary", "model/gltf+json"]),
+        base64: Schema.String.check(Schema.isMaxLength(11_184_812)),
+        hostNodeIds: Schema.Array(Schema.String).check(Schema.isMaxLength(16)),
+      }),
+    ).check(Schema.isMaxLength(4)),
+  ),
   inlineAssets: Schema.optional(
     Schema.Array(
       Schema.Struct({

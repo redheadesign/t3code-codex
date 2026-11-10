@@ -299,7 +299,7 @@ export function DesignPresentation({
                   : ui("Original site", "Оригинал")}
               </Button>
             ) : null}
-            {!originalVisible && !current?.prototypeWidget ? (
+            {!originalVisible && !current?.prototypeWidget && !current?.scene3d ? (
               <span className="text-xs text-muted-foreground">
                 {ui(
                   "Click connected layers to navigate · ← Back",
