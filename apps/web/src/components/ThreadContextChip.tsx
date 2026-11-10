@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import type { ThreadContextRecord } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
@@ -13,6 +14,7 @@ export function ThreadContextChip(props: {
   copyMarkdown?: string;
   unreadable?: boolean;
 }) {
+  const ui = useUiText();
   const { environmentId, threadId } = props.record;
   const shell = useThreadShell({ environmentId, threadId });
   const project = useProject(shell ? scopeProjectRef(environmentId, shell.projectId) : null);
@@ -42,7 +44,7 @@ export function ThreadContextChip(props: {
         {props.unreadable
           ? "On another machine, so this machine's agent can't read it. Remove it or switch back to send."
           : shell
-            ? "Open thread"
+            ? ui("Open thread", "Открыть чат")
             : "Thread no longer available"}
       </TooltipPopup>
     </Tooltip>

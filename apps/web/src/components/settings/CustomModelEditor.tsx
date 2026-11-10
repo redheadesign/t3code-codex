@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { PlusIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import type { ProviderDriverKind, ServerProviderModel } from "@t3tools/contracts";
@@ -43,6 +44,7 @@ export function CustomModelEditor({
   onSave,
   onCancel,
 }: CustomModelEditorProps) {
+  const ui = useUiText();
   const [draft, setDraft] = useState<CustomModelDraft>(() => draftFromDefinition(entry));
   const [error, setError] = useState<string | null>(null);
   const presets = driverKind ? (DESCRIPTOR_PRESETS_BY_KIND[driverKind] ?? []) : [];
@@ -150,7 +152,7 @@ export function CustomModelEditor({
         onChange={(event) =>
           updateChoice(descriptor.key, choice.key, { label: event.target.value })
         }
-        placeholder="Label"
+        placeholder={ui("Label", "Название")}
         className="min-w-0 flex-1"
         aria-label="Choice label"
       />
@@ -163,7 +165,7 @@ export function CustomModelEditor({
           }
           aria-label="Default choice"
         />
-        Default
+        {ui("Default", "По умолчанию")}
       </label>
       <Button
         size="icon-micro"
@@ -226,7 +228,7 @@ export function CustomModelEditor({
           size="compact"
           value={descriptor.label}
           onChange={(event) => updateDescriptor(descriptor.key, { label: event.target.value })}
-          placeholder="Label"
+          placeholder={ui("Label", "Название")}
           className="min-w-0 flex-1"
           aria-label="Option label"
         />
@@ -363,10 +365,10 @@ export function CustomModelEditor({
 
       <div className="flex gap-2">
         <Button size="sm" variant="outline" onClick={handleSave}>
-          Save
+          {ui("Save", "Сохранить")}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
+          {ui("Cancel", "Отмена")}
         </Button>
       </div>
     </div>

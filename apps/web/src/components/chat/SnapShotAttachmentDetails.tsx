@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { SnapShotSource } from "@t3tools/contracts";
 import { ImageIcon, TextIcon } from "lucide-react";
 import { Suspense } from "react";
@@ -80,6 +81,7 @@ export function SnapShotContentsButton({
   className?: string;
   side?: "top" | "right" | "bottom" | "left";
 }) {
+  const ui = useUiText();
   const includesAccessibility = snapShotIncludesAccessibility(source);
   const ContentsIcon = includesAccessibility ? TextIcon : ImageIcon;
   const accessibilityDetails = snapShotAccessibilityDetails(source);
@@ -94,7 +96,9 @@ export function SnapShotContentsButton({
               render={
                 <Button
                   aria-label={
-                    includesAccessibility ? "View accessibility data" : "No accessibility data"
+                    includesAccessibility
+                      ? ui("View accessibility data", "Данные доступности")
+                      : ui("No accessibility data", "Нет данных доступности")
                   }
                   className={className}
                   onClick={(event) => event.stopPropagation()}

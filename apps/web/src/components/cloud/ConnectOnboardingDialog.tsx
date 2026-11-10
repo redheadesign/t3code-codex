@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAuth } from "@clerk/react";
 import { useAtomValue } from "@effect/atom-react";
 import {
@@ -50,6 +51,7 @@ type OnboardingStep = "publish" | "devices";
 const EMPTY_SESSION_STATE_ATOM = Atom.make(AsyncResult.initial<AuthSessionState>());
 
 function ConfiguredConnectOnboardingDialog() {
+  const ui = useUiText();
   // Pending Clerk sessions must not look signed out or activation would look like a new sign-in.
   const { isLoaded, isSignedIn, userId } = useAuth({ treatPendingAsSignedOut: false });
   const [optOutState, setOptOutState] = useLocalStorage(
@@ -291,12 +293,12 @@ function ConfiguredConnectOnboardingDialog() {
                 disabled={isApplying || !canManageRelay || linkStateData === null}
                 onClick={() => void applyPublishSelection()}
               >
-                {isApplying ? "Enabling…" : "Continue"}
+                {isApplying ? "Enabling…" : ui("Continue", "Далее")}
               </Button>
             </>
           ) : (
             <Button disabled={isApplying} onClick={complete}>
-              Done
+              {ui("Done", "Готово")}
             </Button>
           )}
         </WizardFooter>
@@ -331,6 +333,7 @@ function PublishStep({
   readonly onExposeEnvironmentChange: (enabled: boolean) => void;
   readonly onPublishAgentActivityChange: (enabled: boolean) => void;
 }) {
+  const ui = useUiText();
   return (
     <div className="space-y-3">
       <div className="rounded-lg border">
@@ -342,7 +345,7 @@ function PublishStep({
           onCheckedChange={onExposeEnvironmentChange}
         />
         <OnboardingToggleRow
-          title="Publish agent activity"
+          title={ui("Publish agent activity", "Делиться активностью")}
           description="Send activity from this environment to your mobile clients for push notifications and Live Activities."
           checked={publishAgentActivity}
           disabled={disabled}

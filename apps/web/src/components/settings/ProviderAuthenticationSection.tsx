@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -40,6 +41,7 @@ export function ProviderAuthenticationSection({
   readonly provider: ServerProvider;
   readonly readOnly: boolean;
 }) {
+  const ui = useUiText();
   const target = { environmentId, input: { instanceId } };
   const query = useEnvironmentQuery(serverEnvironment.providerAuthState(target));
   const commands = { reportFailure: false, reportDefect: false };
@@ -274,7 +276,7 @@ export function ProviderAuthenticationSection({
                   )
                 }
               >
-                Cancel
+                {ui("Cancel", "Отмена")}
               </Button>
             ) : !active && !needsExternalSetup && provider.setup?.canAuthenticate !== false ? (
               <Button
@@ -302,8 +304,8 @@ export function ProviderAuthenticationSection({
                       ? "Retry connection"
                       : "Retry sign-in"
                     : usesCredentials
-                      ? "Connect"
-                      : "Sign in"}
+                      ? ui("Connect", "Подключить")
+                      : ui("Sign in", "Войти")}
               </Button>
             ) : null}
             {!active && signedIn && (provider.auth.canLogout ?? provider.setup?.canAuthenticate) ? (
@@ -321,7 +323,7 @@ export function ProviderAuthenticationSection({
                     });
                 }}
               >
-                Sign out
+                {ui("Sign out", "Выйти")}
               </Button>
             ) : null}
           </>
@@ -427,7 +429,7 @@ export function ProviderAuthenticationSection({
                 className="w-fit"
                 disabled={disabled}
               >
-                Connect
+                {ui("Connect", "Подключить")}
               </Button>
             </form>
           ) : null}
@@ -467,7 +469,7 @@ export function ProviderAuthenticationSection({
                 className="w-fit"
                 disabled={disabled || !values.callback?.trim()}
               >
-                Continue
+                {ui("Continue", "Далее")}
               </Button>
             </form>
           ) : null}

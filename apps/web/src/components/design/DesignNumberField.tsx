@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   useId,
   useRef,
@@ -42,6 +43,7 @@ export function DesignNumberField({
   placeholder?: string | undefined;
   suffix?: string;
 }) {
+  const ui = useUiText();
   const [draft, setDraft] = useState<string | null>(null);
   const [scrubValue, setScrubValue] = useState<number | null>(null);
   const [invalid, setInvalid] = useState(false);
@@ -194,7 +196,7 @@ export function DesignNumberField({
   };
   const error = invalid ? (
     <span id={errorId} role="alert" className="sr-only">
-      Enter a valid number or equation.
+      {ui("Enter a valid number or equation.", "Нужно число или формула.")}
     </span>
   ) : null;
   if (compact)

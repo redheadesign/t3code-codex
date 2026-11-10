@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
   type ProviderInstanceId,
@@ -140,6 +141,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   effortColumn?: ReactNode;
   footer?: ReactNode;
 }) {
+  const ui = useUiText();
   const composerFloatingLayerProps = useComposerMenuProps();
   const [uncontrolledIsMenuOpen, setUncontrolledIsMenuOpen] = useState(false);
   const isMenuOpen = props.open ?? uncontrolledIsMenuOpen;
@@ -584,7 +586,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
           {props.triggerSuffix}
           {selectedModel?.isUnavailable && !selectedEntries && props.triggerLabel === undefined ? (
             <Badge variant="outline" size="sm">
-              Unavailable
+              {ui("Unavailable", "Недоступно")}
             </Badge>
           ) : null}
         </span>
@@ -670,19 +672,19 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                     <Button
                       variant="ghost-muted"
                       size="compact"
-                      aria-label="Back to reasoning"
+                      aria-label={ui("Back to reasoning", "К анализу")}
                       onClick={() => {
                         setCompactChoosingModel(false);
                         setBrowsedProvider(activeEntry?.driverKind ?? "codex");
                         focusEffortAfterCompactTransition();
                       }}
                     >
-                      Back
+                      {ui("Back", "Назад")}
                     </Button>
                   </div>
                   <div className="px-3 pt-3 pb-1">
                     <ToggleGroup
-                      aria-label="Subscriptions"
+                      aria-label={ui("Subscriptions", "Подписки")}
                       variant="segmented"
                       size="default"
                       className="w-full"
@@ -707,7 +709,14 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                             value={driver}
                             className="flex-1"
                             aria-label={label}
-                            title={locked ? "Start a new thread to switch subscriptions" : label}
+                            title={
+                              locked
+                                ? ui(
+                                    "Start a new thread to switch subscriptions",
+                                    "Сменить подписку можно в новом чате",
+                                  )
+                                : label
+                            }
                             disabled={locked || !entries.some((entry) => entry.enabled)}
                           >
                             <Icon className="size-5" aria-hidden />

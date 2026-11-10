@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type {
   EnvironmentId,
   PullRequestDiffSide,
@@ -140,6 +141,7 @@ export function ReviewThreadCard({
   onToggleResolved: () => void;
   onReacted: () => void;
 }) {
+  const ui = useUiText();
   const [expanded, setExpanded] = useState(!thread.isResolved);
   const [replying, setReplying] = useState(false);
   const [reply, setReply] = useState("");
@@ -229,7 +231,7 @@ export function ReviewThreadCard({
           aria-expanded={expanded}
           onClick={() => setExpanded((current) => !current)}
         >
-          {thread.isResolved ? "Resolved" : "Open"} · {commentCount}{" "}
+          {thread.isResolved ? "Resolved" : ui("Open", "Открыть")} · {commentCount}{" "}
           {commentCount === 1 ? "comment" : "comments"}
         </button>
         {thread.isOutdated ? <span>outdated</span> : null}
@@ -316,7 +318,7 @@ export function ReviewThreadCard({
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
               >
-                {loadingMore ? "Loading..." : "Load more comments"}
+                {loadingMore ? ui("Loading...", "Загрузка…") : "Load more comments"}
               </Button>
             </div>
           ) : null}
@@ -342,7 +344,7 @@ export function ReviewThreadCard({
                 />
                 <div className="mt-2 flex justify-end gap-2">
                   <Button size="xs" variant="ghost" onClick={() => setReplying(false)}>
-                    Cancel
+                    {ui("Cancel", "Отмена")}
                   </Button>
                   <Button
                     size="xs"

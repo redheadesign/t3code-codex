@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAuth } from "@clerk/react";
 import { useAtomValue } from "@effect/atom-react";
 import type {
@@ -135,6 +136,7 @@ export function AgentProjectImportDialog(props: {
   readonly environmentIds: readonly EnvironmentId[];
   readonly onClose: () => void;
 }) {
+  const ui = useUiText();
   const scans = useProjectScans(props.environmentIds);
   const [selection, setSelection] = useState<ImportSelection | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -148,7 +150,7 @@ export function AgentProjectImportDialog(props: {
       }}
     >
       <WizardPopup size="wide" bottomStickOnMobile={false} showCloseButton={!isImporting}>
-        <DialogTitle className="sr-only">Import projects</DialogTitle>
+        <DialogTitle className="sr-only">{ui("Import projects", "Импорт проектов")}</DialogTitle>
         <WizardPanel>
           <ImportStep
             scans={scans}
@@ -178,6 +180,7 @@ export function WelcomeWizard({
   readonly resumeEnvironmentId?: EnvironmentId | undefined;
   readonly onDone: (projectRef?: ScopedProjectRef) => void | Promise<void>;
 }) {
+  const ui = useUiText();
   const [step, setStep] = useState<WizardStep>(resumeEnvironmentId ? "agents" : "connection");
   const { environments } = useEnvironments();
   const [selection, setSelection] = useState<ReadonlySet<EnvironmentId> | null>(null);
@@ -282,12 +285,12 @@ export function WelcomeWizard({
         initialFocus={() => document.getElementById("onboarding-pairing-url") ?? true}
       >
         <WizardHeader
-          title="Set up T3 Code"
+          title={ui("Set up T3 Code", "Настройка T3 Code")}
           identity={
             <div className="flex items-baseline gap-1.5" role="img" aria-label="T3 Code">
               <T3Wordmark className="h-4 w-auto shrink-0" aria-hidden />
               <span className="text-2xl font-medium tracking-tight text-muted-foreground">
-                Code
+                {ui("Code", "Код")}
               </span>
             </div>
           }
@@ -361,6 +364,7 @@ function ConnectionStep({
   readonly onContinue: () => void;
   readonly onPaired: (environmentId: EnvironmentId) => void;
 }) {
+  const ui = useUiText();
   const { environments } = useEnvironments();
   const telemetryOff = managedTelemetryOffMessage(usePrimaryManagedPolicy());
   const cloudEnabled = hasCloudPublicConfig();
@@ -387,14 +391,19 @@ function ConnectionStep({
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-        Connect your computers
+        {ui("Connect your computers", "Подключите компьютеры")}
       </h1>
       <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-        Choose one or more computers. We’ll set up agents and projects on each.
+        {ui(
+          "Choose one or more computers. We’ll set up agents and projects on each.",
+          "Выберите, где настроить агентов и проекты.",
+        )}
       </p>
       {directEnvironments.length > 0 ? (
         <fieldset className="mt-5 space-y-2">
-          <legend className="sr-only">Computers to set up</legend>
+          <legend className="sr-only">
+            {ui("Computers to set up", "Компьютеры для настройки")}
+          </legend>
           {directEnvironments.map((environment) => (
             <label
               key={environment.environmentId}
@@ -417,7 +426,7 @@ function ConnectionStep({
                   </span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {!environment.entry.enabled && environment.connection.phase !== "unsupported"
-                      ? "Off"
+                      ? ui("Off", "Выкл.")
                       : presentSavedCloudEnvironmentConnection(environment.connection).buttonLabel}
                   </span>
                 </span>
@@ -458,7 +467,7 @@ function ConnectionStep({
               }
             >
               <LinkIcon className="size-4 text-muted-foreground" />
-              <span className="flex-1 text-left">Add a computer</span>
+              <span className="flex-1 text-left">{ui("Add a computer", "Добавить компьютер")}</span>
               <ChevronRightIcon
                 className={cn("size-4 text-muted-foreground", pairingOpen && "rotate-90")}
               />
@@ -507,7 +516,7 @@ function ConnectionStep({
           disabled={!ready || isPairing}
           onClick={onContinue}
         >
-          Continue
+          {ui("Continue", "Далее")}
           <ArrowRightIcon className="size-3.5" />
         </Button>
       </div>
@@ -526,6 +535,7 @@ function ConnectAccountOption({
   readonly selectedIds: ReadonlySet<EnvironmentId>;
   readonly onToggleEnvironment: (environmentId: EnvironmentId, checked: boolean) => void;
 }) {
+  const ui = useUiText();
   const { environments } = useEnvironments();
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
@@ -553,11 +563,11 @@ function ConnectAccountOption({
           <span className="flex-1 text-left">T3 Connect</span>
           <span className="text-xs text-muted-foreground">
             {!isLoaded
-              ? "Loading sign-in…"
+              ? ui("Loading sign-in…", "Открываем вход…")
               : !isSignedIn
-                ? "Sign in"
+                ? ui("Sign in", "Войти")
                 : !discoveryReady
-                  ? "Loading computers…"
+                  ? ui("Loading computers…", "Загрузка компьютеров…")
                   : null}
           </span>
           <ChevronRightIcon
@@ -576,17 +586,25 @@ function ConnectAccountOption({
                   selection={{ selectedIds, onChange: onToggleEnvironment, autoSelectedComputers }}
                   refreshWhileEmpty
                   empty={
-                    <p className="py-3 text-sm text-muted-foreground">No computers linked yet.</p>
+                    <p className="py-3 text-sm text-muted-foreground">
+                      {ui("No computers linked yet.", "Нет связанных компьютеров.")}
+                    </p>
                   }
                 />
               ) : null}
             </div>
             <p className="text-sm text-muted-foreground">
-              Run this on each computer you want to connect.
+              {ui(
+                "Run this on each computer you want to connect.",
+                "Запустите команду на каждом нужном компьютере.",
+              )}
             </p>
             <CommandBlock command="npx t3 connect" className="mt-3" />
             <p className="mt-3 text-xs text-muted-foreground">
-              Keep T3 Code running. Select the computers you want to set up above.
+              {ui(
+                "Keep T3 Code running. Select the computers you want to set up above.",
+                "Оставьте T3 Code открытым и выберите компьютеры выше.",
+              )}
             </p>
           </div>
         </CollapsiblePanel>
@@ -604,6 +622,7 @@ function PairingForm({
   readonly setIsPairing: (value: boolean) => void;
   readonly onPaired: (environmentId: EnvironmentId) => void;
 }) {
+  const ui = useUiText();
   const connectPairingEnvironment = useAtomCommand(connectPairing, { reportFailure: false });
   const [pairingUrl, setPairingUrl] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -644,7 +663,7 @@ function PairingForm({
       >
         <div>
           <label className="block text-sm text-muted-foreground" htmlFor="onboarding-pairing-url">
-            Pairing link
+            {ui("Pairing link", "Ссылка для связи")}
           </label>
           <Input
             id="onboarding-pairing-url"
@@ -684,10 +703,10 @@ function PairingForm({
               className="group flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               <ChevronRightIcon className="size-3.5 group-data-panel-open:rotate-90" />
-              Need a pairing link?
+              {ui("Need a pairing link?", "Где взять ссылку?")}
             </CollapsibleTrigger>
             <Button type="submit" disabled={isPairing || pairingUrl.trim().length === 0}>
-              {isPairing ? "Pairing..." : "Pair"}
+              {isPairing ? ui("Pairing...", "Подключаем…") : ui("Pair", "Связать")}
             </Button>
           </div>
           <CollapsiblePanel>
@@ -725,11 +744,15 @@ function AgentsStep({
   readonly environmentIds: readonly EnvironmentId[];
   readonly onContinue: () => void;
 }) {
+  const ui = useUiText();
   const { environments } = useEnvironments();
   return (
     <StepShell
-      title="Connect your agents"
-      description="Choose an agent to start coding. You can add more later."
+      title={ui("Connect your agents", "Подключите агентов")}
+      description={ui(
+        "Choose an agent to start coding. You can add more later.",
+        "Выберите агента для работы. Других можно добавить позже.",
+      )}
     >
       <ScrollArea scrollFade className="mt-5 h-auto max-h-[min(32rem,55dvh)]">
         <div className="space-y-5 pr-3">
@@ -747,7 +770,7 @@ function AgentsStep({
       </ScrollArea>
       <div className="mt-6 flex justify-end">
         <Button autoFocus onClick={onContinue}>
-          Continue
+          {ui("Continue", "Далее")}
           <ArrowRightIcon className="size-3.5" />
         </Button>
       </div>
@@ -762,6 +785,7 @@ function ConnectedAgentsStep({
   readonly environmentId: EnvironmentId;
   readonly machineLabel: string;
 }) {
+  const ui = useUiText();
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
     reportFailure: false,
@@ -816,7 +840,7 @@ function ConnectedAgentsStep({
       <h2 className="mb-2 text-sm font-medium">{machineLabel}</h2>
       {!canOperateTerminal ? (
         <p className="mb-2 text-sm text-muted-foreground">
-          This connection cannot control terminals.
+          {ui("This connection cannot control terminals.", "Нет доступа к терминалам.")}
         </p>
       ) : null}
       <div className="space-y-1.5">
@@ -900,7 +924,7 @@ function ConnectedAgentsStep({
       ) ? (
         <div className="mt-3">
           <Button size="xs" variant="ghost-muted" onClick={() => setAddingAccount(true)}>
-            Connect another ChatGPT account
+            {ui("Connect another ChatGPT account", "Добавить аккаунт ChatGPT")}
           </Button>
         </div>
       ) : null}
@@ -1025,6 +1049,7 @@ function AgentCard({
   readonly terminalAvailable: boolean;
   readonly onOpenTerminal: () => void;
 }) {
+  const ui = useUiText();
   const meta = providerClients.get(ProviderDriverKind.make(driver));
   const displayName =
     provider?.displayName || (driver === "claudeAgent" ? "Claude Code" : (meta?.label ?? driver));
@@ -1041,7 +1066,7 @@ function AgentCard({
       <div className="min-w-0 flex-1">
         <span className="block text-sm font-medium text-foreground">{displayName}</span>
         <p className="mt-0.5 text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
-          {providerState === "ready" ? "Ready to code." : summary.headline}
+          {providerState === "ready" ? ui("Ready to code.", "Всё готово.") : summary.headline}
           {providerState !== "ready" && summary.detail ? ` · ${summary.detail}` : ""}
         </p>
       </div>
@@ -1049,12 +1074,12 @@ function AgentCard({
         {providerState === "ready" ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
             <CheckIcon className="size-3.5" />
-            Ready
+            {ui("Ready", "Готово")}
           </span>
         ) : providerState === "checking" ? (
-          <span className="text-xs text-muted-foreground">Checking...</span>
+          <span className="text-xs text-muted-foreground">{ui("Checking...", "Проверяем…")}</span>
         ) : providerState === "disabled" ? (
-          <span className="text-xs text-muted-foreground">Disabled</span>
+          <span className="text-xs text-muted-foreground">{ui("Disabled", "Выкл.")}</span>
         ) : providerState === "attention" ? (
           <span className="text-xs text-muted-foreground">{summary.headline}</span>
         ) : (
@@ -1065,7 +1090,7 @@ function AgentCard({
             disabled={terminalOpen || !terminalAvailable}
           >
             <TerminalIcon className="size-3.5" />
-            {providerState === "signIn" ? "Sign in" : "Install"}
+            {providerState === "signIn" ? ui("Sign in", "Войти") : ui("Install", "Установить")}
           </Button>
         )}
       </div>
@@ -1080,6 +1105,7 @@ function AgentInstallTerminal({
   readonly session: AgentTerminalSession;
   readonly onClose: () => void;
 }) {
+  const ui = useUiText();
   const { command, cwd, driver, environmentId, keybindings, providerInstanceId } = session;
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const [advancedTypography] = useLocalStorage(
@@ -1179,18 +1205,21 @@ function AgentInstallTerminal({
       <div className="flex items-center justify-between border-b border-border/60 bg-background/60 px-3 py-1.5">
         <span className="text-2xs font-medium text-muted-foreground">
           {!canOperateTerminal ? (
-            "This connection cannot control terminals."
+            ui("This connection cannot control terminals.", "Нет доступа к терминалам.")
           ) : setupState === "writeFailed" ? (
             <>
               Run <code className="rounded bg-muted px-1 font-mono">{command}</code> in this
               terminal.
             </>
           ) : setupState === "ready" ? (
-            "Review the command, then press Enter to run it."
+            ui(
+              "Review the command, then press Enter to run it.",
+              "Проверьте команду и нажмите Enter.",
+            )
           ) : setupState === "openFailed" ? (
-            "Could not open the setup terminal."
+            ui("Could not open the setup terminal.", "Терминал не открылся.")
           ) : (
-            "Preparing command..."
+            ui("Preparing command...", "Готовим команду…")
           )}
         </span>
         <div className="flex items-center gap-1">
@@ -1205,11 +1234,11 @@ function AgentInstallTerminal({
                 }
               }}
             >
-              Retry
+              {ui("Retry", "Повторить")}
             </Button>
           ) : null}
           <Button size="xs" variant="ghost-muted" onClick={onClose}>
-            Close
+            {ui("Close", "Закрыть")}
           </Button>
         </div>
       </div>
@@ -1263,6 +1292,7 @@ function ImportStep({
     importedThreadCount?: number,
   ) => Promise<boolean>;
 }) {
+  const ui = useUiText();
   const { environments } = useEnvironments();
   const writableEnvironments = useEnvironmentsWithScope(scans, AuthOrchestrationOperateScope);
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
@@ -1487,11 +1517,16 @@ function ImportStep({
   if (scans.every((scan) => scan.data === null) && scans.some((scan) => scan.isPending)) {
     return (
       <div className="flex h-full min-h-40 flex-col">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Your projects</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          {ui("Your projects", "Ваши проекты")}
+        </h1>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6">
           <Spinner size="lg" tone="muted" />
           <p className="text-center text-sm text-muted-foreground">
-            Looking for projects from Claude Code and Codex…
+            {ui(
+              "Looking for projects from Claude Code and Codex…",
+              "Ищем проекты Claude Code и Codex…",
+            )}
           </p>
         </div>
         <div className="flex justify-end">
@@ -1505,8 +1540,11 @@ function ImportStep({
 
   return (
     <StepShell
-      title="Import your projects"
-      description="Import projects and conversations from Claude Code and Codex on your selected computers."
+      title={ui("Import your projects", "Импорт проектов")}
+      description={ui(
+        "Import projects and conversations from Claude Code and Codex on your selected computers.",
+        "Перенесите проекты и чаты Claude Code и Codex с выбранных компьютеров.",
+      )}
     >
       {candidates.length > 0 ? (
         <div className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -1520,7 +1558,7 @@ function ImportStep({
               disabled={isImporting || selected.length === candidates.length}
               onClick={() => setSelectedKeys(new Set(candidates.map((item) => item.key)))}
             >
-              Select all
+              {ui("Select all", "Выбрать всё")}
             </Button>
             <Button
               variant="ghost"
@@ -1528,7 +1566,7 @@ function ImportStep({
               disabled={isImporting || selected.length === 0}
               onClick={() => setSelectedKeys(new Set())}
             >
-              Select none
+              {ui("Select none", "Снять выбор")}
             </Button>
           </div>
         </div>
@@ -1554,7 +1592,7 @@ function ImportStep({
                 {scan.isPending && scan.data === null ? (
                   <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
                     <Spinner size="md" />
-                    Looking for projects…
+                    {ui("Looking for projects…", "Ищем проекты…")}
                   </div>
                 ) : scan.error !== null ? (
                   <div
@@ -1563,12 +1601,15 @@ function ImportStep({
                   >
                     <span>Could not check projects. {scan.error}</span>
                     <Button variant="ghost" size="sm" onClick={scan.refresh}>
-                      Retry
+                      {ui("Retry", "Повторить")}
                     </Button>
                   </div>
                 ) : scanCandidates.length === 0 ? (
                   <p className="py-2 text-sm text-muted-foreground">
-                    No existing Claude Code or Codex projects found.
+                    {ui(
+                      "No existing Claude Code or Codex projects found.",
+                      "Проекты Claude Code и Codex не найдены.",
+                    )}
                   </p>
                 ) : null}
                 {scan.data?.truncated ? (
@@ -1599,7 +1640,7 @@ function ImportStep({
           onClick={() => void runImport(selected)}
         >
           {isImporting
-            ? "Importing…"
+            ? ui("Importing…", "Импорт…")
             : `Import ${selected.length} ${selected.length === 1 ? "project" : "projects"}`}
         </Button>
       </div>
@@ -1621,6 +1662,7 @@ function ImportCandidateList({
   readonly selectedKeys: ReadonlySet<string>;
   readonly onSelectionChange: (next: ReadonlySet<string>) => void;
 }) {
+  const ui = useUiText();
   const { repositories, other } = groupOnboardingProjects(candidates);
   const setKeys = (keys: ReadonlyArray<string>, checked: boolean) => {
     const next = new Set(selectedKeys);
@@ -1657,7 +1699,9 @@ function ImportCandidateList({
             />
             <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-left">
               <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
-              <span className="truncate text-sm text-muted-foreground">Other folders</span>
+              <span className="truncate text-sm text-muted-foreground">
+                {ui("Other folders", "Другие папки")}
+              </span>
               <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
                 {other.length} {other.length === 1 ? "folder" : "folders"}
               </span>

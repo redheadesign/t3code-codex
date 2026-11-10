@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { scopeProjectRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { useNavigate } from "@tanstack/react-router";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
@@ -153,6 +154,7 @@ export function PreviewView({
   visible,
   onSendAnnotation,
 }: Props) {
+  const ui = useUiText();
   const navigate = useNavigate();
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const [pickActive, setPickActive] = useState(false);
@@ -1098,7 +1100,10 @@ export function PreviewView({
           ) : (
             <div className="flex h-full items-center justify-center p-8 text-center">
               <p className="max-w-sm text-sm text-muted-foreground">
-                This tab is open in the T3 Code desktop app.
+                {ui(
+                  "This tab is open in the T3 Code desktop app.",
+                  "Вкладка открыта в приложении T3 Code.",
+                )}
               </p>
             </div>
           )

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { DesktopPreviewColorScheme } from "@t3tools/contracts";
 import { Minus, MoreVertical, Plus as PlusIcon, RotateCcw } from "lucide-react";
 
@@ -84,6 +85,7 @@ export function PreviewMoreMenu({
   profileName,
   move,
 }: Props) {
+  const ui = useUiText();
   const zoomLabel = `${Math.round(zoomFactor * 100)}%`;
   const disabled = !enabled;
   return (
@@ -91,26 +93,28 @@ export function PreviewMoreMenu({
       <MenuTriggerButton />
       <MenuPopup align="end" sideOffset={6}>
         <MenuItem onClick={actions.hardReload} disabled={disabled}>
-          Hard reload
+          {ui("Hard reload", "Обновить без кеша")}
         </MenuItem>
         {actions.openDevTools ? (
           <MenuItem onClick={actions.openDevTools} disabled={disabled}>
-            Open DevTools
+            {ui("Open DevTools", "DevTools")}
           </MenuItem>
         ) : null}
         {actions.toggleNativePictureInPicture ? (
           <MenuItem onClick={actions.toggleNativePictureInPicture} disabled={disabled}>
             {nativePictureInPicture
-              ? "Close separate preview window"
-              : "Open separate preview window"}
+              ? ui("Close separate preview window", "Закрыть окно превью")
+              : ui("Open separate preview window", "Превью в новом окне")}
           </MenuItem>
         ) : null}
         {move ? <MenuItem onClick={move.onMove}>{move.label}</MenuItem> : null}
         <MenuItem onClick={onToggleDeviceToolbar} disabled={disabled}>
-          {deviceToolbarVisible ? "Hide device toolbar" : "Show device toolbar"}
+          {deviceToolbarVisible
+            ? ui("Hide device toolbar", "Скрыть панель устройства")
+            : ui("Show device toolbar", "Панель устройства")}
         </MenuItem>
         <MenuSub>
-          <MenuSubTrigger disabled={disabled}>Appearance</MenuSubTrigger>
+          <MenuSubTrigger disabled={disabled}>{ui("Appearance", "Внешний вид")}</MenuSubTrigger>
           <MenuSubPopup>
             <MenuRadioGroup
               value={colorScheme}
@@ -131,14 +135,14 @@ export function PreviewMoreMenu({
           className="justify-between"
           disabled={disabled}
         >
-          <span>Zoom</span>
+          <span>{ui("Zoom", "Масштаб")}</span>
           <span className="flex items-center gap-1">
             <Button
               variant="outline"
               size="icon-xs"
               type="button"
               onClick={actions.zoomOut}
-              aria-label="Zoom out"
+              aria-label={ui("Zoom out", "Уменьшить")}
               disabled={disabled}
             >
               <Minus />
@@ -151,7 +155,7 @@ export function PreviewMoreMenu({
               size="icon-xs"
               type="button"
               onClick={actions.zoomIn}
-              aria-label="Zoom in"
+              aria-label={ui("Zoom in", "Увеличить")}
               disabled={disabled}
             >
               <PlusIcon />
@@ -161,7 +165,7 @@ export function PreviewMoreMenu({
               size="icon-xs"
               type="button"
               onClick={actions.resetZoom}
-              aria-label="Reset zoom"
+              aria-label={ui("Reset zoom", "Сбросить масштаб")}
               disabled={disabled}
             >
               <RotateCcw />
@@ -175,8 +179,10 @@ export function PreviewMoreMenu({
               <span className="block truncate">Profile: {profileName}</span>
             </MenuGroupLabel>
           ) : null}
-          <MenuItem onClick={actions.clearCookies}>Clear cookies</MenuItem>
-          <MenuItem onClick={actions.clearCache}>Clear cache</MenuItem>
+          <MenuItem onClick={actions.clearCookies}>
+            {ui("Clear cookies", "Очистить cookie")}
+          </MenuItem>
+          <MenuItem onClick={actions.clearCache}>{ui("Clear cache", "Очистить кеш")}</MenuItem>
         </MenuGroup>
       </MenuPopup>
     </Menu>

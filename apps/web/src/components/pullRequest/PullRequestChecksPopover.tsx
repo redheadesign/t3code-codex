@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type * as React from "react";
 import type {
   EnvironmentId,
@@ -59,6 +60,7 @@ function ChecksBody({
   checks: ReadonlyArray<PullRequestCheck>;
   threadRef: ScopedThreadRef | null;
 }) {
+  const ui = useUiText();
   const openLink = useOpenLink(threadRef);
   const [showAll, setShowAll] = useState(false);
   const { attention, running, completed } = groupPullRequestChecks(checks);
@@ -105,7 +107,7 @@ function ChecksBody({
                       });
                     }}
                   >
-                    Details
+                    {ui("Details", "Детали")}
                   </button>
                 )}
               </li>
@@ -120,7 +122,7 @@ function ChecksBody({
           aria-expanded={showAll}
           onClick={() => setShowAll(!showAll)}
         >
-          {showAll ? "Show less" : "Show all"}
+          {showAll ? ui("Show less", "Свернуть") : "Show all"}
         </Button>
       ) : null}
     </>

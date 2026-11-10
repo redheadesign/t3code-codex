@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { useAtomValue } from "@effect/atom-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
@@ -187,17 +188,23 @@ function FirstRunRecovery({
   readonly reason: "settings" | "connection";
   readonly retrying?: boolean;
 }) {
+  const ui = useUiText();
   const settingsReadFailed = reason === "settings";
   return (
     <main className="flex h-dvh min-h-0 items-center justify-center bg-background px-6 text-foreground">
       <div className="flex max-w-sm flex-col items-center text-center">
         <h1 className="text-lg font-semibold">
-          {settingsReadFailed ? "Could not read settings" : "Still connecting"}
+          {settingsReadFailed
+            ? ui("Could not read settings", "Настройки недоступны")
+            : ui("Still connecting", "Подключаем…")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {settingsReadFailed
-            ? "Your saved settings could not be loaded."
-            : "T3 Code could not confirm this workspace."}
+            ? ui("Your saved settings could not be loaded.", "Не удалось загрузить настройки.")
+            : ui(
+                "T3 Code could not confirm this workspace.",
+                "Не удалось проверить рабочую папку.",
+              )}
         </p>
         <Button
           className="mt-5"
@@ -213,7 +220,7 @@ function FirstRunRecovery({
           }}
         >
           <RefreshIcon refreshing={retrying} />
-          {settingsReadFailed ? "Retry" : "Reload"}
+          {settingsReadFailed ? ui("Retry", "Повторить") : ui("Reload", "Обновить")}
         </Button>
       </div>
     </main>

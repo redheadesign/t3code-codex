@@ -8,6 +8,7 @@ import {
 import { memo } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 
+import { useUiText } from "~/i18n";
 import { cn } from "../../lib/utils";
 import { T3Wordmark } from "../T3Wordmark";
 import {
@@ -28,7 +29,7 @@ import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { UsageIndicatorButton } from "./UsageIndicator";
 import { validateScheduledTasksSearch } from "../settings/scheduledTasksSettings.logic";
 
-export { SidebarActivityButton } from "./SidebarActivity";
+export { SidebarActivityButton, SidebarActivityPanel } from "./SidebarActivity";
 
 export function SidebarBrandWidthProbe({
   isElectron,
@@ -74,6 +75,7 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
 }
 
 const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
+  const text = useUiText();
   const navigate = useNavigate();
   const navigateToMainApp = useNavigateToMainApp();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -114,7 +116,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
         <SidebarMenuItem className="min-w-0 flex-1">
           <SidebarMenuButton onClick={handleBackClick}>
             <ArrowLeftIcon />
-            <span>Back</span>
+            <span>{text("Back", "Назад")}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       ) : null}
@@ -124,6 +126,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
 });
 
 const SidebarMobileNavigation = memo(function SidebarMobileNavigation() {
+  const text = useUiText();
   const navigate = useNavigate();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { setOpenMobile } = useSidebar();
@@ -138,8 +141,8 @@ const SidebarMobileNavigation = memo(function SidebarMobileNavigation() {
           size="icon"
           className={linkClass}
           isActive={pathname === "/"}
-          tooltip="Home"
-          render={<Link to="/" aria-label="Home" onClick={close} />}
+          tooltip={text("Home", "Главная")}
+          render={<Link to="/" aria-label={text("Home", "Главная")} onClick={close} />}
         >
           <HomeIcon />
         </SidebarMenuButton>
@@ -149,8 +152,14 @@ const SidebarMobileNavigation = memo(function SidebarMobileNavigation() {
           size="icon"
           className={linkClass}
           isActive={pathname === "/automations"}
-          tooltip="Automations"
-          render={<Link to="/automations" aria-label="Automations" onClick={close} />}
+          tooltip={text("Automations", "Автоматизации")}
+          render={
+            <Link
+              to="/automations"
+              aria-label={text("Automations", "Автоматизации")}
+              onClick={close}
+            />
+          }
         >
           <CalendarClockIcon />
         </SidebarMenuButton>
@@ -161,12 +170,12 @@ const SidebarMobileNavigation = memo(function SidebarMobileNavigation() {
             size="icon"
             className={linkClass}
             isActive={pathname === "/pull-requests"}
-            tooltip="Pull requests"
+            tooltip={text("Pull requests", "Пул-реквесты")}
             render={
               <Link
                 to="/pull-requests"
                 search={readPullRequestListPreferences()}
-                aria-label="Pull requests"
+                aria-label={text("Pull requests", "Пул-реквесты")}
                 onClick={close}
               />
             }
@@ -180,8 +189,8 @@ const SidebarMobileNavigation = memo(function SidebarMobileNavigation() {
           size="icon"
           className={linkClass}
           isActive={pathname === "/tasks"}
-          tooltip="Tasks"
-          render={<Link to="/tasks" aria-label="Tasks" onClick={close} />}
+          tooltip={text("Tasks", "Задачи")}
+          render={<Link to="/tasks" aria-label={text("Tasks", "Задачи")} onClick={close} />}
         >
           <ListTodoIcon />
         </SidebarMenuButton>
@@ -200,8 +209,10 @@ const SidebarMobileNavigation = memo(function SidebarMobileNavigation() {
           size="icon"
           className={linkClass}
           isActive={pathname.startsWith("/settings")}
-          tooltip="Settings"
-          render={<Link to="/settings" aria-label="Settings" onClick={close} />}
+          tooltip={text("Settings", "Настройки")}
+          render={
+            <Link to="/settings" aria-label={text("Settings", "Настройки")} onClick={close} />
+          }
         >
           <SettingsIcon />
         </SidebarMenuButton>

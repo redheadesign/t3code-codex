@@ -3,7 +3,7 @@ import {
   OrchestratorMcpFailure,
   ProjectId,
   TaskWorkspaceBoard,
-  TaskWorkspaceBoardCommand,
+  TaskWorkspaceBoardAgentCommand,
   TaskWorkspaceBoardTask,
   TaskWorkspaceProjectWiki,
 } from "@t3tools/contracts";
@@ -39,7 +39,7 @@ const taskSummary = Schema.Struct({
 const TaskBoardTool = Tool.make("t3_task_board", {
   ...shared,
   description:
-    "Read a project's local task board and wiki. Omit projectId inside a T3 chat. Pass taskId for details and handoff notes. Use nextOffset and wikiNextOffset to continue. Tasks without a threadId have no chat yet.",
+    "Read a project's task board and wiki. Omit projectId inside a T3 chat. Pass taskId for the brief, feedback, artifact links and chat history. Use nextOffset and wikiNextOffset to continue.",
   parameters: Schema.Struct({
     projectId: Schema.optional(ProjectId),
     taskId: Schema.optional(TaskWorkspaceBoardTask.fields.id),
@@ -62,11 +62,11 @@ const TaskBoardTool = Tool.make("t3_task_board", {
 const TaskUpdateTool = Tool.make("t3_task_update", {
   ...shared,
   description:
-    "Change the local task board using its current revision from t3_task_board. Claim before taking work. Comment with results or handoff details, then release. Use openLocalTask only if asked to create the task's chat. Moving a linked task to done archives its chat.",
+    "Update tasks with the current revision from t3_task_board. Claim work, comment with results, then release. Resolve feedback after addressing it. Artifact targets are HTTP(S) URLs, project-relative files or Canvas document IDs. Moving a linked task to done archives its chat. Open a new task chat only when asked.",
   parameters: Schema.Struct({
     projectId: Schema.optional(ProjectId),
     revision: TaskWorkspaceBoard.fields.revision,
-    command: TaskWorkspaceBoardCommand,
+    command: TaskWorkspaceBoardAgentCommand,
   }),
   success: Schema.Struct({
     revision: TaskWorkspaceBoard.fields.revision,

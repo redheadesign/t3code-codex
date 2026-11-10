@@ -1,6 +1,7 @@
 import { ArchiveIcon, FolderPlusIcon } from "lucide-react";
 import { type ComponentProps, type ReactNode } from "react";
 
+import { useUiText } from "~/i18n";
 import { cn } from "~/lib/utils";
 import { T3Wordmark } from "../T3Wordmark";
 import { SidebarMenuButton } from "../ui/sidebar";
@@ -12,6 +13,7 @@ export function SidebarThreadHeader(props: {
   importSessions: ReactNode;
   activity?: ReactNode;
 }) {
+  const text = useUiText();
   return (
     <div className="flex items-center gap-1">
       <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-sm font-medium text-sidebar-foreground">
@@ -19,11 +21,17 @@ export function SidebarThreadHeader(props: {
         <span>Code</span>
       </div>
       {props.activity}
-      <SidebarHeaderIconButton label="Add project" onClick={props.onNewProject}>
+      <SidebarHeaderIconButton
+        label={text("Add project", "Добавить проект")}
+        onClick={props.onNewProject}
+      >
         <FolderPlusIcon />
       </SidebarHeaderIconButton>
       {props.importSessions}
-      <SidebarHeaderIconButton label="Archived threads" onClick={props.onArchive}>
+      <SidebarHeaderIconButton
+        label={text("Archived threads", "Архив чатов")}
+        onClick={props.onArchive}
+      >
         <ArchiveIcon />
       </SidebarHeaderIconButton>
     </div>

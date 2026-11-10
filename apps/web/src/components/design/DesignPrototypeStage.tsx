@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DesignPrototypeSettings } from "./designDocument";
 import { observeResize } from "../../lib/observeResize";
@@ -13,6 +14,7 @@ export function DesignPrototypeStage({
   readonly settings: DesignPrototypeSettings;
   readonly children: ReactNode;
 }) {
+  const ui = useUiText();
   const host = useRef<HTMLDivElement | null>(null);
   const [available, setAvailable] = useState({ width: 0, height: 0 });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Fit the playback screen to the observed presentation viewport.
@@ -61,7 +63,7 @@ export function DesignPrototypeStage({
         >
           <div
             role="region"
-            aria-label="Prototype screen"
+            aria-label={ui("Prototype screen", "Экран прототипа")}
             className="relative overflow-hidden bg-white"
             style={{ width, height, borderRadius: Math.max(0, radius - bezel) }}
           >

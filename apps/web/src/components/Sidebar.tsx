@@ -1,5 +1,6 @@
 import { liveShellEnvironmentIdsAtom } from "../state/shell";
 import { attachSidebarTree } from "../lib/sidebarTree";
+import { useUiText } from "~/i18n";
 import { type EnvironmentId, type ScopedProjectRef } from "@t3tools/contracts";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
@@ -239,7 +240,11 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "./ui/menu";
-import { SidebarActivityButton, SidebarChromeFooter } from "./sidebar/SidebarChrome";
+import {
+  SidebarActivityButton,
+  SidebarActivityPanel,
+  SidebarChromeFooter,
+} from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import { SidebarThreadSearch } from "./sidebar/SidebarThreadSearch";
 import { TooltipProvider } from "./ui/tooltip";
@@ -878,6 +883,7 @@ function readRouteThreadKey(router: AnyRouter): string | null {
 }
 
 export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
+  const text = useUiText();
   const {
     projects,
     serverConfigs,
@@ -892,6 +898,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const { isMobile, setOpenMobile } = useSidebar();
   const [threadSearch, setThreadSearch] = useState("");
   const [projectImportOpen, setProjectImportOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const restoreActivityFocus = useRef(false);
+  const activityButtonRef = useStableCallback((button: HTMLButtonElement | null) => {
+    if (button && restoreActivityFocus.current) {
+      restoreActivityFocus.current = false;
+      button.focus();
+    }
+  });
   const threadSearchInputRef = useRef<HTMLInputElement | null>(null);
   const isSearchingThreads = threadSearch.trim().length > 0;
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
@@ -1190,18 +1204,22 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const clicked = await settlePromise(() =>
           showContextMenuFallback(
             [
-              { id: "new-thread", label: "New thread" },
-              { id: "copy-path", label: "Copy path" },
+              { id: "new-thread", label: text("New thread", "Новый чат") },
+              { id: "copy-path", label: text("Copy path", "Скопировать путь") },
               ...(canPinProject(group)
                 ? [
                     group.pinned
-                      ? { id: "unpin", label: "Unpin project", icon: "pin-off" }
-                      : { id: "pin", label: "Pin project", icon: "pin" },
+                      ? {
+                          id: "unpin",
+                          label: text("Unpin project", "Открепить проект"),
+                          icon: "pin-off",
+                        }
+                      : { id: "pin", label: text("Pin project", "Закрепить проект"), icon: "pin" },
                   ]
                 : []),
               {
                 id: "project-settings",
-                label: "Project settings",
+                label: text("Project settings", "Настройки проекта"),
                 icon: "settings",
               },
             ],
@@ -2378,11 +2396,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           projectByKey.get(`${session.environmentId}:${session.projectId}`)?.workspaceRoot;
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
-            buildDraftActionMenuItems({
-              hasPath: Boolean(workspacePath),
-              hasBranch: Boolean(session.branch),
-              hasProject: projectGroup != null,
-            }),
+            buildDraftActionMenuItems(
+              {
+                hasPath: Boolean(workspacePath),
+                hasBranch: Boolean(session.branch),
+                hasProject: projectGroup != null,
+              },
+              text,
+            ),
             position,
           ),
         );
@@ -2452,36 +2473,39 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           ) ?? null;
         const clicked = await settlePromise(() =>
           showContextMenuFallback(
-            buildThreadActionMenuItems({
-              canOperate: readEnvironmentScope(
-                threadRef.environmentId,
-                AuthOrchestrationOperateScope,
-              ),
-              branch: thread.branch ?? null,
-              projectFilter: null,
-              isPinned,
-              isSettled,
-              autoSettleEnabled: thread.autoSettleDisabledAt == null,
-              isSnoozed,
-              canSnoozeNow: canSnooze(thread, {
-                now: new Date().toISOString(),
-              }),
-              isRegeneratingTitle,
-              isRunning: !threadRuntimeCanArchive(thread.runtime),
-              canShareWithGuest: appAtomRegistry.get(
-                canShareWithGuestAtom(threadRef.environmentId),
-              ),
-              canTurnIntoProject: canTurnThreadIntoProject(threadRef),
-              canOpenTask: configLoaded,
-              supports: {
-                settlement: !projectSidebarEnabled && configLoaded,
-                autoSettleOptOut: !projectSidebarEnabled && supportsAutoSettleOptOut,
-                snooze: configLoaded,
-                pinning: configLoaded,
-                titleRegeneration: configLoaded,
+            buildThreadActionMenuItems(
+              {
+                canOperate: readEnvironmentScope(
+                  threadRef.environmentId,
+                  AuthOrchestrationOperateScope,
+                ),
+                branch: thread.branch ?? null,
+                projectFilter: null,
+                isPinned,
+                isSettled,
+                autoSettleEnabled: thread.autoSettleDisabledAt == null,
+                isSnoozed,
+                canSnoozeNow: canSnooze(thread, {
+                  now: new Date().toISOString(),
+                }),
+                isRegeneratingTitle,
+                isRunning: !threadRuntimeCanArchive(thread.runtime),
+                canShareWithGuest: appAtomRegistry.get(
+                  canShareWithGuestAtom(threadRef.environmentId),
+                ),
+                canTurnIntoProject: canTurnThreadIntoProject(threadRef),
+                canOpenTask: configLoaded,
+                supports: {
+                  settlement: !projectSidebarEnabled && configLoaded,
+                  autoSettleOptOut: !projectSidebarEnabled && supportsAutoSettleOptOut,
+                  snooze: configLoaded,
+                  pinning: configLoaded,
+                  titleRegeneration: configLoaded,
+                },
+                snoozePresets,
               },
-              snoozePresets,
-            }),
+              text,
+            ),
             position,
           ),
         );
@@ -2804,6 +2828,20 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const newThreadShortcutLabel =
     shortcutLabelForCommand(keybindings, "chat.newLocal") ??
     shortcutLabelForCommand(keybindings, "chat.new");
+  const newThreadLabel = text("New thread", "Новый чат");
+  if (projectSidebarEnabled && activityOpen) {
+    return (
+      <>
+        <SidebarActivityPanel
+          onBack={() => {
+            restoreActivityFocus.current = true;
+            setActivityOpen(false);
+          }}
+        />
+        <SidebarChromeFooter />
+      </>
+    );
+  }
   return (
     <>
       {projectImportOpen ? (
@@ -2822,14 +2860,21 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         fixedHeader={
           <div className="flex flex-col gap-1.5 border-b border-sidebar-border/70 px-2 py-2">
             <SidebarThreadHeader
-              activity={projectSidebarEnabled ? <SidebarActivityButton /> : null}
+              activity={
+                projectSidebarEnabled ? (
+                  <SidebarActivityButton
+                    onOpen={() => setActivityOpen(true)}
+                    buttonRef={activityButtonRef}
+                  />
+                ) : null
+              }
               onNewProject={openAddProjectCommandPalette}
               importSessions={
                 <Menu>
                   <MenuTrigger
                     render={
                       <SidebarHeaderIconButton
-                        label="Import agent sessions"
+                        label={text("Import agent sessions", "Импортировать чаты агентов")}
                         disabled={connectedEnvironmentIds.length === 0}
                       />
                     }
@@ -2839,12 +2884,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   <MenuPopup align="end">
                     <MenuItem onClick={() => setProjectImportOpen(true)}>
                       <DownloadIcon />
-                      Import projects…
+                      {text("Import projects…", "Импортировать проекты…")}
                     </MenuItem>
                     {scopeGroups.length > 0 ? (
                       <MenuGroup>
                         <MenuSeparator />
-                        <MenuGroupLabel>Import into an existing project</MenuGroupLabel>
+                        <MenuGroupLabel>
+                          {text(
+                            "Import into an existing project",
+                            "Импортировать в существующий проект",
+                          )}
+                        </MenuGroupLabel>
                         {scopeGroups.map((group) => (
                           <MenuItem
                             key={group.projectKey}
@@ -2879,8 +2929,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               </InputGroupAddon>
               <InputGroupInput
                 ref={threadSearchInputRef}
-                aria-label="Search threads"
-                placeholder="Search threads"
+                aria-label={text("Search threads", "Поиск по чатам")}
+                placeholder={text("Search threads", "Поиск по чатам")}
                 value={threadSearch}
                 onChange={(event) => {
                   setThreadSearch(event.currentTarget.value);
@@ -2900,7 +2950,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     type="button"
                     size="icon-xs"
                     variant="ghost-muted"
-                    aria-label="Clear thread search"
+                    aria-label={text("Clear thread search", "Очистить поиск")}
                     onClick={() => {
                       setThreadSearch("");
                       threadSearchInputRef.current?.focus();
@@ -2913,7 +2963,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             </InputGroup>
             <div className="flex items-center gap-1">
               <SidebarMenuButton
-                aria-label="New thread"
+                aria-label={newThreadLabel}
                 className="min-w-0 flex-1"
                 disabled={projects.length === 0}
                 onClick={(event) => {
@@ -2922,11 +2972,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 }}
                 size="default"
                 tooltip={
-                  newThreadShortcutLabel ? `New thread (${newThreadShortcutLabel})` : "New thread"
+                  newThreadShortcutLabel
+                    ? `${newThreadLabel} (${newThreadShortcutLabel})`
+                    : newThreadLabel
                 }
               >
                 <SquarePenIcon />
-                <span>New thread</span>
+                <span>{newThreadLabel}</span>
               </SidebarMenuButton>
             </div>
           </div>
@@ -3110,7 +3162,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               key="projects-label"
                               className="mt-2 list-none px-(--sidebar-row-content-inset) py-1 text-xs font-medium text-sidebar-muted-foreground"
                             >
-                              Projects
+                              {text("Projects", "Проекты")}
                             </li>,
                           );
                         }
@@ -3141,7 +3193,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 key={`empty-project-folder:${folder.group.projectKey}`}
                                 className="flex h-8 list-none items-center ps-9 pe-2.5 text-sm text-sidebar-muted-foreground"
                               >
-                                {folder.hasChats ? "No chats to show" : "No chats"}
+                                {folder.hasChats
+                                  ? text("No chats to show", "Нет доступных чатов")
+                                  : text("No chats", "Нет чатов")}
                               </li>,
                             );
                           }
@@ -3152,7 +3206,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               key="recent-label"
                               className="mt-3 list-none px-(--sidebar-row-content-inset) py-1 text-xs font-medium text-sidebar-muted-foreground"
                             >
-                              Recent
+                              {text("Recent", "Недавние")}
                             </li>,
                           );
                           for (const thread of recentThreads) {
@@ -3230,7 +3284,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               className={cn(
                                 projectFolders === null && workingThreads.length === 0 && "mt-auto",
                               )}
-                              label="Snoozed"
+                              label={text("Snoozed", "Отложенные")}
                               count={snoozedThreads.length}
                               toggle={{
                                 expanded: snoozedShelfExpanded,
@@ -3247,7 +3301,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               className={cn(
                                 workingThreads.length + snoozedThreads.length === 0 && "mt-auto",
                               )}
-                              label="Settled"
+                              label={text("Settled", "Завершённые")}
                               count={settledCount}
                               dragging={from !== null}
                               isDropTarget={dragTargetSection === "settled"}
@@ -3263,7 +3317,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             <SidebarSectionPlaceholder
                               key="settled-placeholder"
                               marker="settled-placeholder"
-                              label="Settled"
+                              label={text("Settled", "Завершённые")}
                               showHint={
                                 from !== null &&
                                 (renderedSettledThreads.length === 0 ||
@@ -3297,12 +3351,18 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         {/* Plus means "add", so revealing more uses a chevron. */}
                         <ChevronDownIcon aria-hidden className="size-4 shrink-0" />
                         {olderSettledShelf.loading
-                          ? "Loading"
+                          ? text("Loading", "Загрузка")
                           : olderSettledShelf.failed
-                            ? "Could not load older threads. Retry"
+                            ? text(
+                                "Could not load older threads. Retry",
+                                "Не удалось загрузить старые чаты. Повторить",
+                              )
                             : projectFolders !== null
-                              ? "Show more chats"
-                              : `Show ${Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT)} more`}
+                              ? text("Show more chats", "Показать ещё")
+                              : text(
+                                  `Show ${Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT)} more`,
+                                  `Показать ещё ${Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT)}`,
+                                )}
                       </button>
                     </li>
                   ) : null}
@@ -3328,11 +3388,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
                   >
                     <PlusIcon className="-mx-0.5 size-3" />
-                    Add project
+                    {text("Add project", "Добавить проект")}
                   </button>
                 </>
               ) : (
-                "No threads yet"
+                text("No threads yet", "Чатов пока нет")
               )}
             </div>
           ) : null}

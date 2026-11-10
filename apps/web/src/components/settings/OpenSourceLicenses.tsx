@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { ChevronRightIcon, ExternalLinkIcon, SearchIcon } from "lucide-react";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import * as Cause from "effect/Cause";
@@ -205,6 +206,7 @@ function LicenseHeaderAction({
 }
 
 function LicenseManifestError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const ui = useUiText();
   return (
     <div className="flex flex-col items-start gap-3 px-3 py-5 sm:px-4">
       <div className="flex flex-col gap-1">
@@ -214,7 +216,7 @@ function LicenseManifestError({ message, onRetry }: { message: string; onRetry: 
         </p>
       </div>
       <Button type="button" size="xs" variant="outline" onClick={onRetry}>
-        Try again
+        {ui("Try again", "Повторить")}
       </Button>
     </div>
   );

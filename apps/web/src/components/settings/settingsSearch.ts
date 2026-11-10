@@ -50,6 +50,7 @@ export type SettingsSearchScope =
 export interface SettingsSearchItem {
   readonly id: string;
   readonly title: string;
+  readonly titleRu?: string;
   readonly to: SettingsPath;
   readonly targetId?: string;
   readonly searchTerms?: ReadonlyArray<string>;
@@ -110,9 +111,39 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/archived": "Archive",
 };
 
+const SETTINGS_SECTION_LABELS_RU = {
+  "/settings/diagnostics": "Диагностика",
+  "/settings/projects": "Проекты",
+  "/settings/general": "Общие",
+  "/settings/appearance": "Внешний вид",
+  "/settings/chat": "Чат",
+  "/settings/diffs": "Правки и PR",
+  "/settings/keybindings": "Клавиши",
+  "/settings/snap-shot": "SnapShots",
+  "/settings/providers": "Агенты",
+  "/settings/threads": "Чаты",
+  "/settings/browser": "Браузер",
+  "/settings/devices": "Устройства",
+  "/settings/scheduled-tasks": "Автозадачи",
+  "/settings/source-control": "Git",
+  "/settings/worktrees": "Рабочие деревья",
+  "/settings/connections": "Среды",
+  "/settings/access": "Доступ",
+  "/settings/secrets": "Секреты",
+  "/settings/maintenance": "Обслуживание",
+  "/settings/labs": "Лаборатория",
+  "/settings/about": "О программе",
+  "/settings/archived": "Архив",
+} satisfies Record<SettingsPath, string>;
+
+export function settingsSectionLabel(path: SettingsPath, text: (en: string, ru: string) => string) {
+  return text(SETTINGS_SECTION_LABELS[path], SETTINGS_SECTION_LABELS_RU[path]);
+}
+
 /** Sidebar order. A group without a heading is set apart by space alone. */
 export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   readonly heading: string | null;
+  readonly headingRu?: string;
   readonly paths: ReadonlyArray<SettingsPath>;
 }> = [
   {
@@ -128,6 +159,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   },
   {
     heading: "Agents",
+    headingRu: "Агенты",
     paths: [
       "/settings/providers",
       "/settings/threads",
@@ -138,10 +170,12 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   },
   {
     heading: "Code",
+    headingRu: "Код",
     paths: ["/settings/projects", "/settings/source-control", "/settings/worktrees"],
   },
   {
     heading: "Connections",
+    headingRu: "Подключения",
     paths: [
       "/settings/connections",
       "/settings/access",
@@ -220,6 +254,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "storage-worktree-keep-when",
     targetId: "storage-worktrees",
     title: "Keep worktrees with local changes",
+    titleRu: "Хранить деревья с правками",
     to: "/settings/worktrees",
     scope: "project-defaults",
     searchTerms: [
@@ -229,6 +264,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-delete-now",
     title: "Delete now",
+    titleRu: "Удалить сейчас",
     to: "/settings/maintenance",
     scope: "environment-defaults",
     searchTerms: ["storage cleanup run now results report removed kept failed"],
@@ -236,6 +272,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-worktrees",
     title: "Worktree cleanup",
+    titleRu: "Очистка рабочих деревьев",
     to: "/settings/worktrees",
     scope: "project-defaults",
     searchTerms: [
@@ -245,6 +282,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-worktrees-location",
     title: "Worktree location",
+    titleRu: "Папка рабочих деревьев",
     to: "/settings/worktrees",
     scope: "environment-defaults",
     searchTerms: ["worktree location folder directory path drive external disk"],
@@ -252,6 +290,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-artifacts",
     title: "Artifacts and logs",
+    titleRu: "Артефакты и журналы",
     to: "/settings/maintenance",
     scope: "environment-defaults",
     searchTerms: [
@@ -261,6 +300,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "project-defaults",
     title: "Project defaults and overrides",
+    titleRu: "Настройки проектов",
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: ["model workspace environments projects inheritance checkout"],
@@ -268,12 +308,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "project-overview",
     title: "Project overview",
+    titleRu: "О проекте",
     to: "/settings/projects",
     searchTerms: ["name icon emoji image checkout remove delete"],
   },
   {
     id: "default-model",
     title: "Default model",
+    titleRu: "Основная модель",
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: ["new thread project provider reasoning effort"],
@@ -281,6 +323,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "fallback-model",
     title: "Fallback model",
+    titleRu: "Запасная модель",
     to: "/settings/threads",
     scope: "environment-defaults",
     searchTerms: ["fallback agent provider out of usage new threads"],
@@ -289,6 +332,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "default-permissions",
     title: "Permissions",
+    titleRu: "Права",
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: [
@@ -298,6 +342,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "color-scheme",
     title: "Color scheme",
+    titleRu: "Цветовая схема",
     to: "/settings/appearance",
     searchTerms: ["appearance light dark system mode"],
     targetId: "appearance",
@@ -305,6 +350,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "theme",
     title: "Themes",
+    titleRu: "Темы",
     to: "/settings/appearance",
     searchTerms: ["appearance colors palette custom import"],
     targetId: "appearance",
@@ -313,6 +359,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     // Prefixed because the slider control already owns the `appearance-contrast` id.
     id: "setting-appearance-contrast",
     title: "Contrast",
+    titleRu: "Контраст",
     to: "/settings/appearance",
     searchTerms: ["colors borders interface"],
   },
@@ -320,24 +367,28 @@ export const SETTINGS_SEARCH_ITEMS = [
     // Prefixed because the slider control already owns the `glass-opacity` id.
     id: "setting-glass-opacity",
     title: "Glass opacity",
+    titleRu: "Плотность фона",
     to: "/settings/appearance",
     searchTerms: ["transparent transparency solid menus dialogs composer"],
   },
   {
     id: "diff-color-scheme",
     title: "Diff colors",
+    titleRu: "Цвета правок",
     to: "/settings/diffs",
     searchTerms: ["red green blue orange additions deletions changes counts palette colorblind"],
   },
   {
     id: "chat-width",
     title: "Chat width",
+    titleRu: "Ширина чата",
     to: "/settings/appearance",
     searchTerms: ["wide full width column layout messages composer monitor"],
   },
   {
     id: "thread-details-items",
     title: "Thread details",
+    titleRu: "Детали чата",
     to: "/settings/appearance",
     searchTerms: [
       "customize show hide panel card environment editor scripts branch pull request git changes servers automations lineage usage limits 5 hour weekly quota tokens context window",
@@ -346,23 +397,27 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "effort-display",
     title: "Effort display",
+    titleRu: "Индикатор анализа",
     to: "/settings/appearance",
     searchTerms: ["reasoning effort thinking bars graph word label level composer"],
   },
   {
     id: "math-rendering",
     title: "Render math",
+    titleRu: "Формулы",
     to: "/settings/appearance",
     searchTerms: ["latex tex katex equations formulas markdown"],
   },
   {
     id: "panel-animations",
     title: "Panel animations",
+    titleRu: "Анимация панелей",
     to: "/settings/appearance",
   },
   {
     id: "environment-identification",
     title: "Environment identification",
+    titleRu: "Метки сред",
     to: "/settings/appearance",
     searchTerms: ["dev nightly latest channel artwork pill label hide none"],
     targetId: "appearance-interface",
@@ -370,36 +425,42 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "interface-font",
     title: "Interface font",
+    titleRu: "Шрифт интерфейса",
     to: "/settings/appearance",
     searchTerms: ["typography family size system sans"],
   },
   {
     id: "prompt-font",
     title: "Prompt font",
+    titleRu: "Шрифт чата",
     to: "/settings/appearance",
     searchTerms: ["typography family size composer input"],
   },
   {
     id: "code-font",
     title: "Code font",
+    titleRu: "Шрифт кода",
     to: "/settings/appearance",
     searchTerms: ["typography family size monospace code blocks diffs file previews"],
   },
   {
     id: "terminal-font",
     title: "Terminal font",
+    titleRu: "Шрифт терминала",
     to: "/settings/appearance",
     searchTerms: ["typography family size monospace output"],
   },
   {
     id: "separate-fonts",
     title: "Separate fonts",
+    titleRu: "Разные шрифты",
     to: "/settings/appearance",
     searchTerms: ["typography advanced prompt code terminal font family size individually"],
   },
   {
     id: "font-smoothing",
     title: "Font smoothing",
+    titleRu: "Сглаживание",
     to: "/settings/appearance",
     searchTerms: ["typography text grayscale anti aliasing macos thin"],
     macOnly: true,
@@ -407,29 +468,34 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "word-wrap",
     title: "Word wrap",
+    titleRu: "Перенос строк",
     to: "/settings/appearance",
     searchTerms: ["long lines code blocks diffs file previews"],
   },
   {
     id: "composer-context",
     title: "Composer context",
+    titleRu: "Контекст чата",
     to: "/settings/appearance",
   },
   {
     id: "project-grouping",
     title: "Project grouping",
+    titleRu: "Группы проектов",
     to: "/settings/general",
     searchTerms: ["combine matching repositories environments sidebar"],
   },
   {
     id: "project-order",
     title: "Project order",
+    titleRu: "Порядок проектов",
     to: "/settings/general",
     searchTerms: ["sort projects sidebar manual created recent"],
   },
   {
     id: "snooze-options",
     title: "Snooze options",
+    titleRu: "Сроки паузы",
     to: "/settings/threads",
     searchTerms: ["snooze presets times later tonight tomorrow next week remind"],
     environmentOnly: true,
@@ -438,36 +504,42 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "snooze-limited-threads",
     title: "Snooze until limits reset",
+    titleRu: "Отложить до сброса",
     to: "/settings/threads",
     searchTerms: ["usage quota rate limit reset wake recover continue"],
   },
   {
     id: "auto-resume-limited-threads",
     title: "Resume after usage limits",
+    titleRu: "Продолжать после сброса",
     to: "/settings/threads",
     searchTerms: ["usage quota rate limit reset recover continue"],
   },
   {
     id: "working-shelf",
     title: "Working section",
+    titleRu: "Раздел «В работе»",
     to: "/settings/general",
     searchTerms: ["hide fold running monitoring threads inbox sidebar shelf"],
   },
   {
     id: "boring-sidebar",
     title: "Group chats by project",
+    titleRu: "Группы по проектам",
     to: "/settings/labs",
     searchTerms: ["beta folders project tree legacy old classic sidebar"],
   },
   {
     id: "boring-sidebar-multiline",
     title: "Two-line folder rows",
+    titleRu: "Две строки на папку",
     to: "/settings/labs",
     searchTerms: ["beta boring sidebar folder rows multiline branch pull request details"],
   },
   {
     id: "guest-links",
     title: "Guest links",
+    titleRu: "Гостевые ссылки",
     to: "/settings/labs",
     scope: "environment",
     searchTerms: ["beta share guest invite link teammate watch t3 connect tunnel"],
@@ -475,6 +547,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "linked-environments-beta",
     title: "Linked environments",
+    titleRu: "Связанные среды",
     to: "/settings/labs",
     scope: "environment",
     searchTerms: ["beta link another machine vps peer agents work there delegate"],
@@ -482,6 +555,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "simlock-hosts",
     title: "Simlock device hosts (alpha)",
+    titleRu: "Серверы Simlock (альфа)",
     to: "/settings/labs",
     scope: "environment",
     searchTerms: ["beta alpha simlock callstack simulator emulator ios android pool lease gateway"],
@@ -489,6 +563,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "auto-settle-inactive-threads",
     title: "Auto-settle inactive threads",
+    titleRu: "Убирать неактивные",
     to: "/settings/threads",
     searchTerms: ["sidebar inactivity days no activity automatically"],
     requiresThreadAutoSettlement: true,
@@ -497,6 +572,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "compact-idle-threads",
     title: "Compact idle threads",
+    titleRu: "Сжатие чатов",
     to: "/settings/providers",
     scope: "environment-defaults",
     searchTerms: ["claude context compaction idle cache tokens usage summary resume"],
@@ -504,6 +580,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "auto-settle-merged-threads",
     title: "Auto-settle merged threads",
+    titleRu: "Убирать после слияния",
     to: "/settings/threads",
     searchTerms: ["pull request merge closed automatically sidebar"],
     requiresThreadAutoSettlement: true,
@@ -512,6 +589,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "keep-threads-with-pull-requests",
     title: "Keep threads with a PR",
+    titleRu: "Сохранять чаты с PR",
     to: "/settings/threads",
     targetId: "auto-settle-inactive-threads",
     searchTerms: ["pull request inactivity auto-settle merge close sidebar"],
@@ -521,6 +599,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "days-before-auto-settle",
     title: "Days of inactivity before auto-settle",
+    titleRu: "Дней без работы",
     to: "/settings/threads",
     targetId: "auto-settle-inactive-threads",
     searchTerms: ["thread timeout activity sidebar"],
@@ -530,24 +609,35 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "thread-notifications",
     title: "Thread notifications",
+    titleRu: "Системные",
     to: "/settings/general",
     searchTerms: ["notification sound alert completion input approval desktop"],
   },
   {
+    id: "interface-language",
+    title: "Interface language",
+    titleRu: "Язык интерфейса",
+    to: "/settings/general",
+    searchTerms: ["russian english locale translation русский английский перевод"],
+  },
+  {
     id: "in-app-notifications",
     title: "In-app notifications",
+    titleRu: "В приложении",
     to: "/settings/general",
     searchTerms: ["notification toast popup completion input approval failure"],
   },
   {
     id: "time-format",
     title: "Time format",
+    titleRu: "Формат времени",
     to: "/settings/general",
     searchTerms: ["timestamp clock locale system browser os 12 hour 24 hour"],
   },
   {
     id: "response-streaming",
     title: "Response streaming",
+    titleRu: "Показ ответа",
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: ["output token paragraph buffered wait turn legacy"],
@@ -555,54 +645,63 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "hide-whitespace-changes",
     title: "Hide whitespace changes",
+    titleRu: "Скрывать правки пробелов",
     to: "/settings/diffs",
     searchTerms: ["diff ignore spaces edits default"],
   },
   {
     id: "default-diff-file-state",
     title: "Default diff file state",
+    titleRu: "Вид файлов",
     to: "/settings/diffs",
     searchTerms: ["collapsed expanded collapse expand files pull request pr code tab"],
   },
   {
     id: "diff-layout",
     title: "Diff layout",
+    titleRu: "Вид правок",
     to: "/settings/diffs",
     searchTerms: ["stacked split side by side unified inline view"],
   },
   {
     id: "proactive-panels",
     title: "Open pull requests and changes panels proactively",
+    titleRu: "Автооткрытие PR и правок",
     to: "/settings/diffs",
     searchTerms: ["proactive automatically open diff pull request pr right panel agent completion"],
   },
   {
     id: "skills-in-slash-menu",
     title: "Show skills in slash menu",
+    titleRu: "Навыки в меню /",
     to: "/settings/chat",
     searchTerms: ["command menu dollar $ slash /"],
   },
   {
     id: "composer-rich-text",
     title: "Rich text composer",
+    titleRu: "Форматирование",
     to: "/settings/chat",
     searchTerms: ["composer rich text tiptap bold italic markdown styled wysiwyg"],
   },
   {
     id: "send-shortcut",
     title: "Send shortcut",
+    titleRu: "Клавиши отправки",
     to: "/settings/chat",
     searchTerms: ["enter return command ctrl multiline prompt new line composer"],
   },
   {
     id: "follow-up-behavior",
     title: "Follow-up behavior",
+    titleRu: "Отправка уточнений",
     to: "/settings/chat",
     searchTerms: ["queue steer running turn send default behavior composer"],
   },
   {
     id: "provider-update-checks",
     title: "Provider update checks",
+    titleRu: "Обновления агентов",
     to: "/settings/maintenance",
     searchTerms: [
       "installed cli versions newer available codex claude cursor grok fx kiro opencode",
@@ -612,6 +711,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "continue-threads-after-server-update",
     title: "Continue threads after restarts",
+    titleRu: "Продолжать после запуска",
     to: "/settings/maintenance",
     scope: "project-defaults",
     searchTerms: [
@@ -621,6 +721,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "background-activity",
     title: "Background activity",
+    titleRu: "Фоновая работа",
     to: "/settings/maintenance",
     scope: "environment-defaults",
     searchTerms: [
@@ -630,6 +731,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "new-threads",
     title: "New threads",
+    titleRu: "Новые чаты",
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: ["default workspace mode draft local worktree"],
@@ -637,6 +739,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "worktree-submodules",
     title: "Submodules",
+    titleRu: "Подмодули",
     to: "/settings/worktrees",
     scope: "project-defaults",
     searchTerms: ["git submodule init recursive top-level none worktree t3.json"],
@@ -644,6 +747,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "start-from-origin",
     title: "Start from remote",
+    titleRu: "Из удалённой ветки",
     to: "/settings/worktrees",
     scope: "project-defaults",
     searchTerms: ["new worktrees start remote origin latest fetched branch local"],
@@ -651,6 +755,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "add-project-starts-in",
     title: "Add project starts in",
+    titleRu: "Папка проектов",
     to: "/settings/threads",
     scope: "environment-defaults",
     searchTerms: ["base directory folder browser path home"],
@@ -658,24 +763,28 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "unpin-confirmation",
     title: "Unpin confirmation",
+    titleRu: "Открепление",
     to: "/settings/general",
     searchTerms: ["ask before thread pinned section"],
   },
   {
     id: "archive-confirmation",
     title: "Archive confirmation",
+    titleRu: "Архивация",
     to: "/settings/general",
     searchTerms: ["ask before thread second click inline action"],
   },
   {
     id: "delete-confirmation",
     title: "Delete confirmation",
+    titleRu: "Удаление",
     to: "/settings/general",
     searchTerms: ["ask before thread chat history"],
   },
   {
     id: "quit-confirmation",
     title: "Quit shortcut",
+    titleRu: "Клавиши выхода",
     to: "/settings/general",
     searchTerms: ["confirmation desktop app exit direct hold double click press twice"],
     desktopOnly: true,
@@ -683,6 +792,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "text-generation-model",
     title: "Text generation model",
+    titleRu: "Модель для текста",
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: ["generated thread titles source control content default provider"],
@@ -690,6 +800,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "thread-title-instructions",
     title: "Thread title instructions",
+    titleRu: "Названия чатов",
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: ["generated thread titles prompt custom style naming rename regenerate"],
@@ -697,12 +808,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "app-version",
     title: "Version",
+    titleRu: "Версия",
     to: "/settings/about",
     searchTerms: ["about check for updates download install upgrade release"],
   },
   {
     id: "update-track",
     title: "Update track",
+    titleRu: "Канал обновлений",
     to: "/settings/about",
     searchTerms: ["release channel stable latest nightly prerelease"],
     releaseChannelOnly: true,
@@ -710,6 +823,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "cli-command",
     title: "t3 command",
+    titleRu: "Команда t3",
     to: "/settings/about",
     searchTerms: ["cli terminal shell path install command line"],
     desktopOnly: true,
@@ -717,18 +831,21 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "mobile-app",
     title: "Mobile app",
+    titleRu: "Приложение для телефона",
     to: "/settings/about",
     searchTerms: ["phone tablet iPhone iPad iOS Android App Store Google Play QR"],
   },
   {
     id: "privacy-policy",
     title: "Privacy policy",
+    titleRu: "Конфиденциальность",
     to: "/settings/about",
     searchTerms: ["telemetry analytics usage data tracking legal opt out"],
   },
   {
     id: "telemetry-export",
     title: "OpenTelemetry export",
+    titleRu: "Экспорт OpenTelemetry",
     to: "/settings/diagnostics",
     targetId: "telemetry-export",
     scope: "environment",
@@ -737,29 +854,34 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "diagnostics",
     title: "Diagnostics",
+    titleRu: "Диагностика",
     to: "/settings/maintenance",
     searchTerms: ["logs traces processes resource history failures spans cpu memory"],
   },
   {
     id: "open-source-licenses",
     title: "Open source licenses",
+    titleRu: "Лицензии",
     to: "/settings/about",
   },
   {
     id: "legacy-plan-mode",
     title: "Plan mode (legacy)",
+    titleRu: "Режим плана",
     to: "/settings/labs",
     searchTerms: ["build plan composer old"],
   },
   {
     id: "legacy-context-window-indicator",
     title: "Context window indicator (legacy)",
+    titleRu: "Индикатор контекста",
     to: "/settings/labs",
     searchTerms: ["composer meter usage tokens circle old"],
   },
   {
     id: "keybindings",
     title: "Keybindings",
+    titleRu: "Клавиши",
     to: "/settings/keybindings",
     searchTerms: ["keyboard shortcuts hotkeys commands bindings json"],
   },
@@ -773,6 +895,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "snap-shot-accessibility",
     title: "Include app text",
+    titleRu: "Включать текст",
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
     searchTerms: [
@@ -782,30 +905,35 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "snap-shot-shortcut",
     title: "Capture shortcut",
+    titleRu: "Клавиши снимка",
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
   },
   {
     id: "snap-shot-sound",
     title: "Capture sound",
+    titleRu: "Звук снимка",
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
   },
   {
     id: "snap-shot-flash",
     title: "Capture flash",
+    titleRu: "Вспышка",
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
   },
   {
     id: "snap-shot-animations",
     title: "Capture animations",
+    titleRu: "Анимация снимка",
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
   },
   {
     id: "providers",
     title: "Providers",
+    titleRu: "Агенты",
     to: "/settings/providers",
     searchTerms: [
       "agents cli codex claude cursor grok fx kiro opencode antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory codex_home shadow home endpoint arguments environment variables display name accent color custom favorite hidden auto compact native sessions import resume",
@@ -814,6 +942,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "usage-providers",
     title: "Usage providers",
+    titleRu: "Источники расхода",
     to: "/settings/providers",
     searchTerms: [
       "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove",
@@ -823,6 +952,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "cursor-keychain-usage",
     title: "Cursor account usage",
+    titleRu: "Расход Cursor",
     to: "/settings/providers",
     searchTerms: ["cursor macOS keychain usage tokens cost limits permission"],
     providerSettingsOnly: true,
@@ -831,6 +961,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "provider-health-check-interval",
     title: "Health check interval",
+    titleRu: "Интервал проверки",
     to: "/settings/providers",
     searchTerms: ["refresh availability versions auth state models background probes seconds off"],
     providerSettingsOnly: true,
@@ -838,6 +969,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "agent-browser-access",
     title: "Agent browser access",
+    titleRu: "Доступ к браузеру",
     to: "/settings/browser",
     scope: "project-defaults",
     searchTerms: ["allow disable enable open drive preview tools sessions project override"],
@@ -845,6 +977,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "device-sources",
     title: "Device sources",
+    titleRu: "Источники устройств",
     to: "/settings/devices",
     searchTerms: [
       "device hosts ssh remote mac mini identity key connection eas expo cloud simlock pool gateway local simulators",
@@ -853,6 +986,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "agent-device-access",
     title: "Agents can use devices",
+    titleRu: "Доступ к устройствам",
     to: "/settings/devices",
     targetId: "devices",
     searchTerms: ["allow simulator emulator ios android drive tools sessions"],
@@ -860,6 +994,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "device-hub",
     title: "Use devices",
+    titleRu: "Устройства",
     to: "/settings/devices",
     targetId: "devices",
     searchTerms: ["device hub simulator emulator ios android install start version"],
@@ -867,6 +1002,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "device-platform-support",
     title: "Local simulators",
+    titleRu: "Локальные симуляторы",
     to: "/settings/devices",
     targetId: "device-sources",
     searchTerms: ["simulator support xcode android studio sdk avd runtime"],
@@ -874,65 +1010,76 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "browser-profiles",
     title: "Browser profiles",
+    titleRu: "Профили браузера",
     to: "/settings/browser",
     targetId: "browser",
   },
   {
     id: "browser-default-profile",
     title: "Default browser profile",
+    titleRu: "Профиль браузера",
     to: "/settings/browser",
     targetId: "browser-profiles",
   },
   {
     id: "browser-default-viewport",
     title: "Default browser viewport",
+    titleRu: "Размер окна браузера",
     to: "/settings/browser",
     searchTerms: ["preview size width height device desktop mobile rotate"],
   },
   {
     id: "browser-default-zoom",
     title: "Default browser zoom",
+    titleRu: "Масштаб браузера",
     to: "/settings/browser",
     searchTerms: ["preview page scale tabs percent"],
   },
   {
     id: "browser-default-appearance",
     title: "Default browser appearance",
+    titleRu: "Тема браузера",
     to: "/settings/browser",
     searchTerms: ["preview color scheme light dark system os"],
   },
   {
     id: "browser-recording-frame-rate",
     title: "Browser recording frame rate",
+    titleRu: "Кадры в секунду",
     to: "/settings/browser",
   },
   {
     id: "browser-recording-key-presses",
     title: "Show key presses in recordings",
+    titleRu: "Записывать клавиши",
     to: "/settings/browser",
     searchTerms: ["browser preview keyboard shortcuts keystrokes overlay capture"],
   },
   {
     id: "browser-recording-mouse-presses",
     title: "Show mouse presses in recordings",
+    titleRu: "Записывать клики",
     to: "/settings/browser",
     searchTerms: ["browser preview clicks buttons drag overlay capture"],
   },
   {
     id: "browser-link-target",
     title: "Open links in",
+    titleRu: "Открывать ссылки в",
     to: "/settings/browser",
     searchTerms: ["links default browser in-app browser external open"],
   },
   {
     id: "browser-search-engine",
     title: "Search engine",
+    titleRu: "Поисковик",
     to: "/settings/browser",
     searchTerms: ["address bar duckduckgo google bing brave kagi ecosia custom url"],
   },
   {
     id: "pull-request-links-open-in-app",
     title: "Open pull requests in T3 Code",
+    titleRu: "Открывать PR в T3 Code",
     to: "/settings/diffs",
     searchTerms: [
       `pr commit links ${SOURCE_CONTROL_HOST_LABELS} browser external click default pull request view panel`,
@@ -941,12 +1088,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "browser-auto-show-floating-preview",
     title: "Auto-show floating preview",
+    titleRu: "Плавающее превью",
     to: "/settings/browser",
     searchTerms: ["agent opens browser device simulator pop into view hide"],
   },
   {
     id: "automatic-pull",
     title: "Automatically pull",
+    titleRu: "Автообновление ветки",
     to: "/settings/source-control",
     scope: "project-defaults",
     searchTerms: ["auto pull default branch current checkout fast forward upstream"],
@@ -954,6 +1103,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "remove-agent-credits-on-merge",
     title: "Remove agent credits when merging",
+    titleRu: "Убирать подпись агента при слиянии",
     to: "/settings/source-control",
     scope: "project-defaults",
     searchTerms: [
@@ -963,6 +1113,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "pull-request-merge-method",
     title: "Default merge method",
+    titleRu: "Способ слияния",
     to: "/settings/source-control",
     scope: "project-defaults",
     searchTerms: ["pull request merge squash rebase last selected"],
@@ -970,6 +1121,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "source-control",
     title: "Source control",
+    titleRu: "Git",
     to: "/settings/source-control",
     scope: "environment-defaults",
     searchTerms: [
@@ -979,6 +1131,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "git-fetch-interval",
     title: "Git fetch interval",
+    titleRu: "Интервал Git fetch",
     to: "/settings/maintenance",
     targetId: "background-activity",
     searchTerms: [
@@ -990,6 +1143,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "worktree-branch-naming",
     title: "Worktree branch naming",
+    titleRu: "Названия веток",
     to: "/settings/worktrees",
     searchTerms: ["static semantic prefix custom prompt instructions feat fix refactor chore"],
     environmentOnly: true,
@@ -999,6 +1153,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "source-control-writing-style",
     title: "Source control writing style",
+    titleRu: "Тексты в Git",
     to: "/settings/source-control",
     searchTerms: [
       "repository conventions conventional commits custom instructions change descriptions request titles",
@@ -1008,6 +1163,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "follow-change-request-templates",
     title: "Follow change request templates",
+    titleRu: "Шаблоны PR",
     to: "/settings/source-control",
     searchTerms: ["repository pr pull request description structure"],
     environmentOnly: true,
@@ -1015,6 +1171,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "source-control-writer-model",
     title: "Source control writer model",
+    titleRu: "Модель для Git",
     to: "/settings/source-control",
     searchTerms: [
       "override generated commit change request pr titles descriptions branch bookmark",
@@ -1025,6 +1182,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "review-guides",
     title: "Review guides (beta)",
+    titleRu: "Правила ревью (бета)",
     to: "/settings/source-control",
     searchTerms: ["pull request pr guided review guide tour beta experimental"],
     environmentOnly: true,
@@ -1032,6 +1190,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "review-guide-model",
     title: "Review guide model",
+    titleRu: "Модель для правил",
     to: "/settings/source-control",
     // Hidden until review guides are on, so a search lands on the switch that shows it.
     targetId: "review-guides",
@@ -1042,6 +1201,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "review-guide-instructions",
     title: "Review guide instructions",
+    titleRu: "Инструкции к ревью",
     to: "/settings/source-control",
     targetId: "review-guides",
     searchTerms: ["pull request pr guided review guide preferences taste prompt custom"],
@@ -1051,12 +1211,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "project-actions",
     title: "Actions",
+    titleRu: "Действия",
     to: "/settings/projects",
     searchTerms: ["commands scripts setup run dev server checkout worktree t3.json import"],
   },
   {
     id: "environment-icon",
     title: "Environment icon",
+    titleRu: "Значок среды",
     to: "/settings/access",
     targetId: "connections-environment",
     searchTerms: ["machine glyph sidebar mac mini studio laptop desktop server cloud vm"],
@@ -1064,6 +1226,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "local-environment",
     title: "Local environment",
+    titleRu: "Локальная среда",
     to: "/settings/connections",
     searchTerms: ["turn off on disable enable local server agents remote only restart"],
     desktopOnly: true,
@@ -1071,6 +1234,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "network-access",
     title: "Network access",
+    titleRu: "Доступ по сети",
     to: "/settings/access",
     targetId: "connections-environment",
     searchTerms: ["expose backend remote pairing local machine interfaces host restart"],
@@ -1088,6 +1252,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "wsl-backend",
     title: "WSL backend",
+    titleRu: "Сервер в WSL",
     to: "/settings/access",
     searchTerms: [
       "windows subsystem linux distro second server projects stop windows backend restart wsl only",
@@ -1111,6 +1276,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "hold-webhooks-while-offline",
     localEnvironmentOnly: true,
     title: "Hold webhooks while offline",
+    titleRu: "Копить вебхуки офлайн",
     to: "/settings/access",
     targetId: "connections-environment",
     searchTerms: ["webhook automations offline queue mailbox t3 connect"],
@@ -1121,6 +1287,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "publish-agent-activity",
     localEnvironmentOnly: true,
     title: "Publish agent activity",
+    titleRu: "Делиться активностью",
     to: "/settings/access",
     targetId: "connections-environment",
     searchTerms: ["mobile push notifications live activities cloud tunnel"],
@@ -1129,6 +1296,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "connections-environment",
     title: "This machine",
+    titleRu: "Этот компьютер",
     to: "/settings/access",
     searchTerms: [
       "connections server backend local remote access administrative permissions scope pairing links qr code authorized clients sessions revoke endpoint",
@@ -1138,6 +1306,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "linked-environments",
     peerLinksOnly: true,
     title: "Linked environments",
+    titleRu: "Связанные среды",
     to: "/settings/connections",
     targetId: "linked-environments",
     searchTerms: ["link peer another machine vps agents work there handoff pairing code"],
@@ -1145,12 +1314,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "remote-environments",
     title: "Environments",
+    titleRu: "Среды",
     to: "/settings/connections",
     searchTerms: ["add pair backend host code ssh config agent tunnel saved t3 connect"],
   },
   {
     id: "load-balancing",
     title: "Load balancing",
+    titleRu: "Балансировка",
     to: "/settings/connections",
     searchTerms: [
       "automatic machine environment resources cpu memory capacity preference weight shared projects",
@@ -1159,6 +1330,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "pull-request-routing",
     title: "Pull request sharing",
+    titleRu: "Доступ к PR",
     to: "/settings/connections",
     searchTerms: [
       `pull request routing trusted environments shared credentials permissions read actions source control ${SOURCE_CONTROL_HOST_LABELS}`,
@@ -1167,6 +1339,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "secret-providers",
     title: "Secret providers",
+    titleRu: "Источники секретов",
     to: "/settings/secrets",
     searchTerms: ["1password vault credentials api key"],
     secretsFeatureOnly: true,
@@ -1174,6 +1347,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "secret-providers-add",
     title: "Add secret provider",
+    titleRu: "Добавить источник",
     to: "/settings/secrets",
     targetId: "secret-providers",
     searchTerms: ["new 1password vault op cli account"],
@@ -1182,6 +1356,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "archive",
     title: "Archived threads",
+    titleRu: "Архив чатов",
     to: "/settings/archived",
     searchTerms: ["restore reopen deleted history projects"],
   },
@@ -1323,6 +1498,15 @@ export function searchableSetting(id: SettingsSearchItemId): {
   return { id: anchorId, title };
 }
 
+export function settingsRowTitle(
+  id: string | undefined,
+  title: string,
+  text: (en: string, ru: string) => string,
+) {
+  const item: SettingsSearchItem | undefined = SEARCH_ITEMS_BY_ID.get(id as SettingsSearchItemId);
+  return item?.title === title && item.titleRu ? text(title, item.titleRu) : title;
+}
+
 export function filterAvailableSettingsSearchItems(
   availability: SettingsSearchAvailability,
 ): ReadonlyArray<SettingsSearchItem> {
@@ -1370,7 +1554,9 @@ export function searchSettings(
       const title = normalizeSearchText(item.title);
       const fields = [
         title,
+        ...(item.titleRu ? [normalizeSearchText(item.titleRu)] : []),
         normalizeSearchText(SETTINGS_SECTION_LABELS[item.to]),
+        normalizeSearchText(SETTINGS_SECTION_LABELS_RU[item.to]),
         ...(item.searchTerms ?? []).map(normalizeSearchText),
       ];
       if (!queryTokens.every((token) => fields.some((field) => field.includes(token)))) return [];

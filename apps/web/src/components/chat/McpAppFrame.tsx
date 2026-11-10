@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { EnvironmentId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import {
   makeMcpAppHost,
@@ -86,6 +87,7 @@ export function McpAppFrame(props: {
   readonly awaitingUser?: boolean;
   readonly onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
+  const ui = useUiText();
   const { app } = props;
   const theme = useHtmlRenderTheme();
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -416,7 +418,7 @@ export function McpAppFrame(props: {
             setClosed(false);
           }}
         >
-          Show app
+          {ui("Show app", "Приложение")}
         </Button>
       </div>
     );
@@ -448,7 +450,7 @@ export function McpAppFrame(props: {
           >
             <span className="truncate">{app.server}</span>
             <Button
-              aria-label="Exit full screen"
+              aria-label={ui("Exit full screen", "Свернуть")}
               size="icon-sm"
               variant="ghost"
               onClick={() => setDisplayMode("inline")}

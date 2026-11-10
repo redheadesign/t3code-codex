@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { DraftId } from "~/composerDraftStore";
 import { composerDraftHasUserContent, useComposerDraftStore } from "~/composerDraftStore";
 import { resolveEnvironmentMachineKind, type ScopedProjectRef } from "@t3tools/contracts";
@@ -66,6 +67,7 @@ export function DraftHeroHeadline({
   activeProjectRef,
   activeProjectTitle,
 }: DraftHeroHeadlineProps) {
+  const ui = useUiText();
   const projects = useProjects();
   const threads = useVisibleThreadShells();
   const { environments } = useEnvironments();
@@ -244,7 +246,11 @@ export function DraftHeroHeadline({
     <ProjectPicker
       items={pickerItems}
       selectedValue={activeProjectKey}
-      title={isScratchDraft ? "No project" : (activeProjectTitle ?? "Choose a project")}
+      title={
+        isScratchDraft
+          ? ui("No project", "Без проекта")
+          : (activeProjectTitle ?? "Choose a project")
+      }
       titleIcon={
         activeProjectGroup && !isScratchDraft ? (
           <ProjectFavicon project={activeProjectGroup} className="size-full" />
@@ -333,7 +339,7 @@ export function DraftHeroHeadline({
             />
           }
         >
-          or start without a project
+          {ui("or start without a project", "или без проекта")}
         </TooltipTrigger>
         {noProjectShortcut ? <TooltipPopup side="bottom">{noProjectShortcut}</TooltipPopup> : null}
       </Tooltip>
@@ -360,11 +366,11 @@ export function DraftHeroHeadline({
       ) : (
         <h1 className="w-full text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl">
           {isScratchDraft ? (
-            <>What should we work on?</>
+            <>{ui("What should we work on?", "Над чем работаем?")}</>
           ) : canChooseProject ? (
             <>{projectSelector} to start</>
           ) : (
-            <>Add a project to start</>
+            <>{ui("Add a project to start", "Добавьте проект")}</>
           )}
         </h1>
       )}

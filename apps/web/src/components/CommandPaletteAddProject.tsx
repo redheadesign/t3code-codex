@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   type AddProjectRemoteSource,
   type NewProjectPublishTarget,
@@ -80,6 +81,7 @@ export function NewProjectPublishHostPicker(props: {
   readonly value: SourceControlProviderKind;
   readonly onValueChange: (kind: SourceControlProviderKind) => void;
 }) {
+  const ui = useUiText();
   const [open, setOpen] = useState(false);
   return (
     <span
@@ -101,7 +103,11 @@ export function NewProjectPublishHostPicker(props: {
           if (kind !== null) props.onValueChange(kind);
         }}
       >
-        <SelectTrigger size="xs" variant="ghost" aria-label="Host for the new repository">
+        <SelectTrigger
+          size="xs"
+          variant="ghost"
+          aria-label={ui("Host for the new repository", "Сервис для нового репозитория")}
+        >
           <SelectValue>
             {(kind: SourceControlProviderKind) => sourceControlClients.get(kind).label}
           </SelectValue>
@@ -127,6 +133,7 @@ export function NewProjectSummary(props: {
   readonly projectsRoot: string | null;
   readonly environmentLabel: string | null;
 }) {
+  const ui = useUiText();
   return (
     <div className="p-2 pb-0">
       <div className="flex min-h-8 items-center gap-2 rounded-sm px-2 py-1.5">
@@ -135,13 +142,15 @@ export function NewProjectSummary(props: {
         </CommandPaletteTitleIcon>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-foreground text-sm">
-            {props.name.length > 0 ? props.name : "New project"}
+            {props.name.length > 0 ? props.name : ui("New project", "Новый проект")}
           </span>
           <span className="truncate text-muted-foreground/85 text-xs">
             {props.name.length > 0
-              ? `Creates ${props.pathPreview}`
-              : `Goes in ${props.projectsRoot}`}
-            {props.environmentLabel === null ? null : ` on ${props.environmentLabel}`}
+              ? ui(`Creates ${props.pathPreview}`, `Создаст папку ${props.pathPreview}`)
+              : ui(`Goes in ${props.projectsRoot}`, `Папка проектов ${props.projectsRoot}`)}
+            {props.environmentLabel === null
+              ? null
+              : ui(` on ${props.environmentLabel}`, ` · ${props.environmentLabel}`)}
           </span>
         </span>
       </div>
@@ -154,9 +163,12 @@ export function RemoteRepositorySummary(props: {
   readonly title: string;
   readonly description: string;
 }) {
+  const ui = useUiText();
   return (
     <div className="shrink-0 p-2 pb-0">
-      <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">Repository</div>
+      <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
+        {ui("Repository", "Репозиторий")}
+      </div>
       <div className="flex min-h-8 items-center gap-2 rounded-sm px-2 py-1.5">
         <CommandPaletteTitleIcon>
           {remoteProjectSourceIcon(props.source, ITEM_ICON_CLASS)}

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { AssistantCitation } from "@t3tools/contracts";
 import {
   assistantCitationLabel,
@@ -51,6 +52,7 @@ export function AssistantCitationChip({
     onRestoreFocus?: () => void;
   };
 }) {
+  const ui = useUiText();
   const navigate = useNavigate();
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const commentPopupRef = useRef<HTMLDivElement>(null);
@@ -151,7 +153,7 @@ export function AssistantCitationChip({
             render={<Button variant="outline" size="sm" render={<Link {...sourceLinkProps} />} />}
           >
             <ArrowUpRightIcon aria-hidden="true" />
-            Go to source
+            {ui("Go to source", "К источнику")}
           </PopoverClose>
         </div>
       </ContextChipPopover>
@@ -177,7 +179,11 @@ export function AssistantCitationChip({
           }}
         >
           <PopoverTrigger
-            aria-label={citation.comment ? "Edit citation comment" : "Add comment to citation"}
+            aria-label={
+              citation.comment
+                ? ui("Edit citation comment", "Править комментарий")
+                : ui("Add comment to citation", "К цитате")
+            }
             data-citation-comment-trigger="true"
             render={<ContextChipAction />}
           >
@@ -208,7 +214,7 @@ export function AssistantCitationChip({
                   : undefined
               }
               ref={commentPopupRef}
-              aria-label="Edit citation comment"
+              aria-label={ui("Edit citation comment", "Править комментарий")}
               width="md"
               padding="compact"
               onPointerDown={(event) => event.stopPropagation()}

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type {
   ModelSelection,
   ProviderInstanceId,
@@ -28,6 +29,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   size?: "sm" | "xs";
   onToggleInteractionMode: () => void;
 }) {
+  const ui = useUiText();
   const size = props.size ?? "sm";
   const interactionModeTooltip =
     props.interactionMode === "plan"
@@ -66,7 +68,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
           data-composer-control-label
           className={size === "xs" ? "sr-only" : "sr-only sm:not-sr-only"}
         >
-          {props.interactionMode === "plan" ? "Plan" : "Build"}
+          {props.interactionMode === "plan" ? ui("Plan", "План") : ui("Build", "Работа")}
         </span>
       </TooltipTrigger>
       <TooltipPopup side="top">{interactionModeTooltip}</TooltipPopup>
@@ -81,15 +83,18 @@ export function ComposerPermissionsSection(props: {
   runtimeModeOptions: ReadonlyArray<RuntimeModeOption>;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
+  const ui = useUiText();
   const descriptionId = useId();
   return (
     <div
       data-composer-permissions
       className="w-[min(40rem,calc(100vw-3rem))] max-w-[calc(100vw-3rem)]"
     >
-      <div className="px-3 pt-2 pb-1 text-muted-foreground text-sm">Permissions</div>
+      <div className="px-3 pt-2 pb-1 text-muted-foreground text-sm">
+        {ui("Permissions", "Права")}
+      </div>
       <MenuPrimitive.RadioGroup
-        aria-label="Permissions"
+        aria-label={ui("Permissions", "Права")}
         value={props.runtimeMode}
         onValueChange={(value: RuntimeMode) => {
           if (value !== props.runtimeMode) props.onRuntimeModeChange(value);

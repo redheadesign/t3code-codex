@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { DeviceHostUpdates } from "./DeviceHostUpdates";
 import type { DevicePlatform, DeviceServiceState, EnvironmentId } from "@t3tools/contracts";
 import {
@@ -146,6 +147,7 @@ export function DeviceSetup(props: {
   readonly onDismiss?: () => void;
   readonly presentation?: "dialog" | "panel";
 }) {
+  const ui = useUiText();
   const canConfigure = useEnvironmentScope(props.environmentId, AuthSettingsWriteScope);
   const configure = useAtomCommand(deviceEnvironment.configure);
   const list = useAtomCommand(deviceEnvironment.list, { reportFailure: false });
@@ -285,7 +287,7 @@ export function DeviceSetup(props: {
                     onClick={checkPlatforms}
                   >
                     {pending === "check" ? <Spinner size="xs" /> : null}
-                    {pending === "check" ? "Checking…" : "Refresh"}
+                    {pending === "check" ? "Checking…" : ui("Refresh", "Обновить")}
                   </Button>
                 </div>
                 <div className="rounded-2xl border border-white/15 bg-black/30 p-4 shadow-lg shadow-black/10 backdrop-blur-md [&_p.text-muted-foreground]:text-white/70">
@@ -337,7 +339,7 @@ export function DeviceSetup(props: {
                 disabled={busy || pending !== null}
                 onClick={() => setStep(step - 1)}
               >
-                Back
+                {ui("Back", "Назад")}
               </Button>
             ) : null}
             {step === 0 && !enabled ? (
@@ -357,7 +359,7 @@ export function DeviceSetup(props: {
                 disabled={!ready || pending !== null}
                 onClick={() => setStep(step + 1)}
               >
-                Continue
+                {ui("Continue", "Далее")}
               </Button>
             ) : (
               <Button
@@ -371,7 +373,7 @@ export function DeviceSetup(props: {
                 ) : (
                   <ShieldCheck className="size-4" />
                 )}
-                {pending === "complete" ? "Saving…" : "Finish setup"}
+                {pending === "complete" ? ui("Saving…", "Сохраняем…") : "Finish setup"}
               </Button>
             )}
             {props.onDismiss ? (
@@ -514,6 +516,7 @@ export function DeviceHubSetupStatus({
   readonly pending: boolean;
   readonly compact?: boolean;
 }) {
+  const ui = useUiText();
   if (!pending && !deviceHubReadiness(state).ready) return null;
   return (
     <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -525,7 +528,7 @@ export function DeviceHubSetupStatus({
             : "Installing device hub…"
           : state.hostStatus === "starting"
             ? compact
-              ? "Starting…"
+              ? ui("Starting…", "Запускаем…")
               : "Starting device hub…"
             : compact
               ? "Updating…"
@@ -593,6 +596,7 @@ function PlatformStatus(props: {
   readonly status: { readonly ready: boolean; readonly message: string };
   readonly compact?: boolean;
 }) {
+  const ui = useUiText();
   return (
     <div
       className={cn("flex gap-2", !props.compact && "rounded-md border border-border/60 px-3 py-2")}
@@ -607,7 +611,7 @@ function PlatformStatus(props: {
       <div className={cn(props.compact && props.status.ready && "flex items-center gap-2")}>
         <p className="font-medium">{props.platform}</p>
         <p className="text-xs text-muted-foreground">
-          {props.compact && props.status.ready ? "Ready" : props.status.message}
+          {props.compact && props.status.ready ? ui("Ready", "Готово") : props.status.message}
         </p>
       </div>
     </div>

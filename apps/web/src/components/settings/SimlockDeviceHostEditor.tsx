@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { useId, useState, type ReactNode } from "react";
 import type { EnvironmentId, SimlockDeviceHostConfig } from "@t3tools/contracts";
@@ -53,6 +54,7 @@ export function SimlockDeviceHostEditor(props: {
   ) => void;
   onClose: () => void;
 }) {
+  const ui = useUiText();
   const [draft, setDraft] = useState(props.host);
   const [urlEdited, setUrlEdited] = useState(false);
   const machineGateways = useAtomValue(
@@ -135,7 +137,7 @@ export function SimlockDeviceHostEditor(props: {
           </DialogHeader>
           <DialogPanel>
             <label className="block space-y-1.5 text-sm">
-              <span>Name</span>
+              <span>{ui("Name", "Имя")}</span>
               <Input
                 autoFocus
                 required
@@ -202,7 +204,7 @@ export function SimlockDeviceHostEditor(props: {
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="ghost" disabled={props.busy} onClick={props.onClose}>
-              Cancel
+              {ui("Cancel", "Отмена")}
             </Button>
             <Button type="submit" disabled={props.busy || problem !== null}>
               {props.busy ? <Spinner size="xs" /> : null} Save host

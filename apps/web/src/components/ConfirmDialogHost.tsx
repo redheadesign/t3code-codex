@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useSyncExternalStore } from "react";
 
 import {
@@ -51,6 +52,7 @@ function resolveConfirmDialogCopy(message: string): ConfirmationCopy {
 }
 
 export function ConfirmDialogHost() {
+  const ui = useUiText();
   const state = useSyncExternalStore(
     subscribeConfirmDialogHost,
     readConfirmDialogState,
@@ -82,9 +84,11 @@ export function ConfirmDialogHost() {
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {ui("Cancel", "Отмена")}
+          </AlertDialogClose>
           <Button variant={confirmVariant} onClick={onConfirm}>
-            Confirm
+            {ui("Confirm", "Подтвердить")}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>

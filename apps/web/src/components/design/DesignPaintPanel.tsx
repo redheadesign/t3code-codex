@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 /* oxlint-disable react/no-array-index-key -- Paint entries have positional identity; value-based keys remount focused inputs. */
 import { ChevronDownIcon, MinusIcon, MoreHorizontalIcon, PlusIcon } from "lucide-react";
 import { formatHex, parse } from "culori";
@@ -96,6 +97,7 @@ export function DesignPaintPanel({
   node: DesignNode;
   onChange: (patch: Partial<DesignNode>) => void;
 }) {
+  const ui = useUiText();
   const text = node.kind === "text";
   const color = text
     ? (node.typography?.color ?? node.fill)
@@ -134,13 +136,16 @@ export function DesignPaintPanel({
   };
   return (
     <>
-      <section aria-label="Fill" className="space-y-2 border-b border-border/60 px-3 py-2.5">
+      <section
+        aria-label={ui("Fill", "Заливка")}
+        className="space-y-2 border-b border-border/60 px-3 py-2.5"
+      >
         <div className="flex h-6 items-center justify-between">
-          <h3 className="text-xs font-medium">Fill</h3>
+          <h3 className="text-xs font-medium">{ui("Fill", "Заливка")}</h3>
           <Button
             size="icon-xs"
             variant="ghost-muted"
-            aria-label="Add fill"
+            aria-label={ui("Add fill", "Добавить заливку")}
             disabled={text && !!color}
             onClick={() =>
               text
@@ -159,7 +164,7 @@ export function DesignPaintPanel({
             <div className="flex min-w-0 items-center gap-1">
               <div className="min-w-0 flex-1">
                 <DesignInspectorColor
-                  label="Text color"
+                  label={ui("Text color", "Цвет текста")}
                   value={color}
                   onChange={(color) =>
                     onChange({ fill: color, typography: { ...node.typography, color } })
@@ -169,7 +174,7 @@ export function DesignPaintPanel({
               <Button
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label="Remove fill"
+                aria-label={ui("Remove fill", "Убрать заливку")}
                 onClick={() =>
                   onChange({ fill: null, typography: { ...node.typography, color: undefined } })
                 }
@@ -320,7 +325,7 @@ export function DesignPaintPanel({
                           />
                         }
                       >
-                        Layer order
+                        {ui("Layer order", "Порядок слоёв")}
                         <ChevronDownIcon />
                       </MenuTrigger>
                       <MenuPopup>
@@ -328,17 +333,17 @@ export function DesignPaintPanel({
                           disabled={index === 0}
                           onClick={() => saveFills(move(fills, index, -1))}
                         >
-                          Move up
+                          {ui("Move up", "Выше")}
                         </MenuItem>
                         <MenuItem
                           disabled={index === fills.length - 1}
                           onClick={() => saveFills(move(fills, index, 1))}
                         >
-                          Move down
+                          {ui("Move down", "Ниже")}
                         </MenuItem>
                         <MenuSeparator />
                         <MenuItem onClick={() => saveFills(fills.filter((_, i) => i !== index))}>
-                          Remove fill
+                          {ui("Remove fill", "Убрать заливку")}
                         </MenuItem>
                       </MenuPopup>
                     </Menu>
@@ -357,13 +362,16 @@ export function DesignPaintPanel({
           ))
         )}
       </section>
-      <section aria-label="Stroke" className="space-y-2 border-b border-border/60 px-3 py-2.5">
+      <section
+        aria-label={ui("Stroke", "Обводка")}
+        className="space-y-2 border-b border-border/60 px-3 py-2.5"
+      >
         <div className="flex h-6 items-center justify-between">
-          <h3 className="text-xs font-medium">Stroke</h3>
+          <h3 className="text-xs font-medium">{ui("Stroke", "Обводка")}</h3>
           <Button
             size="icon-xs"
             variant="ghost-muted"
-            aria-label="Add stroke"
+            aria-label={ui("Add stroke", "Добавить обводку")}
             onClick={() => saveStrokes([...strokes, { color: "#000000", width: 1 }])}
           >
             <PlusIcon />
@@ -422,7 +430,7 @@ export function DesignPaintPanel({
                       disabled={index === 0}
                       onClick={() => saveStrokes(move(strokes, index, -1))}
                     >
-                      Move up
+                      {ui("Move up", "Выше")}
                     </Button>
                     <Button
                       size="xs"
@@ -430,7 +438,7 @@ export function DesignPaintPanel({
                       disabled={index === strokes.length - 1}
                       onClick={() => saveStrokes(move(strokes, index, 1))}
                     >
-                      Move down
+                      {ui("Move down", "Ниже")}
                     </Button>
                   </div>
                 </PopoverPopup>

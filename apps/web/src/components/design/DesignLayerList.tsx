@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   useEffect,
   useLayoutEffect,
@@ -65,6 +66,7 @@ export function DesignLayerList({
   onToggleExpand: (id: string) => void;
   renderRow: (entry: DesignLayerEntry) => ReactNode;
 }) {
+  const ui = useUiText();
   const body = useRef<HTMLDivElement>(null);
   const [focusRequest, setFocusRequest] = useState<{ id: string } | null>(null);
   const lastSelected = useRef<string | null>(null);
@@ -141,7 +143,7 @@ export function DesignLayerList({
     <div
       ref={body}
       role="list"
-      aria-label="Design layer list"
+      aria-label={ui("Design layer list", "Слои макета")}
       style={{ position: "relative", height: rows.length * ROW_HEIGHT }}
       onFocusCapture={(event) => {
         const id =

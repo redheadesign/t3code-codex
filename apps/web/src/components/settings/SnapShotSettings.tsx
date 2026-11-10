@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import {
   isModifierPairShortcut,
@@ -79,6 +80,7 @@ type ShortcutCheck =
     };
 
 export function SnapShotSettings() {
+  const ui = useUiText();
   const settings = useClientSettings((current) => ({
     snapShotAnimations: current.snapShotAnimations,
     snapShotEnabled: current.snapShotEnabled,
@@ -438,7 +440,7 @@ export function SnapShotSettings() {
                             disabled={!canSaveShortcut || setupBusy}
                             onClick={() => void saveShortcut()}
                           >
-                            {setupBusy ? "Saving…" : "Save"}
+                            {setupBusy ? ui("Saving…", "Сохраняем…") : ui("Save", "Сохранить")}
                           </Button>
                           <Button
                             size="xs"
@@ -451,7 +453,7 @@ export function SnapShotSettings() {
                               setShortcutCheck({ status: "idle", availability: null });
                             }}
                           >
-                            Cancel
+                            {ui("Cancel", "Отмена")}
                           </Button>
                         </>
                       ) : state?.mode === "portal" &&
@@ -482,7 +484,7 @@ export function SnapShotSettings() {
                       disabled={!captureAvailable}
                     >
                       {soundSelection === "off" ? (
-                        "Off"
+                        ui("Off", "Выкл.")
                       ) : soundSelection === "soft-pop" ? (
                         <>
                           Whoosh <span className="text-muted-foreground">(Default)</span>
@@ -499,7 +501,7 @@ export function SnapShotSettings() {
                         value={soundSelection}
                       >
                         <MenuRadioItem closeOnClick value="off">
-                          Off
+                          {ui("Off", "Выкл.")}
                         </MenuRadioItem>
                         <div className={soundOptionRowClassName}>
                           <MenuRadioItem closeOnClick value="soft-pop">

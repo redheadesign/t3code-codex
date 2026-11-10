@@ -3764,7 +3764,7 @@ export const layerWsRpc = (
             validateTaskWorkspaceScope(input).pipe(
               Effect.flatMap((): Effect.Effect<TaskWorkspaceSnapshot, TaskWorkspaceError> =>
                 input.localOnly === true && taskBoard !== undefined
-                  ? taskBoard.read(input.projectId).pipe(
+                  ? taskBoard.read(input.projectId, { taskId: input.taskId, threadId: input.threadId }).pipe(
                       Effect.map((board) => ({ ...emptyTaskWorkspaceSnapshot(), board })),
                     )
                   : taskWorkspace.read(input),

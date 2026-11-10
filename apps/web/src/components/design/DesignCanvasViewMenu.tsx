@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { Button } from "../ui/button";
@@ -56,6 +57,7 @@ export function DesignCanvasViewMenu({
   propertyLabels: boolean;
   onPropertyLabels: (value: boolean) => void;
 }) {
+  const ui = useUiText();
   const [draft, setDraft] = useState("");
   const percent = Math.round(zoom * 10000) / 100;
   return (
@@ -64,7 +66,15 @@ export function DesignCanvasViewMenu({
         if (open) setDraft(`${percent}%`);
       }}
     >
-      <MenuTrigger render={<Button size="xs" variant="ghost" aria-label="Zoom and view options" />}>
+      <MenuTrigger
+        render={
+          <Button
+            size="xs"
+            variant="ghost"
+            aria-label={ui("Zoom and view options", "Вид и масштаб")}
+          />
+        }
+      >
         <span className="tabular-nums">{Math.round(percent)}%</span>
         <ChevronDownIcon />
       </MenuTrigger>
@@ -72,7 +82,7 @@ export function DesignCanvasViewMenu({
         <div className="p-2">
           <Input
             size="sm"
-            aria-label="Canvas zoom"
+            aria-label={ui("Canvas zoom", "Масштаб холста")}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -84,16 +94,20 @@ export function DesignCanvasViewMenu({
         </div>
         <MenuSeparator />
         <MenuItem onClick={() => onZoom(zoom * 1.2)}>
-          Zoom in<MenuShortcut>⇧ +</MenuShortcut>
+          {ui("Zoom in", "Увеличить")}
+          <MenuShortcut>⇧ +</MenuShortcut>
         </MenuItem>
         <MenuItem onClick={() => onZoom(zoom / 1.2)}>
-          Zoom out<MenuShortcut>⇧ −</MenuShortcut>
+          {ui("Zoom out", "Уменьшить")}
+          <MenuShortcut>⇧ −</MenuShortcut>
         </MenuItem>
         <MenuItem onClick={() => onFit(false)}>
-          Zoom to fit<MenuShortcut>⇧ 1</MenuShortcut>
+          {ui("Zoom to fit", "Весь холст")}
+          <MenuShortcut>⇧ 1</MenuShortcut>
         </MenuItem>
         <MenuItem onClick={() => onFit(true)}>
-          Zoom to selection<MenuShortcut>⇧ 2</MenuShortcut>
+          {ui("Zoom to selection", "К выделению")}
+          <MenuShortcut>⇧ 2</MenuShortcut>
         </MenuItem>
         {[50, 100, 200].map((value) => (
           <MenuItem key={value} onClick={() => onZoom(value / 100)}>
@@ -103,7 +117,7 @@ export function DesignCanvasViewMenu({
         <MenuSeparator />
         <MenuSub>
           <MenuSubTrigger>
-            Pixel preview
+            {ui("Pixel preview", "Пиксельный вид")}
             <MenuShortcut>{isMacPlatform(navigator.platform) ? "⌃ P" : "Ctrl Alt P"}</MenuShortcut>
           </MenuSubTrigger>
           <MenuSubPopup>
@@ -114,7 +128,7 @@ export function DesignCanvasViewMenu({
               {([0, 1, 2] as const).map((value) => (
                 <MenuRadioItem key={value} value={value} closeOnClick>
                   <span className="flex items-center justify-between gap-8">
-                    {value === 0 ? "Disabled" : `${value}x`}
+                    {value === 0 ? ui("Disabled", "Выкл.") : `${value}x`}
                     <MenuRadioItemIndicator />
                   </span>
                 </MenuRadioItem>
@@ -124,33 +138,33 @@ export function DesignCanvasViewMenu({
         </MenuSub>
         <MenuCheckboxItem checked={pixelGrid} onCheckedChange={onPixelGrid}>
           <span className="flex w-full items-center justify-between gap-6">
-            <span>Pixel grid</span>
+            <span>{ui("Pixel grid", "Сетка пикселей")}</span>
             <MenuShortcut>⇧ '</MenuShortcut>
           </span>
         </MenuCheckboxItem>
         <MenuCheckboxItem checked={snap} onCheckedChange={onSnap}>
           <span className="flex w-full items-center justify-between gap-6">
-            <span>Snap to pixel grid</span>
+            <span>{ui("Snap to pixel grid", "Привязка к пикселям")}</span>
             <MenuShortcut>⇧ ⌘ '</MenuShortcut>
           </span>
         </MenuCheckboxItem>
         <MenuCheckboxItem checked={guides} onCheckedChange={onGuides}>
-          Guides
+          {ui("Guides", "Направляющие")}
         </MenuCheckboxItem>
         <MenuCheckboxItem checked={rulers} onCheckedChange={onRulers}>
           <span className="flex w-full items-center justify-between gap-6">
-            <span>Rulers</span>
+            <span>{ui("Rulers", "Линейки")}</span>
             <MenuShortcut>⇧ R</MenuShortcut>
           </span>
         </MenuCheckboxItem>
         <MenuCheckboxItem checked={outlines} onCheckedChange={onOutlines}>
           <span className="flex w-full items-center justify-between gap-6">
-            <span>Outlines</span>
+            <span>{ui("Outlines", "Контуры")}</span>
             <MenuShortcut>⌘ Y</MenuShortcut>
           </span>
         </MenuCheckboxItem>
         <MenuCheckboxItem checked={propertyLabels} onCheckedChange={onPropertyLabels}>
-          Property labels
+          {ui("Property labels", "Подписи свойств")}
         </MenuCheckboxItem>
       </MenuPopup>
     </Menu>

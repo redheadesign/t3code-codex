@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { useState } from "react";
 
@@ -13,6 +14,13 @@ import { searchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
 export function NotificationSettings() {
+  const ui = useUiText();
+  const modeLabels = {
+    off: ui("Off", "Выкл."),
+    notifications: ui(NOTIFICATION_MODE_LABELS.notifications, "Без звука"),
+    sound: ui(NOTIFICATION_MODE_LABELS.sound, "Только звук"),
+    "notifications-and-sound": ui(NOTIFICATION_MODE_LABELS["notifications-and-sound"], "Со звуком"),
+  };
   const mode = useScopedSettings((settings) => settings.notificationMode);
   const updateSettings = useUpdateScopedSettings();
   const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
@@ -23,7 +31,10 @@ export function NotificationSettings() {
       {...searchableSetting("thread-notifications")}
       description={
         permissionMessage ??
-        "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while T3 Code is open."
+        ui(
+          "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while T3 Code is open.",
+          "Уведомления о результате, ошибке или запросе ответа, пока T3 Code открыт.",
+        )
       }
       control={
         <Select
@@ -42,7 +53,10 @@ export function NotificationSettings() {
             if (hasDesktopNotifications(value)) {
               if (typeof Notification === "undefined" || !window.isSecureContext) {
                 setPermissionMessage(
-                  "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
+                  ui(
+                    "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
+                    "Для уведомлений откройте приложение или сайт по HTTPS. Звук доступен и здесь.",
+                  ),
                 );
                 return;
               }
@@ -51,13 +65,19 @@ export function NotificationSettings() {
               setRequesting(false);
               if (permission._tag === "Failure") {
                 setPermissionMessage(
-                  "Notifications are unavailable in this browser. Sound only is still available.",
+                  ui(
+                    "Notifications are unavailable in this browser. Sound only is still available.",
+                    "Браузер не поддерживает уведомления. Можно оставить звук.",
+                  ),
                 );
                 return;
               }
               if (permission.value !== "granted") {
                 setPermissionMessage(
-                  "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
+                  ui(
+                    "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
+                    "Разрешите уведомления в браузере или системе и выберите этот режим снова.",
+                  ),
                 );
                 return;
               }
@@ -65,11 +85,15 @@ export function NotificationSettings() {
             updateSettings({ notificationMode: value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Thread notifications">
-            <SelectValue>{NOTIFICATION_MODE_LABELS[mode]}</SelectValue>
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-56"
+            aria-label={ui("Thread notifications", "Системные")}
+          >
+            <SelectValue>{modeLabels[mode]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
-            {Object.entries(NOTIFICATION_MODE_LABELS).map(([value, label]) => (
+            {Object.entries(modeLabels).map(([value, label]) => (
               <SelectItem key={value} hideIndicator value={value}>
                 {label}
               </SelectItem>

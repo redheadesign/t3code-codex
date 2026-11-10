@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { pipe } from "effect/Function";
 import {
   SECRET_REQUEST_DEFAULT_PLACEHOLDER,
@@ -54,6 +55,7 @@ function PendingSecretRequestForm(props: {
   readonly environmentId: EnvironmentId;
   readonly item: SecretRequestItem;
 }) {
+  const ui = useUiText();
   const { item } = props;
   const inputId = useId();
   const errorId = useId();
@@ -143,7 +145,7 @@ function PendingSecretRequestForm(props: {
           />
         </div>
         <Button type="submit" disabled={submitting || secret.trim().length === 0}>
-          Save securely
+          {ui("Save securely", "Сохранить в секрете")}
         </Button>
       </div>
       {error !== null ? (
@@ -166,7 +168,7 @@ function PendingSecretRequestForm(props: {
           disabled={submitting}
           onClick={() => void send({ type: "decline" })}
         >
-          Decline
+          {ui("Decline", "Отклонить")}
         </Button>
       </div>
     </form>

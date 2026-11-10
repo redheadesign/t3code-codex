@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useState, type ReactNode } from "react";
 import {
   ChevronDownIcon,
@@ -55,6 +56,7 @@ function FontFamily({
   allNodes: readonly DesignNode[];
   onChange: (update: (node: DesignNode) => Partial<DesignNode> | null) => boolean;
 }) {
+  const ui = useUiText();
   const family = common(nodes, (node) => node.typography?.family ?? "system-ui");
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
@@ -92,12 +94,14 @@ function FontFamily({
         render={
           <button
             type="button"
-            aria-label="Font family"
+            aria-label={ui("Font family", "Шрифт")}
             className="flex h-6 w-full min-w-0 items-center justify-between rounded-md border border-input px-2 text-left text-xs outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
           />
         }
       >
-        <span className="truncate">{family.mixed ? "Mixed" : family.value}</span>
+        <span className="truncate">
+          {family.mixed ? ui("Mixed", "Разные значения") : family.value}
+        </span>
         <ChevronDownIcon className="size-3 shrink-0" />
       </PopoverTrigger>
       <PopoverPopup width="sm" align="end" padding="none">
@@ -105,9 +109,9 @@ function FontFamily({
           <Input
             size="sm"
             autoFocus
-            aria-label="Find font"
+            aria-label={ui("Find font", "Найти шрифт")}
             value={draft}
-            placeholder="Search or enter a font family"
+            placeholder={ui("Search or enter a font family", "Название шрифта")}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
@@ -117,7 +121,11 @@ function FontFamily({
             }}
           />
         </div>
-        <div className="max-h-64 overflow-y-auto px-1 pb-1" role="group" aria-label="Font families">
+        <div
+          className="max-h-64 overflow-y-auto px-1 pb-1"
+          role="group"
+          aria-label={ui("Font families", "Шрифты")}
+        >
           {fonts
             .filter((font) => font.toLowerCase().includes(draft.trim().toLowerCase()))
             .map((font) => (
@@ -154,6 +162,7 @@ export function DesignTextSizingControl({
   onChange: (update: (node: DesignNode) => Partial<DesignNode> | null) => boolean;
   compact?: boolean;
 }) {
+  const ui = useUiText();
   const sizing = common(nodes, (node) => {
     const width = node.layoutSizing?.width ?? "fixed";
     const height = node.layoutSizing?.height ?? "fixed";
@@ -185,7 +194,7 @@ export function DesignTextSizingControl({
           <Button
             size={compact ? "icon-xs" : "sm"}
             variant={compact ? "ghost-muted" : "secondary"}
-            aria-label="Text sizing"
+            aria-label={ui("Text sizing", "Размер текста")}
           />
         }
       >
@@ -194,7 +203,7 @@ export function DesignTextSizingControl({
         ) : (
           <>
             {sizing.mixed
-              ? "Mixed"
+              ? ui("Mixed", "Разные значения")
               : (sizingOptions.find(([value]) => value === sizing.value)?.[1] ?? "Fixed size")}
             <ChevronDownIcon />
           </>
@@ -248,6 +257,7 @@ export function DesignTypographyPanel({
   showSizing?: boolean;
   onChange: (update: (node: DesignNode) => Partial<DesignNode> | null) => boolean;
 }) {
+  const ui = useUiText();
   const type = <K extends keyof DesignTypography>(key: K, value: DesignTypography[K]) =>
     onChange((node) => ({ typography: { ...node.typography, [key]: value } }));
   const weight = common(
@@ -282,7 +292,7 @@ export function DesignTypographyPanel({
         mixed={value.mixed || unit.mixed}
         compact
         propertyLabels
-        placeholder={key === "lineHeight" ? "Auto" : undefined}
+        placeholder={key === "lineHeight" ? ui("Auto", "Авто") : undefined}
         suffix={!unit.mixed && unit.value === "percent" ? "%" : ""}
         min={key === "lineHeight" ? 0 : undefined}
         onChange={() => undefined}
@@ -307,7 +317,7 @@ export function DesignTypographyPanel({
                 <MenuItem
                   onClick={() => onChange((node) => designTypeMetricUpdate(node, key, "Auto"))}
                 >
-                  Auto
+                  {ui("Auto", "Авто")}
                 </MenuItem>
               ) : null}
               {(["px", "percent"] as const).map((next) => (
@@ -332,7 +342,7 @@ export function DesignTypographyPanel({
                     )
                   }
                 >
-                  {next === "px" ? "Pixels" : "Percent"}
+                  {next === "px" ? ui("Pixels", "Пиксели") : ui("Percent", "Проценты")}
                 </MenuItem>
               ))}
             </MenuPopup>
@@ -416,8 +426,11 @@ export function DesignTypographyPanel({
     (node) => node.typography?.fontVariationSettings ?? "normal",
   );
   return (
-    <section aria-label="Typography" className="space-y-2 border-b border-border/60 px-3 py-2.5">
-      <h3 className="text-xs font-medium">Typography</h3>
+    <section
+      aria-label={ui("Typography", "Текст")}
+      className="space-y-2 border-b border-border/60 px-3 py-2.5"
+    >
+      <h3 className="text-xs font-medium">{ui("Typography", "Текст")}</h3>
       {showSizing ? (
         <DesignTextSizingControl nodes={nodes} allNodes={allNodes} onChange={onChange} />
       ) : null}
@@ -428,12 +441,14 @@ export function DesignTypographyPanel({
             render={
               <button
                 type="button"
-                aria-label="Font style"
+                aria-label={ui("Font style", "Начертание")}
                 className="flex h-6 min-w-0 items-center justify-between gap-1 rounded-md bg-input/25 px-2 text-xs"
               />
             }
           >
-            <span className="truncate">{weight.mixed ? "Mixed" : styleName}</span>
+            <span className="truncate">
+              {weight.mixed ? ui("Mixed", "Разные значения") : styleName}
+            </span>
             <ChevronDownIcon className="size-3 shrink-0" />
           </MenuTrigger>
           <MenuPopup align="start">
@@ -457,7 +472,7 @@ export function DesignTypographyPanel({
           </MenuPopup>
         </Menu>
         <DesignNumberField
-          label="Font size"
+          label={ui("Font size", "Кегль")}
           prefix=""
           value={size.value}
           mixed={size.mixed}
@@ -482,7 +497,7 @@ export function DesignTypographyPanel({
                 render={
                   <button
                     type="button"
-                    aria-label="Font size presets"
+                    aria-label={ui("Font size presets", "Кегль")}
                     className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent"
                   />
                 }
@@ -511,7 +526,7 @@ export function DesignTypographyPanel({
         {metric("Letter spacing", "letterSpacing", "|A|")}
       </div>
       <div className="grid gap-2">
-        <span className="text-2xs text-muted-foreground">Alignment</span>
+        <span className="text-2xs text-muted-foreground">{ui("Alignment", "Выравнивание")}</span>
         <div className="flex items-center gap-2">
           <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
             {alignment(false)}
@@ -523,18 +538,26 @@ export function DesignTypographyPanel({
                 render={
                   <PopoverTrigger
                     render={
-                      <Button size="icon-xs" variant="ghost-muted" aria-label="Type settings" />
+                      <Button
+                        size="icon-xs"
+                        variant="ghost-muted"
+                        aria-label={ui("Type settings", "Параметры текста")}
+                      />
                     }
                   />
                 }
               >
                 <SlidersHorizontalIcon />
               </TooltipTrigger>
-              <TooltipPopup>Type settings</TooltipPopup>
+              <TooltipPopup>{ui("Type settings", "Параметры текста")}</TooltipPopup>
             </Tooltip>
             <PopoverPopup width="sm" side="left" align="start">
-              <div className="grid gap-4" role="group" aria-label="Type settings">
-                <h4 className="text-xs font-medium">Type settings</h4>
+              <div
+                className="grid gap-4"
+                role="group"
+                aria-label={ui("Type settings", "Параметры текста")}
+              >
+                <h4 className="text-xs font-medium">{ui("Type settings", "Параметры текста")}</h4>
                 {settingsRow(
                   "Decoration",
                   <div className="flex gap-1">
@@ -552,7 +575,11 @@ export function DesignTypographyPanel({
                             ? "ghost-muted"
                             : "secondary"
                         }
-                        aria-label={value === "underline" ? "Underline" : "Strikethrough"}
+                        aria-label={
+                          value === "underline"
+                            ? ui("Underline", "Подчёркивание")
+                            : ui("Strikethrough", "Зачёркивание")
+                        }
                         aria-pressed={!decoration.mixed && decoration.value.includes(value)}
                         onClick={() => {
                           onChange((node) => {
@@ -585,10 +612,16 @@ export function DesignTypographyPanel({
                   "Letter case",
                   <Menu>
                     <MenuTrigger
-                      render={<Button size="xs" variant="secondary" aria-label="Letter case" />}
+                      render={
+                        <Button
+                          size="xs"
+                          variant="secondary"
+                          aria-label={ui("Letter case", "Регистр")}
+                        />
+                      }
                     >
                       {letterCase.mixed
-                        ? "Mixed"
+                        ? ui("Mixed", "Разные значения")
                         : {
                             none: "Original",
                             uppercase: "UPPERCASE",
@@ -621,21 +654,31 @@ export function DesignTypographyPanel({
                   "Wrap style",
                   <Menu>
                     <MenuTrigger
-                      render={<Button size="xs" variant="secondary" aria-label="Wrap style" />}
+                      render={
+                        <Button
+                          size="xs"
+                          variant="secondary"
+                          aria-label={ui("Wrap style", "Перенос строк")}
+                        />
+                      }
                     >
                       {wrap.mixed
-                        ? "Mixed"
+                        ? ui("Mixed", "Разные значения")
                         : wrap.value === "auto"
-                          ? "Auto"
+                          ? ui("Auto", "Авто")
                           : wrap.value === "balance"
-                            ? "Balance"
-                            : "Pretty"}
+                            ? ui("Balance", "Равные строки")
+                            : ui("Pretty", "Без висячих слов")}
                       <ChevronDownIcon />
                     </MenuTrigger>
                     <MenuPopup>
                       {(["auto", "balance", "pretty"] as const).map((value) => (
                         <MenuItem key={value} onClick={() => type("wrap", value)}>
-                          {value === "auto" ? "Auto" : value === "balance" ? "Balance" : "Pretty"}
+                          {value === "auto"
+                            ? ui("Auto", "Авто")
+                            : value === "balance"
+                              ? ui("Balance", "Равные строки")
+                              : ui("Pretty", "Без висячих слов")}
                         </MenuItem>
                       ))}
                     </MenuPopup>
@@ -645,7 +688,7 @@ export function DesignTypographyPanel({
                   "OpenType features",
                   <Input
                     size="sm"
-                    aria-label="OpenType features"
+                    aria-label={ui("OpenType features", "Опции OpenType")}
                     placeholder='e.g. "kern", "liga"'
                     value={fontFeatureSettings.mixed ? "Mixed" : fontFeatureSettings.value}
                     onChange={(event) => type("fontFeatureSettings", event.target.value)}
@@ -655,7 +698,7 @@ export function DesignTypographyPanel({
                   "Variable font axes",
                   <Input
                     size="sm"
-                    aria-label="Variable font axes"
+                    aria-label={ui("Variable font axes", "Оси шрифта")}
                     placeholder='e.g. "wght" 650, "wdth" 90'
                     value={fontVariationSettings.mixed ? "Mixed" : fontVariationSettings.value}
                     onChange={(event) => type("fontVariationSettings", event.target.value)}
@@ -666,7 +709,7 @@ export function DesignTypographyPanel({
                   <div className="grid grid-cols-2 gap-2">
                     <DesignNumberField
                       compact
-                      label="Indent"
+                      label={ui("Indent", "Отступ")}
                       displayLabel="Indent"
                       prefix="↦"
                       value={indent.value}
@@ -676,7 +719,7 @@ export function DesignTypographyPanel({
                     />
                     <DesignNumberField
                       compact
-                      label="Paragraph spacing"
+                      label={ui("Paragraph spacing", "Отступ абзаца")}
                       displayLabel="Spacing"
                       prefix="↕"
                       value={paragraphSpacing.value}
@@ -690,25 +733,31 @@ export function DesignTypographyPanel({
                   "List style",
                   <Menu>
                     <MenuTrigger
-                      render={<Button size="xs" variant="secondary" aria-label="List style" />}
+                      render={
+                        <Button
+                          size="xs"
+                          variant="secondary"
+                          aria-label={ui("List style", "Вид списка")}
+                        />
+                      }
                     >
                       {listStyle.mixed
-                        ? "Mixed"
+                        ? ui("Mixed", "Разные значения")
                         : listStyle.value === "bulleted"
-                          ? "Bulleted"
+                          ? ui("Bulleted", "Маркеры")
                           : listStyle.value === "numbered"
-                            ? "Numbered"
-                            : "None"}
+                            ? ui("Numbered", "Номера")
+                            : ui("None", "Нет")}
                       <ChevronDownIcon />
                     </MenuTrigger>
                     <MenuPopup>
                       {(["none", "bulleted", "numbered"] as const).map((value) => (
                         <MenuItem key={value} onClick={() => type("listStyle", value)}>
                           {value === "none"
-                            ? "None"
+                            ? ui("None", "Нет")
                             : value === "bulleted"
-                              ? "Bulleted"
-                              : "Numbered"}
+                              ? ui("Bulleted", "Маркеры")
+                              : ui("Numbered", "Номера")}
                         </MenuItem>
                       ))}
                     </MenuPopup>
@@ -719,21 +768,31 @@ export function DesignTypographyPanel({
                   <div className="grid gap-2">
                     <Menu>
                       <MenuTrigger
-                        render={<Button size="xs" variant="secondary" aria-label="Truncation" />}
+                        render={
+                          <Button
+                            size="xs"
+                            variant="secondary"
+                            aria-label={ui("Truncation", "Обрезка")}
+                          />
+                        }
                       >
                         {truncation.mixed
-                          ? "Mixed"
+                          ? ui("Mixed", "Разные значения")
                           : truncation.value === "ellipsis"
-                            ? "Ellipsis"
+                            ? ui("Ellipsis", "Многоточие")
                             : truncation.value === "clip"
-                              ? "Clip"
-                              : "None"}
+                              ? ui("Clip", "Обрезать")
+                              : ui("None", "Нет")}
                         <ChevronDownIcon />
                       </MenuTrigger>
                       <MenuPopup>
                         {(["none", "clip", "ellipsis"] as const).map((value) => (
                           <MenuItem key={value} onClick={() => type("truncation", value)}>
-                            {value === "none" ? "None" : value === "clip" ? "Clip" : "Ellipsis"}
+                            {value === "none"
+                              ? ui("None", "Нет")
+                              : value === "clip"
+                                ? ui("Clip", "Обрезать")
+                                : ui("Ellipsis", "Многоточие")}
                           </MenuItem>
                         ))}
                       </MenuPopup>
@@ -741,7 +800,7 @@ export function DesignTypographyPanel({
                     {truncation.value !== "none" ? (
                       <DesignNumberField
                         compact
-                        label="Max lines"
+                        label={ui("Max lines", "Макс. строк")}
                         displayLabel="Max lines"
                         prefix="#"
                         value={maxLines.value || undefined}

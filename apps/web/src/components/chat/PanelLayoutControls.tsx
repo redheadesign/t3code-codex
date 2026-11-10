@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { PanelBottomIcon, PanelRightCloseIcon, PanelRightIcon, SquareMenuIcon } from "lucide-react";
 import { Maximize2, Minimize2 } from "lucide";
 import { MorphIcon } from "~/components/MorphIcon";
@@ -49,12 +50,13 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
   onToggleThreadPanel,
   onToggleRightPanel,
 }: PanelLayoutControlsProps) {
+  const ui = useUiText();
   const threadPanelToggle = (
     <Toggle
       className="relative shrink-0 [-webkit-app-region:no-drag]"
       pressed={threadPanelOpen}
       onPressedChange={threadPanelPresentation === "popover" ? undefined : onToggleThreadPanel}
-      aria-label="Toggle thread details panel"
+      aria-label={ui("Toggle thread details panel", "Детали чата")}
       variant="ghost"
       size="sm"
     >
@@ -90,7 +92,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
               className="shrink-0 [-webkit-app-region:no-drag]"
               pressed={terminalOpen}
               onPressedChange={onToggleTerminal}
-              aria-label="Toggle terminal drawer"
+              aria-label={ui("Toggle terminal drawer", "Терминал")}
               variant="ghost"
               size="sm"
               disabled={!terminalAvailable}
@@ -101,7 +103,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
           <TooltipPopup side="bottom">
             {terminalAvailable
               ? `Toggle terminal drawer${terminalShortcutLabel ? ` (${terminalShortcutLabel})` : ""}`
-              : "Terminal drawer is unavailable"}
+              : ui("Terminal drawer is unavailable", "Терминал недоступен")}
           </TooltipPopup>
         </Tooltip>
       ) : null}
@@ -112,7 +114,11 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
               className="shrink-0 [-webkit-app-region:no-drag]"
               pressed={rightPanelOpen}
               onPressedChange={onToggleRightPanel}
-              aria-label={rightPanelOpen ? "Close right panel" : "Open right panel"}
+              aria-label={
+                rightPanelOpen
+                  ? ui("Close right panel", "Закрыть панель")
+                  : ui("Open right panel", "Открыть панель")
+              }
               data-right-panel-toggle
               variant="ghost"
               size="sm"

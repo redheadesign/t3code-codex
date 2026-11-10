@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { ReactNode } from "react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
@@ -201,6 +202,7 @@ function TerminalFontRow() {
 }
 
 function FontSmoothingRow() {
+  const ui = useUiText();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   if (!isMacPlatform(navigator.platform)) return null;
@@ -222,7 +224,7 @@ function FontSmoothingRow() {
         <Switch
           checked={settings.fontSmoothing}
           onCheckedChange={(checked) => updateSettings({ fontSmoothing: Boolean(checked) })}
-          aria-label="Font smoothing"
+          aria-label={ui("Font smoothing", "Сглаживание")}
         />
       }
     />
@@ -273,6 +275,7 @@ function SeparateFontsRow({
   readonly checked: boolean;
   readonly onCheckedChange: (checked: boolean) => void;
 }) {
+  const ui = useUiText();
   return (
     <SettingsRow
       {...searchableSetting("separate-fonts")}
@@ -281,7 +284,7 @@ function SeparateFontsRow({
         <Switch
           checked={checked}
           onCheckedChange={(next) => onCheckedChange(Boolean(next))}
-          aria-label="Separate fonts"
+          aria-label={ui("Separate fonts", "Разные шрифты")}
         />
       }
     />
@@ -319,6 +322,7 @@ function SimpleFontRows() {
 }
 
 export function TypographySection() {
+  const ui = useUiText();
   const [advanced, setAdvanced] = useLocalStorage(
     TYPOGRAPHY_ADVANCED_STORAGE_KEY,
     false,
@@ -335,7 +339,7 @@ export function TypographySection() {
   const showAdvanced =
     advanced || (searchTargetId !== null && isAdvancedTypographyTarget(searchTargetId));
   return (
-    <SettingsSection id="typography" title="Typography">
+    <SettingsSection id="typography" title={ui("Typography", "Текст")}>
       {showAdvanced ? <FontSettingsGroup /> : <SimpleFontRows />}
       <WordWrapRow />
       <AdvancedSettings

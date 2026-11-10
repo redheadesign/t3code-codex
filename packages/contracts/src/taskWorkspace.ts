@@ -1,10 +1,25 @@
 import * as Schema from "effect/Schema";
 
-import { EnvironmentId, IsoDateTime, ProjectId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import {
+  EnvironmentId,
+  IsoDateTime,
+  MessageId,
+  ProjectId,
+  RunId,
+  ThreadId,
+  TrimmedNonEmptyString,
+} from "./baseSchemas.ts";
+import { ModelSelection } from "./modelSelection.ts";
+import { ProviderDriverKind } from "./providerInstance.ts";
 import { SecretReference } from "./secretReference.ts";
 
-const Id = TrimmedNonEmptyString.check(Schema.isMaxLength(256));
+const ID_LIMIT = 256;
+const Id = TrimmedNonEmptyString.check(Schema.isMaxLength(ID_LIMIT));
 const LongText = Schema.String.check(Schema.isMaxLength(200_000));
+export const TASK_WORKSPACE_FEEDBACK_MAX_COMMENTS = 100;
+export const TASK_WORKSPACE_FEEDBACK_MAX_CHARS = 190_000;
+export const TASK_WORKSPACE_FEEDBACK_COMMENT_MAX_CHARS =
+  TASK_WORKSPACE_FEEDBACK_MAX_CHARS - ID_LIMIT;
 
 export const TaskWorkspaceTaskStatus = Schema.Struct({
   name: TrimmedNonEmptyString,
@@ -221,6 +236,45 @@ export const TaskWorkspaceBoardActivity = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
+export const TaskWorkspaceBoardComment = Schema.Struct({
+  ...TaskWorkspaceComment.fields,
+  feedback: Schema.optional(
+    Schema.Struct({
+      status: Schema.Literals(["pending", "sending", "sent", "resolved"]),
+      messageId: Schema.optional(MessageId),
+      sentAt: Schema.optional(IsoDateTime),
+      delivery: Schema.optional(Schema.Literals(["started", "queued"])),
+      resolvedAt: Schema.optional(IsoDateTime),
+    }),
+  ),
+});
+export type TaskWorkspaceBoardComment = typeof TaskWorkspaceBoardComment.Type;
+
+const linkFields = {
+  title: Id,
+  kind: Schema.Literals(["url", "file", "design"]),
+  target: TrimmedNonEmptyString.check(Schema.isMaxLength(2_048)),
+};
+export const TaskWorkspaceBoardLink = Schema.Struct({
+  id: Id,
+  ...linkFields,
+  author: Id,
+  createdAt: IsoDateTime,
+});
+export type TaskWorkspaceBoardLink = typeof TaskWorkspaceBoardLink.Type;
+
+export const TaskWorkspaceThreadHistoryEntry = Schema.Struct({
+  id: Id,
+  kind: Schema.Literals(["run", "branch", "provider"]),
+  description: LongText,
+  createdAt: IsoDateTime,
+  runId: Schema.optional(RunId),
+  branch: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
+  previousBranch: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
+  provider: Schema.optional(ProviderDriverKind),
+});
+export type TaskWorkspaceThreadHistoryEntry = typeof TaskWorkspaceThreadHistoryEntry.Type;
+
 export const TaskWorkspaceBoardTask = Schema.Struct({
   id: Id,
   title: Id,
@@ -229,8 +283,11 @@ export const TaskWorkspaceBoardTask = Schema.Struct({
   threadId: Schema.NullOr(ThreadId),
   claim: Schema.NullOr(Schema.Struct({ owner: Id, claimedAt: IsoDateTime })),
   blockedBy: Schema.Array(Id).check(Schema.isMaxLength(100)),
-  comments: Schema.Array(TaskWorkspaceComment),
+  comments: Schema.Array(TaskWorkspaceBoardComment),
   activity: Schema.Array(TaskWorkspaceBoardActivity),
+  initialBrief: Schema.optional(LongText),
+  links: Schema.optional(Schema.Array(TaskWorkspaceBoardLink).check(Schema.isMaxLength(64))),
+  threadHistory: Schema.optional(Schema.Array(TaskWorkspaceThreadHistoryEntry)),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -245,6 +302,7 @@ export const TaskWorkspaceBoard = Schema.Struct({
   revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   tasks: Schema.Array(TaskWorkspaceBoardTask),
   wiki: TaskWorkspaceProjectWiki,
+  intakeThreadId: Schema.optional(ThreadId),
 });
 export type TaskWorkspaceBoard = typeof TaskWorkspaceBoard.Type;
 
@@ -268,6 +326,8 @@ export const TaskWorkspaceReadInput = Schema.Struct({
   assignee: Schema.optional(Schema.String),
   sprintId: Schema.optional(Schema.String),
   localOnly: Schema.optional(Schema.Boolean),
+  taskId: Schema.optional(Id),
+  threadId: Schema.optional(ThreadId),
 });
 export type TaskWorkspaceReadInput = typeof TaskWorkspaceReadInput.Type;
 
@@ -292,7 +352,10 @@ export const TaskWorkspaceConfigureScenario = Schema.Struct({
 export const TaskWorkspaceRunScenario = Schema.Struct({ taskId: Id });
 export const TaskWorkspaceCancelRun = Schema.Struct({ taskId: Id });
 export const TaskWorkspaceRetryStage = Schema.Struct({ taskId: Id, stageId: Id });
-export const TaskWorkspaceSelectVariants = Schema.Struct({ taskId: Id, variantIds: Schema.Array(Id).check(Schema.isMaxLength(3)) });
+export const TaskWorkspaceSelectVariants = Schema.Struct({
+  taskId: Id,
+  variantIds: Schema.Array(Id).check(Schema.isMaxLength(3)),
+});
 export const TaskWorkspaceLaunchStorybook = Schema.Struct({
   taskId: Id,
   artifactId: Id,
@@ -306,7 +369,7 @@ export const TaskWorkspacePublishVariant = Schema.Struct({
 });
 export const TaskWorkspaceSync = Schema.Struct({});
 
-export const TaskWorkspaceBoardCommand = Schema.Union([
+export const TaskWorkspaceBoardAgentCommand = Schema.Union([
   Schema.TaggedStruct("createLocalTask", {
     title: Id,
     description: LongText,
@@ -321,9 +384,27 @@ export const TaskWorkspaceBoardCommand = Schema.Union([
   }),
   Schema.TaggedStruct("openLocalTask", { taskId: Id }),
   Schema.TaggedStruct("commentLocalTask", { taskId: Id, body: LongText }),
+  Schema.TaggedStruct("resolveLocalTaskFeedback", { taskId: Id, commentId: Id }),
+  Schema.TaggedStruct("addLocalTaskLink", { taskId: Id, ...linkFields }),
+  Schema.TaggedStruct("removeLocalTaskLink", { taskId: Id, linkId: Id }),
   Schema.TaggedStruct("claimLocalTask", { taskId: Id, owner: Id }),
   Schema.TaggedStruct("releaseLocalTask", { taskId: Id }),
   Schema.TaggedStruct("updateProjectWiki", { content: LongText }),
+]);
+export const TaskWorkspaceBoardCommand = Schema.Union([
+  TaskWorkspaceBoardAgentCommand,
+  Schema.TaggedStruct("sendLocalTaskFeedback", {
+    taskId: Id,
+    commentIds: Schema.Array(Id).check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(TASK_WORKSPACE_FEEDBACK_MAX_COMMENTS),
+    ),
+  }),
+  Schema.TaggedStruct("submitLocalTaskIdeas", {
+    submissionId: Id,
+    prompt: LongText,
+    modelSelection: ModelSelection,
+  }),
 ]);
 export type TaskWorkspaceBoardCommand = typeof TaskWorkspaceBoardCommand.Type;
 

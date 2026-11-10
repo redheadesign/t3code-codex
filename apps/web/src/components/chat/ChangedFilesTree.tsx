@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useSyncLayout } from "@legendapp/list/react";
 import { type OrchestrationV2CheckpointFileTotals, type RunId } from "@t3tools/contracts";
 import { type MouseEvent, type ReactNode, memo, useLayoutEffect, useRef, useState } from "react";
@@ -36,6 +37,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
   onOpenTurnDiff: (runId: RunId, filePath?: string) => void;
   onFileContextMenu?: ChangedFileContextMenuHandler | undefined;
 }) {
+  const ui = useUiText();
   const {
     runId,
     files,
@@ -82,7 +84,9 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                     size="icon-xs"
                     variant="ghost-muted"
                     aria-label={
-                      allDirectoriesExpanded ? "Collapse all folders" : "Expand all folders"
+                      allDirectoriesExpanded
+                        ? ui("Collapse all folders", "Свернуть папки")
+                        : ui("Expand all folders", "Раскрыть папки")
                     }
                     data-scroll-anchor-ignore
                     onClick={() => {
@@ -98,7 +102,9 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                 />
               </TooltipTrigger>
               <TooltipPopup side="top">
-                {allDirectoriesExpanded ? "Collapse all folders" : "Expand all folders"}
+                {allDirectoriesExpanded
+                  ? ui("Collapse all folders", "Свернуть папки")
+                  : ui("Expand all folders", "Раскрыть папки")}
               </TooltipPopup>
             </Tooltip>
           )}
@@ -109,15 +115,17 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                   type="button"
                   size="sm"
                   variant="ghost-muted"
-                  aria-label="Open diff"
+                  aria-label={ui("Open diff", "Открыть правки")}
                   onClick={() => onOpenTurnDiff(runId, files[0]?.path)}
                 />
               }
             >
               <FileDiffIcon className="size-3" />
-              <span className="hidden @[24rem]/changed-files:inline">Open diff</span>
+              <span className="hidden @[24rem]/changed-files:inline">
+                {ui("Open diff", "Открыть правки")}
+              </span>
             </TooltipTrigger>
-            <TooltipPopup side="top">Open the full diff</TooltipPopup>
+            <TooltipPopup side="top">{ui("Open the full diff", "Все правки")}</TooltipPopup>
           </Tooltip>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
@@ -69,12 +70,13 @@ export function AppRouteModal({ label, children }: { label: string; children: Re
 }
 
 export function AppRouteModalClose({ className }: { className?: string } = {}) {
+  const ui = useUiText();
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <DialogPrimitive.Close
-            aria-label="Close"
+            aria-label={ui("Close", "Закрыть")}
             render={<Button className={cn(className)} size="icon-sm" variant="ghost" />}
           />
         }

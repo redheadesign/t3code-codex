@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { PointerEvent } from "react";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 
@@ -16,6 +17,7 @@ export function DesignRotationOriginHandle({
   onChange: (point: { x: number; y: number }) => void;
   onReset: () => void;
 }) {
+  const ui = useUiText();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -23,7 +25,7 @@ export function DesignRotationOriginHandle({
           <button
             type="button"
             data-design-rotation-origin=""
-            aria-label="Rotation origin"
+            aria-label={ui("Rotation origin", "Центр вращения")}
             aria-description={
               disabled
                 ? "Auto layout controls this layer’s position. Use absolute positioning to move its rotation origin."
@@ -100,8 +102,14 @@ export function DesignRotationOriginHandle({
       </TooltipTrigger>
       <TooltipPopup>
         {disabled
-          ? "Auto layout controls this layer’s position. Use absolute positioning to move its rotation origin."
-          : "Rotation origin · double-click to reset"}
+          ? ui(
+              "Auto layout controls this layer’s position. Use absolute positioning to move its rotation origin.",
+              "Позицию задаёт авторазметка. Для смены центра вращения включите абсолютную позицию.",
+            )
+          : ui(
+              "Rotation origin · double-click to reset",
+              "Центр вращения · Двойной клик для сброса",
+            )}
       </TooltipPopup>
     </Tooltip>
   );

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { AuthSettingsWriteScope, type EnvironmentId, sessionGrantsScope } from "@t3tools/contracts";
 import { ChevronDownIcon, PlusIcon, RotateCcwIcon, XIcon } from "lucide-react";
@@ -101,6 +102,7 @@ export function UsagePriceOverrides({
   readonly initialModel?: string | undefined;
   readonly onOpenChange: (open: boolean) => void;
 }) {
+  const ui = useUiText();
   const environments = useAtomValue(priceTargetsAtom);
   const [selectedIds, setSelectedIds] = useState(initialSelectedEnvironmentIds);
   const selected = environments.filter(
@@ -447,7 +449,11 @@ export function UsagePriceOverrides({
                                   value={row.alias ?? aliasCell.value}
                                   aria-label={`Map ${row.model || "new model"} to model`}
                                   list="usage-alias-models"
-                                  placeholder={row.isNew ? "Optional" : aliasCell.placeholder}
+                                  placeholder={
+                                    row.isNew
+                                      ? ui("Optional", "Необязательно")
+                                      : aliasCell.placeholder
+                                  }
                                   autoComplete="off"
                                   spellCheck={false}
                                   disabled={locked}
@@ -581,7 +587,7 @@ export function UsagePriceOverrides({
                         ? `Not saved · ${result.error}`
                         : result?.status === "saved"
                           ? "Saved"
-                          : "Saving…"}
+                          : ui("Saving…", "Сохраняем…")}
                     </span>
                   </div>
                 );
@@ -608,7 +614,7 @@ export function UsagePriceOverrides({
               onClick={() => void save(failedDestinations.length > 0)}
             >
               {pending
-                ? "Saving…"
+                ? ui("Saving…", "Сохраняем…")
                 : failedDestinations.length > 0
                   ? "Retry failed saves"
                   : "Save changes"}

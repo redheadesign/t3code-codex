@@ -1,16 +1,32 @@
 import { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
+import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { useState } from "react";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import { render } from "../../../test/render";
 import { useProjects, useQuietThreadShells } from "../../state/entities";
 import { makeThreadFixture } from "../../test-fixtures";
+import { useUiStateStore } from "../../uiStateStore";
 import { SidebarProvider } from "../ui/sidebar";
-import { SidebarActivityButton } from "./SidebarActivity";
+import { SidebarActivityButton, SidebarActivityPanel } from "./SidebarActivity";
 
 vi.mock("../../state/entities", { spy: true });
 
-it("opens with the keyboard and prioritizes chats that need attention", async () => {
+function ActivityFixture() {
+  const [open, setOpen] = useState(false);
+  return open ? (
+    <SidebarActivityPanel onBack={() => setOpen(false)} />
+  ) : (
+    <>
+      <SidebarActivityButton onOpen={() => setOpen(true)} />
+      <p>Projects</p>
+    </>
+  );
+}
+
+it("opens the sidebar with the keyboard, prioritizes attention, and returns to projects", async () => {
+  using stack = new DisposableStack();
   const environmentId = EnvironmentId.make("local");
   const approval = makeThreadFixture({
     environmentId,
@@ -22,7 +38,6 @@ it("opens with the keyboard and prioritizes chats that need attention", async ()
     environmentId,
     id: ThreadId.make("completed"),
     title: "Build finished",
-    lastVisitedAt: "2026-11-10T09:00:00.000Z",
     latestRun: {
       runId: RunId.make("last-run"),
       status: "completed",
@@ -39,17 +54,28 @@ it("opens with the keyboard and prioritizes chats that need attention", async ()
     hasPendingApprovals: true,
     archivedAt: "2026-11-10T09:06:00.000Z",
   });
+  const previousVisits = useUiStateStore.getState().threadLastVisitedAtById;
+  stack.defer(() => useUiStateStore.setState({ threadLastVisitedAtById: previousVisits }));
+  useUiStateStore.setState({
+    threadLastVisitedAtById: {
+      ...previousVisits,
+      [scopedThreadKey(scopeThreadRef(environmentId, completion.id))]: "2026-11-10T09:00:00.000Z",
+    },
+  });
   vi.mocked(useProjects).mockReturnValue([]);
   vi.mocked(useQuietThreadShells).mockReturnValue([completion, approval, archived]);
   await using screen = await render(
     <SidebarProvider>
-      <SidebarActivityButton />
+      <ActivityFixture />
     </SidebarProvider>,
   );
 
-  const trigger = screen.getByRole("button", { name: "View activity" });
+  const trigger = screen.getByRole("button", { name: "Notifications" });
   trigger.element().focus();
   await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByRole("heading", { name: "Notifications" })).toBeVisible();
+  await expect.element(screen.getByText("Projects")).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("button", { name: "Back to projects" })).toHaveFocus();
   const entries = page.getByRole("list", { name: "Chat activity" }).getByRole("link");
   await expect.element(entries.nth(0)).toHaveAttribute("href", "/local/approval");
   await expect.element(entries.nth(0).getByText("Needs approval")).toBeVisible();
@@ -57,5 +83,11 @@ it("opens with the keyboard and prioritizes chats that need attention", async ()
   await expect.element(entries.nth(1).getByText("Completed · unread")).toBeVisible();
   await expect.element(page.getByText("Archived task")).not.toBeInTheDocument();
   await userEvent.keyboard("{Escape}");
-  await expect.element(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect.element(screen.getByText("Projects")).toBeVisible();
+  await userEvent.click(trigger);
+  await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
+  await expect.element(entries.nth(1).getByText("Completed", { exact: true })).toBeVisible();
+  await expect.element(entries.nth(0).getByText("Needs approval")).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Back to projects" }));
+  await expect.element(screen.getByText("Projects")).toBeVisible();
 });

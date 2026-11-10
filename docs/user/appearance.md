@@ -1,5 +1,8 @@
 # Appearance and themes
 
+On web and desktop, choose English or Russian in **Settings → General → Interface language**.
+The choice applies to this client.
+
 On web and desktop, open **Settings → Appearance** to choose a theme and follow the system
 appearance or stay in light or dark mode. To use different themes for light and dark mode, select
 the corresponding preview within each theme. Appearance preferences are saved separately on each

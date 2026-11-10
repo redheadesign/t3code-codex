@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   isSecretReference,
   type EnvironmentId,
@@ -34,6 +35,7 @@ export function SourceControlTokenSettings({
   readonly credentials: SourceControlHostCredentials;
   readonly onSaved: () => void;
 }) {
+  const ui = useUiText();
   const { tokens } = useEnvironmentSettings(environmentId, (settings) =>
     readHostCredentialSettings(settings, definition.kind),
   );
@@ -149,7 +151,7 @@ export function SourceControlTokenSettings({
                 disabled={saving}
                 onClick={() => void save(normalizedHost, "")}
               >
-                Remove
+                {ui("Remove", "Убрать")}
               </Button>
             ) : null}
             <Button
@@ -157,7 +159,7 @@ export function SourceControlTokenSettings({
               size="xs"
               disabled={!normalizedHost || submission === "" || saving}
             >
-              Save
+              {ui("Save", "Сохранить")}
             </Button>
           </div>
         </div>

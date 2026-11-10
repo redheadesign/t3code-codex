@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
 import {
@@ -70,6 +71,7 @@ import { buildThreadRouteParams, resolveThreadRouteRef } from "../threadRoutes";
 const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
 
 function WorkspaceGlobalChrome() {
+  const ui = useUiText();
   const navigate = useNavigate();
   const automationsPage = useLocation({
     select: (location) => isAutomationsPage(location.pathname),
@@ -125,12 +127,15 @@ function WorkspaceGlobalChrome() {
         {automationsPage || designPage || tasksPage ? (
           <span aria-hidden className="size-7" />
         ) : (
-          <SidebarTrigger aria-label="Toggle main sidebar" className="size-7" />
+          <SidebarTrigger
+            aria-label={ui("Toggle main sidebar", "Открыть или скрыть панель")}
+            className="size-7"
+          />
         )}
         <Button
           variant="ghost-muted"
           size="icon-sm"
-          aria-label="Global search"
+          aria-label={ui("Global search", "Поиск")}
           onClick={() => openCommandPalette()}
         >
           <SearchIcon aria-hidden className="size-4" />
@@ -529,6 +534,7 @@ function SidebarControl() {
 }
 
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
+  const ui = useUiText();
   const [sidebarRouteReveal] = useState<SidebarRouteReveal>(() => ({
     observedKey: null,
     pendingKey: null,
@@ -603,7 +609,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
                 data-app-sidebar=""
                 {...sidebarArea}
                 role={settingsPage ? "presentation" : "navigation"}
-                aria-label={settingsPage ? undefined : "Threads"}
+                aria-label={settingsPage ? undefined : ui("Threads", "Чаты")}
                 resizable={{
                   maxWidth: sidebarMaximumWidth,
                   minWidth: sidebarMinimumWidth,

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { AuthProvidersManageScope, ProviderDriverKind } from "@t3tools/contracts";
 import { readPreparedConnection, useEnvironmentScope } from "../../state/session";
 import {
@@ -103,6 +104,7 @@ interface CodexSetupSectionProps {
 }
 
 export function CodexSetupSection(props: CodexSetupSectionProps) {
+  const ui = useUiText();
   const [requested, setRequested] = useState(false);
   // A policy that owns Codex's launch settings also rules out ChatGPT's own runtime.
   const codexLocks = managedInstanceLocks(
@@ -148,10 +150,10 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
           existingReady ? (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
               <CheckIcon className="size-3.5" />
-              Ready
+              {ui("Ready", "Готово")}
             </span>
           ) : existingChecking ? (
-            <span className="text-xs text-muted-foreground">Checking...</span>
+            <span className="text-xs text-muted-foreground">{ui("Checking...", "Проверяем…")}</span>
           ) : existingAuthenticated ? (
             <span className="text-xs text-muted-foreground">{existingSummary.headline}</span>
           ) : (
@@ -189,7 +191,7 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
           }
           secondaryControl={
             <Button size="sm" variant="ghost-muted" disabled>
-              Cancel
+              {ui("Cancel", "Отмена")}
             </Button>
           }
         />
@@ -265,6 +267,7 @@ function ManagedCodexSetup({
   readonly onAutoStartConsumed: () => void;
   readonly allowExistingCli?: boolean;
 }) {
+  const ui = useUiText();
   const target = { environmentId, input: { instanceId } };
   const authQuery = useEnvironmentQuery(serverEnvironment.providerAuthState(target));
   const installQuery = useEnvironmentQuery(serverEnvironment.providerInstallState(target));
@@ -721,7 +724,7 @@ function ManagedCodexSetup({
             type="submit"
             disabled={pending || readOnly || !callbackUrl.trim()}
           >
-            Connect
+            {ui("Connect", "Подключить")}
           </Button>
         </form>
         {!remoteWeb ? (
@@ -840,7 +843,7 @@ function ManagedCodexSetup({
             authenticated && !busy ? (
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
                 <CheckIcon className="size-3.5" />
-                Ready
+                {ui("Ready", "Готово")}
               </span>
             ) : authActive ? (
               waitingControl
@@ -883,7 +886,7 @@ function ManagedCodexSetup({
                     );
                 }}
               >
-                Cancel
+                {ui("Cancel", "Отмена")}
               </Button>
             ) : !authActive && !authenticated && hasSavedAccount ? (
               <Button
@@ -940,7 +943,7 @@ function ManagedCodexSetup({
                       onSignInCancelled?.();
                     }}
                   >
-                    Cancel
+                    {ui("Cancel", "Отмена")}
                   </Button>
                 )}
               </>
@@ -960,7 +963,7 @@ function ManagedCodexSetup({
                   );
                 }}
               >
-                Cancel
+                {ui("Cancel", "Отмена")}
               </Button>
             ) : authenticated ? (
               <>
@@ -978,7 +981,7 @@ function ManagedCodexSetup({
                   disabled={unavailable || busy}
                   onClick={() => void run(() => logoutAuth(target))}
                 >
-                  Disconnect
+                  {ui("Disconnect", "Отключить")}
                 </Button>
               </>
             ) : (
@@ -1058,6 +1061,7 @@ export function CodexManagedRuntimeFields({
   readonly instanceId: ProviderInstanceId;
   readonly provider: ServerProvider | undefined;
 }) {
+  const ui = useUiText();
   const installation = useEnvironmentQuery(
     serverEnvironment.providerInstallState({
       environmentId,
@@ -1091,7 +1095,7 @@ export function CodexManagedRuntimeFields({
               aria-label="Codex home path"
               value={provider?.runtimePaths?.homePath ?? ""}
               title={provider?.runtimePaths?.homePath}
-              placeholder="Unavailable"
+              placeholder={ui("Unavailable", "Недоступно")}
               disabled
             />
           </div>
@@ -1110,7 +1114,7 @@ export function CodexManagedRuntimeFields({
               aria-label="Codex shadow home path"
               value={provider?.runtimePaths?.shadowHomePath ?? ""}
               title={provider?.runtimePaths?.shadowHomePath ?? undefined}
-              placeholder={provider?.runtimePaths ? "Not used" : "Unavailable"}
+              placeholder={provider?.runtimePaths ? "Not used" : ui("Unavailable", "Недоступно")}
               disabled
             />
           </div>

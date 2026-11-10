@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { VcsRef } from "@t3tools/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
@@ -57,6 +58,7 @@ export function BranchPicker({
   getItemType?: ((value: string) => string) | undefined;
   children: ReactNode;
 }) {
+  const ui = useUiText();
   const highlightedValueRef = useRef<string | null>(null);
   const startFromOriginSwitchId = useId();
   const branchListScrollElementRef = useRef<HTMLElement | null>(null);
@@ -152,7 +154,7 @@ export function BranchPicker({
       {children}
       <ComboboxPopup {...popupProps}>
         <ComboboxSearchInput
-          placeholder="Search refs..."
+          placeholder={ui("Search refs...", "Поиск веток")}
           value={query}
           onChange={(event) => {
             onQueryChange(event.target.value);
@@ -213,7 +215,9 @@ export function BranchPicker({
                   >
                     <span className="flex min-w-0 items-center gap-1.5 font-medium text-muted-foreground">
                       <RefreshIcon aria-hidden="true" className="size-3 shrink-0" />
-                      <span className="truncate">Start from remote</span>
+                      <span className="truncate">
+                        {ui("Start from remote", "Из удалённой ветки")}
+                      </span>
                     </span>
                     <Switch
                       id={startFromOriginSwitchId}

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import * as Schema from "effect/Schema";
 import { deriveProjectIdentity } from "../../projectIdentity";
 import { ProjectMonogram } from "../ProjectMonogram";
@@ -84,6 +85,7 @@ function ProjectIconPickerBody({
   readonly onClose: () => void;
   readonly onSelect: (icon: ProjectIconOverride) => void;
 }) {
+  const ui = useUiText();
   const automatic = deriveProjectIdentity(projectName);
   const [mode, setMode] = useState<ProjectIconOverride["kind"]>(current?.kind ?? "lucide");
   const [iconName, setIconName] = useState<string>(
@@ -138,7 +140,9 @@ function ProjectIconPickerBody({
 
         {mode !== "emoji" ? (
           <div>
-            <div className="mb-2 text-xs font-medium text-muted-foreground">Color</div>
+            <div className="mb-2 text-xs font-medium text-muted-foreground">
+              {ui("Color", "Цвет")}
+            </div>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Icon color">
               {PROJECT_ICON_COLORS.map((option) => (
                 <button
@@ -258,7 +262,7 @@ function ProjectIconPickerBody({
       </DialogPanel>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
-          Cancel
+          {ui("Cancel", "Отмена")}
         </Button>
         <Button onClick={save} disabled={mode === "monogram" && !validMonogram}>
           Save icon

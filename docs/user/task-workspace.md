@@ -14,6 +14,18 @@ Move cards between statuses or change a status from the task details. Completing
 its linked chat. Reopening it restores the chat. Use the project **Wiki** to record decisions,
 conventions, useful references and how to check the work.
 
+### Turn ideas into tasks
+
+Choose an agent above the board and send your ideas. T3 Code keeps these requests in a separate
+project chat. The agent can add backlog cards, update existing tasks and leave comments.
+
+Open a task to link a Canvas document, a project file or a URL. The task keeps its original brief
+and shows recorded runs, branch changes and agent handoffs from its linked chat.
+
+New comments from the board can be sent to the task chat. Use the play button to send pending
+feedback in a batch. If the chat is working, the message joins its queue. The task shows which
+comments have been sent and which the agent or a user has marked as processed.
+
 ## Coordinate agents
 
 Ask an agent to review the board, pick an available task and claim it before editing. Claims

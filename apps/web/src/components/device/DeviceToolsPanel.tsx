@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { DeviceHubAccess } from "@t3tools/client-runtime/state/deviceHubAccess";
 import type { DevicePermission, DeviceSummary, DeviceTextSize } from "@t3tools/contracts";
 import { ChevronDown, X } from "lucide-react";
@@ -86,6 +87,7 @@ export function DeviceToolsPanel(props: {
   readonly onClose: () => void;
   readonly className?: string;
 }) {
+  const ui = useUiText();
   const { device, controls } = props;
   const { detail, pending, error, foregroundApp, disabled, act } = controls;
   const settings = detail?.settings;
@@ -96,7 +98,7 @@ export function DeviceToolsPanel(props: {
       className={cn("flex min-h-0 flex-col border-border bg-background text-sm", props.className)}
     >
       <div className="flex h-9 shrink-0 items-center gap-2 border-b px-3">
-        <span className="font-medium">Tools</span>
+        <span className="font-medium">{ui("Tools", "Инструменты")}</span>
         {pending ? <Spinner size="sm" /> : null}
         <Button
           size="icon-xs"
@@ -126,7 +128,7 @@ export function DeviceToolsPanel(props: {
           </Section>
         ) : null}
 
-        <Section title="App">
+        <Section title={ui("App", "Приложение")}>
           <Row label="Foreground">
             <span className="truncate font-mono text-xs">{foregroundApp?.id ?? "-"}</span>
           </Row>
@@ -165,9 +167,9 @@ export function DeviceToolsPanel(props: {
         </Section>
 
         <Section title={isIos ? "Simulator" : "Emulator"}>
-          <Row label="Appearance">
+          <Row label={ui("Appearance", "Внешний вид")}>
             <ToggleGroup
-              aria-label="Appearance"
+              aria-label={ui("Appearance", "Внешний вид")}
               value={settings?.appearance ? [settings.appearance] : []}
               disabled={disabled}
               onValueChange={(value) => {
@@ -176,8 +178,8 @@ export function DeviceToolsPanel(props: {
                   void act({ type: "setAppearance", value: next });
               }}
             >
-              <Toggle value="light">Light</Toggle>
-              <Toggle value="dark">Dark</Toggle>
+              <Toggle value="light">{ui("Light", "Светлая")}</Toggle>
+              <Toggle value="dark">{ui("Dark", "Тёмная")}</Toggle>
             </ToggleGroup>
           </Row>
           <Row label="Text size">
@@ -203,7 +205,7 @@ export function DeviceToolsPanel(props: {
                     }
                   }}
                 >
-                  <Toggle value="clear">Clear</Toggle>
+                  <Toggle value="clear">{ui("Clear", "Очистить")}</Toggle>
                   <Toggle value="tinted">Tinted</Toggle>
                 </ToggleGroup>
               </Row>
@@ -450,6 +452,7 @@ function LocationSection(props: {
   readonly onSet: (latitude: number, longitude: number) => Promise<unknown>;
   readonly onClear: () => Promise<unknown>;
 }) {
+  const ui = useUiText();
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const parsed = { latitude: Number(latitude), longitude: Number(longitude) };
@@ -526,7 +529,7 @@ function LocationSection(props: {
               void props.onClear();
             }}
           >
-            Clear
+            {ui("Clear", "Очистить")}
           </Button>
         ) : null}
       </div>
@@ -545,13 +548,14 @@ function PermissionsSection(props: {
     decision: "grant" | "revoke" | "reset",
   ) => Promise<unknown>;
 }) {
+  const ui = useUiText();
   const [appId, setAppId] = useState("");
   const [permission, setPermission] = useState<DevicePermission>("camera");
   const resolvedAppId = appId.trim() || props.defaultAppId;
   const decide = (decision: "grant" | "revoke" | "reset") =>
     void props.onDecide(resolvedAppId, permission, decision);
   return (
-    <Section title="Permissions">
+    <Section title={ui("Permissions", "Права")}>
       <Input
         size="compact"
         font="mono"
@@ -585,7 +589,7 @@ function PermissionsSection(props: {
           disabled={props.disabled || !resolvedAppId}
           onClick={() => decide("revoke")}
         >
-          Revoke
+          {ui("Revoke", "Отозвать")}
         </Button>
         {props.canReset ? (
           <Button
@@ -594,7 +598,7 @@ function PermissionsSection(props: {
             disabled={props.disabled || !resolvedAppId}
             onClick={() => decide("reset")}
           >
-            Reset
+            {ui("Reset", "Сбросить")}
           </Button>
         ) : null}
       </div>

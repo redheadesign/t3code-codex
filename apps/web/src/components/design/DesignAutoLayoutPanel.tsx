@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useState } from "react";
 import {
   Columns2Icon,
@@ -22,6 +23,7 @@ export function DesignAutoLayoutPanel({
   model: DesignLayoutModel;
   onChange: (update: DesignLayoutModel) => void;
 }) {
+  const ui = useUiText();
   const [individualPadding, setIndividualPadding] = useState(false);
   const patch = (update: Partial<DesignLayoutModel>) => onChange({ ...model, ...update });
   const row = model.direction === "row" || model.kind === "grid";
@@ -33,11 +35,11 @@ export function DesignAutoLayoutPanel({
   };
   const alignments = ["start", "center", "end"] as const;
   return (
-    <div className="space-y-2" aria-label="Auto layout settings">
+    <div className="space-y-2" aria-label={ui("Auto layout settings", "Параметры авторазметки")}>
       <div className="flex items-start gap-2">
         <div
           role="group"
-          aria-label="Auto layout alignment"
+          aria-label={ui("Auto layout alignment", "Выравнивание")}
           className="grid size-16 shrink-0 grid-cols-3 grid-rows-3 rounded-md bg-input/25 p-1"
         >
           {alignments.flatMap((vertical) =>
@@ -81,7 +83,7 @@ export function DesignAutoLayoutPanel({
         <div className="grid min-w-0 flex-1 gap-2">
           <DesignNumberField
             compact
-            label="Gap"
+            label={ui("Gap", "Интервал")}
             prefix={row ? <Columns2Icon className="size-3" /> : <Rows2Icon className="size-3" />}
             value={model.gap ?? 0}
             min={0}
@@ -94,7 +96,7 @@ export function DesignAutoLayoutPanel({
                   <Button
                     size="icon-xs"
                     variant="ghost-muted"
-                    aria-label="Wrap auto layout"
+                    aria-label={ui("Wrap auto layout", "Перенос элементов")}
                     aria-pressed={model.wrap === true}
                     onClick={() => patch({ wrap: !model.wrap })}
                   />
@@ -102,7 +104,7 @@ export function DesignAutoLayoutPanel({
               >
                 <WrapTextIcon />
               </TooltipTrigger>
-              <TooltipPopup>Wrap</TooltipPopup>
+              <TooltipPopup>{ui("Wrap", "Перенос")}</TooltipPopup>
             </Tooltip>
             <Popover>
               <PopoverTrigger
@@ -110,7 +112,7 @@ export function DesignAutoLayoutPanel({
                   <Button
                     size="icon-xs"
                     variant="ghost-muted"
-                    aria-label="Auto layout advanced settings"
+                    aria-label={ui("Auto layout advanced settings", "Ещё параметры")}
                   />
                 }
               >
@@ -118,9 +120,9 @@ export function DesignAutoLayoutPanel({
               </PopoverTrigger>
               <PopoverPopup side="left" align="start" width="sm" padding="compact">
                 <div className="space-y-3">
-                  <h4 className="text-xs font-medium">Auto layout</h4>
+                  <h4 className="text-xs font-medium">{ui("Auto layout", "Авторазметка")}</h4>
                   <label className="grid gap-1 text-2xs text-muted-foreground">
-                    Spacing mode
+                    {ui("Spacing mode", "Интервалы")}
                     <Select
                       value={model.justify === "space-between" ? "auto" : "packed"}
                       onValueChange={(value) => {
@@ -128,12 +130,16 @@ export function DesignAutoLayoutPanel({
                           patch({ justify: value === "auto" ? "space-between" : "start" });
                       }}
                     >
-                      <SelectTrigger size="xs" width="fluid" aria-label="Spacing mode">
+                      <SelectTrigger
+                        size="xs"
+                        width="fluid"
+                        aria-label={ui("Spacing mode", "Интервалы")}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectPopup>
-                        <SelectItem value="packed">Packed</SelectItem>
-                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="packed">{ui("Packed", "Плотно")}</SelectItem>
+                        <SelectItem value="auto">{ui("Auto", "Авто")}</SelectItem>
                       </SelectPopup>
                     </Select>
                   </label>
@@ -147,17 +153,21 @@ export function DesignAutoLayoutPanel({
                         })
                       }
                     />
-                    Stretch children
+                    {ui("Stretch children", "Растянуть слои")}
                   </label>
                   <label className="grid gap-1 text-2xs text-muted-foreground">
-                    Counter-axis alignment
+                    {ui("Counter-axis alignment", "По поперечной оси")}
                     <Select
                       value={model.counterAxisAlign ?? "min"}
                       onValueChange={(value) => {
                         if (value !== null) patch({ counterAxisAlign: value });
                       }}
                     >
-                      <SelectTrigger size="xs" width="fluid" aria-label="Counter-axis alignment">
+                      <SelectTrigger
+                        size="xs"
+                        width="fluid"
+                        aria-label={ui("Counter-axis alignment", "По поперечной оси")}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectPopup>
@@ -178,7 +188,7 @@ export function DesignAutoLayoutPanel({
       {model.wrap || model.kind === "grid" ? (
         <DesignNumberField
           compact
-          label="Counter-axis spacing"
+          label={ui("Counter-axis spacing", "Поперечный отступ")}
           prefix={<Rows2Icon className="size-3" />}
           value={model.counterAxisSpacing ?? model.gap ?? 0}
           min={0}
@@ -205,7 +215,7 @@ export function DesignAutoLayoutPanel({
             <>
               <DesignNumberField
                 compact
-                label="Horizontal padding"
+                label={ui("Horizontal padding", "Отступ по X")}
                 prefix={<Columns2Icon className="size-3" />}
                 value={sides.left}
                 mixed={sides.left !== sides.right}
@@ -214,7 +224,7 @@ export function DesignAutoLayoutPanel({
               />
               <DesignNumberField
                 compact
-                label="Vertical padding"
+                label={ui("Vertical padding", "Отступ по Y")}
                 prefix={<Rows2Icon className="size-3" />}
                 value={sides.top}
                 mixed={sides.top !== sides.bottom}
@@ -230,7 +240,7 @@ export function DesignAutoLayoutPanel({
               <Button
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label="Individual padding"
+                aria-label={ui("Individual padding", "Свои отступы")}
                 aria-pressed={individualPadding}
                 onClick={() => setIndividualPadding(!individualPadding)}
               />
@@ -238,7 +248,7 @@ export function DesignAutoLayoutPanel({
           >
             <ScanIcon />
           </TooltipTrigger>
-          <TooltipPopup>Individual padding</TooltipPopup>
+          <TooltipPopup>{ui("Individual padding", "Свои отступы")}</TooltipPopup>
         </Tooltip>
       </div>
     </div>

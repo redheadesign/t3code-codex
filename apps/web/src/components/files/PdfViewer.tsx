@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   useEffect,
   useEffectEvent,
@@ -135,6 +136,7 @@ export default function PdfViewer(props: {
   initialView?: PdfViewState;
   onViewChange?: (view: PdfViewState) => void;
 }) {
+  const ui = useUiText();
   const [savedPosition] = useState(() =>
     props.positionKey === undefined ? undefined : positions.get(props.positionKey),
   );
@@ -368,7 +370,7 @@ export default function PdfViewer(props: {
           <ChevronDownIcon className="size-3.5" />
         </FileSurfaceAction>
         <FileSurfaceAction
-          label="Zoom out"
+          label={ui("Zoom out", "Уменьшить")}
           disabled={scale <= PDF_MIN_ZOOM}
           onPress={() => changeZoom(stepPdfZoom(scale, -1))}
         >
@@ -378,7 +380,7 @@ export default function PdfViewer(props: {
           {zoom === null ? "Fit width" : `${Math.round(scale * 100)}%`}
         </span>
         <FileSurfaceAction
-          label="Zoom in"
+          label={ui("Zoom in", "Увеличить")}
           disabled={scale >= PDF_MAX_ZOOM}
           onPress={() => changeZoom(stepPdfZoom(scale, 1))}
         >

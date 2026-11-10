@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { deriveThreadQueueWorkflowState } from "@t3tools/client-runtime/state/thread-workflows";
 import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
@@ -93,6 +94,7 @@ export function QueuedRunsControl({
   readonly timestampFormat: TimestampFormat;
   readonly onOpenThread: (threadId: ThreadId) => void;
 }) {
+  const ui = useUiText();
   const projection = useThreadProjection(
     scopeThreadRef(props.environmentId, props.threadId),
   )?.projection;
@@ -281,7 +283,7 @@ export function QueuedRunsControl({
                           }}
                         >
                           <ArrowUpIcon />
-                          Send now
+                          {ui("Send now", "Отправить")}
                         </Button>
                       </TooltipTrigger>
                       <TooltipPopup>
@@ -293,19 +295,21 @@ export function QueuedRunsControl({
                 {item.pending ? (
                   <span className="flex items-center gap-1 px-1">
                     <Clock3Icon aria-hidden className="size-3" />
-                    Saving
+                    {ui("Saving", "Сохраняем…")}
                   </span>
                 ) : null}
                 {isEditing ? (
                   <>
-                    <span className="px-1 text-foreground">Editing in the composer</span>
+                    <span className="px-1 text-foreground">
+                      {ui("Editing in the composer", "Правится в поле ввода")}
+                    </span>
                     <Button
                       size="xs"
                       variant="ghost"
-                      aria-label="Cancel editing queued message"
+                      aria-label={ui("Cancel editing queued message", "Отменить правку")}
                       onClick={props.onCancelEdit}
                     >
-                      Cancel
+                      {ui("Cancel", "Отмена")}
                     </Button>
                   </>
                 ) : (
@@ -316,7 +320,7 @@ export function QueuedRunsControl({
                         <Button
                           size="icon-xs"
                           variant="ghost-muted"
-                          aria-label="Edit queued message"
+                          aria-label={ui("Edit queued message", "Править сообщение")}
                           disabled={
                             item.runId === null ||
                             !item.editable ||
@@ -348,7 +352,7 @@ export function QueuedRunsControl({
                           <Button
                             size="icon-xs"
                             variant="ghost-muted"
-                            aria-label="Remove queued message"
+                            aria-label={ui("Remove queued message", "Убрать сообщение")}
                             disabled={item.runId === null || busyRunId !== null}
                             onClick={() => {
                               if (item.runId !== null) void remove(item.runId);
@@ -358,7 +362,7 @@ export function QueuedRunsControl({
                       >
                         <XIcon />
                       </TooltipTrigger>
-                      <TooltipPopup>Remove from queue</TooltipPopup>
+                      <TooltipPopup>{ui("Remove from queue", "Убрать из очереди")}</TooltipPopup>
                     </Tooltip>
                   </>
                 )}
@@ -377,7 +381,7 @@ export function QueuedRunsControl({
             onPointerDown={(event) => event.preventDefault()}
             onClick={() => setShowAll((value) => !value)}
           >
-            {showAll ? "Show fewer" : `Show all ${items.length} queued`}
+            {showAll ? ui("Show fewer", "Свернуть") : `Show all ${items.length} queued`}
             <ChevronDownIcon
               aria-hidden
               className={cn(
@@ -405,6 +409,7 @@ function QueuedMessage(props: {
   readonly onOpenThread: (threadId: ThreadId) => void;
   readonly children: ReactNode;
 }) {
+  const ui = useUiText();
   const presentation = props.message ? resolveUserMessagePresentation(props.message) : null;
   const attribution = presentation?.attribution ?? null;
   const scheduledTaskId = presentation?.scheduledTaskId;
@@ -435,7 +440,9 @@ function QueuedMessage(props: {
   return (
     <>
       {attribution === "t3code" ? (
-        <p className="me-1 text-2xs text-muted-foreground/70">Sent by T3 Code</p>
+        <p className="me-1 text-2xs text-muted-foreground/70">
+          {ui("Sent by T3 Code", "Отправлено T3 Code")}
+        </p>
       ) : null}
       {presentation?.guestName === undefined ? null : (
         <GuestMessageName name={presentation.guestName} />
@@ -501,7 +508,7 @@ function QueuedMessage(props: {
           <span className="me-1 flex items-center gap-2 px-1 opacity-0 transition-opacity duration-200 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover/queued:opacity-100">
             {attribution === "agent" && senderThreadId ? (
               <InlineButton tone="muted" onClick={() => props.onOpenThread(senderThreadId)}>
-                Open thread
+                {ui("Open thread", "Открыть чат")}
               </InlineButton>
             ) : null}
             {scheduledTaskId ? (
@@ -514,7 +521,7 @@ function QueuedMessage(props: {
                   />
                 }
               >
-                Open automation
+                {ui("Open automation", "Открыть автозадачу")}
               </InlineButton>
             ) : null}
             <TimelineRowTimestamp

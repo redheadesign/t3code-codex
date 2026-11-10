@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useState } from "react";
 
 import {
@@ -12,6 +13,7 @@ import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
 export function CliCommandSettingsRow() {
+  const ui = useUiText();
   const bridge = getDesktopCliCommandBridge();
   const query = useEnvironmentQuery(bridge ? desktopCliCommandStateAtom : null);
   const state = query.data;
@@ -55,7 +57,7 @@ export function CliCommandSettingsRow() {
           disabled={pending || query.isPending || (!installed && Boolean(state.shadowedBy))}
           onClick={() => change(installed ? "uninstall" : "install")}
         >
-          {installed ? "Remove" : "Install"}
+          {installed ? ui("Remove", "Убрать") : ui("Install", "Установить")}
         </Button>
       }
     />

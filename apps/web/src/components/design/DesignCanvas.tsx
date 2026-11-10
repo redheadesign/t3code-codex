@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   CircleIcon,
   ChevronDownIcon,
@@ -353,6 +354,7 @@ export function DesignCanvas({
   pageBackground?: string;
   showTools?: boolean;
 }) {
+  const ui = useUiText();
   const surface = useRef<HTMLDivElement>(null);
   const pointerTarget = useRef<Element | null>(null);
   const [deepHoverId, setDeepHoverId] = useState<string | null>(null);
@@ -1242,7 +1244,7 @@ export function DesignCanvas({
         ref={surface}
         data-design-surface=""
         tabIndex={0}
-        aria-label="Canvas editing surface"
+        aria-label={ui("Canvas editing surface", "Холст")}
         style={{
           cursor: box && gesture?.handle ? resizeCursor(gesture.handle, box.rotation) : undefined,
         }}
@@ -1457,7 +1459,7 @@ export function DesignCanvas({
                 <div className="pointer-events-auto absolute start-0 top-7 w-56 rounded-md border border-border bg-background p-2 shadow-lg">
                   <textarea
                     autoFocus
-                    aria-label="Comment text"
+                    aria-label={ui("Comment text", "Комментарий")}
                     className="w-full resize-none bg-transparent p-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     value={comment.text}
                     onPointerDown={(event) => event.stopPropagation()}
@@ -1469,8 +1471,8 @@ export function DesignCanvas({
                       <Button
                         variant="ghost"
                         size="icon-xs"
-                        aria-label="Copy comment link"
-                        title="Copy comment link"
+                        aria-label={ui("Copy comment link", "Ссылка на комментарий")}
+                        title={ui("Copy comment link", "Ссылка на комментарий")}
                         onPointerDown={(event) => event.stopPropagation()}
                         onClick={() => onCopyCommentLink(comment.commentId)}
                       >
@@ -1481,8 +1483,8 @@ export function DesignCanvas({
                       <Button
                         variant="ghost"
                         size="icon-xs"
-                        aria-label="Copy comment reference for agent"
-                        title="Copy comment reference for agent"
+                        aria-label={ui("Copy comment reference for agent", "Ссылка для агента")}
+                        title={ui("Copy comment reference for agent", "Ссылка для агента")}
                         onPointerDown={(event) => event.stopPropagation()}
                         onClick={() => onCopyCommentReference(comment.commentId)}
                       >
@@ -1492,8 +1494,16 @@ export function DesignCanvas({
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      aria-label={comment.resolved ? "Reopen comment" : "Resolve comment"}
-                      title={comment.resolved ? "Reopen comment" : "Resolve comment"}
+                      aria-label={
+                        comment.resolved
+                          ? ui("Reopen comment", "Вернуть комментарий")
+                          : ui("Resolve comment", "Закрыть комментарий")
+                      }
+                      title={
+                        comment.resolved
+                          ? ui("Reopen comment", "Вернуть комментарий")
+                          : ui("Resolve comment", "Закрыть комментарий")
+                      }
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={() => onResolveComment?.(comment.commentId, !comment.resolved)}
                     >
@@ -1502,8 +1512,8 @@ export function DesignCanvas({
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      aria-label="Delete comment"
-                      title="Delete comment"
+                      aria-label={ui("Delete comment", "Удалить комментарий")}
+                      title={ui("Delete comment", "Удалить комментарий")}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={() => {
                         onDeleteComment?.(comment.commentId);
@@ -1691,7 +1701,9 @@ export function DesignCanvas({
                       key={handle}
                       type="button"
                       aria-label={
-                        handle === "ne" ? "Rotate selection" : `Rotate selection ${handle}`
+                        handle === "ne"
+                          ? ui("Rotate selection", "Повернуть")
+                          : `Rotate selection ${handle}`
                       }
                       className="pointer-events-auto absolute outline-none focus-visible:outline-2 focus-visible:outline-primary"
                       style={{
@@ -1789,7 +1801,10 @@ export function DesignCanvas({
         <>
           <div
             className="absolute inset-x-0 top-0 h-5 overflow-hidden border-b border-border bg-background/90"
-            aria-label="Drag down to create a horizontal guide"
+            aria-label={ui(
+              "Drag down to create a horizontal guide",
+              "Потяните вниз для направляющей",
+            )}
             onPointerDown={(event) => beginGuide(event, "y")}
           >
             {Array.from({ length: 40 }, (_, i) => i - 10).map((i) => (
@@ -1804,7 +1819,10 @@ export function DesignCanvas({
           </div>
           <div
             className="absolute inset-y-0 start-0 w-5 overflow-hidden border-e border-border bg-background/90"
-            aria-label="Drag right to create a vertical guide"
+            aria-label={ui(
+              "Drag right to create a vertical guide",
+              "Потяните вправо для направляющей",
+            )}
             onPointerDown={(event) => beginGuide(event, "x")}
           >
             {Array.from({ length: 40 }, (_, i) => i - 10).map((i) => (
@@ -1826,11 +1844,11 @@ export function DesignCanvas({
             ? "absolute bottom-4 start-1/2 flex max-w-[calc(100%-3rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border border-border bg-background p-1 shadow-lg"
             : "hidden"
         }
-        aria-label="Design tools"
+        aria-label={ui("Design tools", "Инструменты")}
         role="toolbar"
       >
         <ToolButton
-          label={tool === "scale" ? "Scale (K)" : "Move (V)"}
+          label={tool === "scale" ? ui("Scale (K)", "Масштаб (K)") : ui("Move (V)", "Выбор (V)")}
           active={tool === "select" || tool === "scale"}
           onClick={() => chooseTool(tool === "scale" ? "scale" : "select")}
         >
@@ -1838,28 +1856,38 @@ export function DesignCanvas({
         </ToolButton>
         <Menu>
           <MenuTrigger
-            render={<Button size="icon-xs" variant="ghost" aria-label="Move and scale tools" />}
+            render={
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                aria-label={ui("Move and scale tools", "Выбор и масштаб")}
+              />
+            }
           >
             <ChevronDownIcon />
           </MenuTrigger>
           <MenuPopup side="top" align="start">
             <MenuItem onClick={() => chooseTool("select")}>
-              <MousePointer2Icon /> Move <span className="ms-auto text-muted-foreground">V</span>
+              <MousePointer2Icon />
+              {ui("Move", "Перенести")}
+              <span className="ms-auto text-muted-foreground">V</span>
             </MenuItem>
             <MenuItem onClick={() => chooseTool("scale")}>
-              <ScalingIcon /> Scale <span className="ms-auto text-muted-foreground">K</span>
+              <ScalingIcon />
+              {ui("Scale", "Масштаб")}
+              <span className="ms-auto text-muted-foreground">K</span>
             </MenuItem>
           </MenuPopup>
         </Menu>
         <ToolButton
-          label="Hand (H / Space)"
+          label={ui("Hand (H / Space)", "Рука (H / пробел)")}
           active={tool === "hand"}
           onClick={() => chooseTool("hand")}
         >
           <HandIcon />
         </ToolButton>
         <ToolButton
-          label="Measure (M)"
+          label={ui("Measure (M)", "Замер (M)")}
           active={tool === "measure"}
           onClick={() => chooseTool("measure")}
         >
@@ -1867,28 +1895,28 @@ export function DesignCanvas({
         </ToolButton>
         <span className="mx-1 h-5 w-px shrink-0 bg-border" />
         <ToolButton
-          label="Frame tool (F)"
+          label={ui("Frame tool (F)", "Фрейм (F)")}
           active={tool === "frame"}
           onClick={() => chooseTool("frame")}
         >
           <FrameIcon />
         </ToolButton>
         <ToolButton
-          label="Section tool (S)"
+          label={ui("Section tool (S)", "Секция (S)")}
           active={tool === "section"}
           onClick={() => chooseTool("section")}
         >
           <PanelsTopLeftIcon />
         </ToolButton>
         <ToolButton
-          label="Slice tool"
+          label={ui("Slice tool", "Область экспорта")}
           active={tool === "slice"}
           onClick={() => chooseTool("slice")}
         >
           <CropIcon />
         </ToolButton>
         <ToolButton
-          label="Comment tool (C)"
+          label={ui("Comment tool (C)", "Комментарий (C)")}
           active={tool === "comment"}
           onClick={() => chooseTool("comment")}
         >
@@ -1907,7 +1935,7 @@ export function DesignCanvas({
                           ? "secondary"
                           : "ghost"
                       }
-                      aria-label="Shape tools"
+                      aria-label={ui("Shape tools", "Фигуры")}
                     />
                   }
                 />
@@ -1922,18 +1950,18 @@ export function DesignCanvas({
               )}
               <ChevronDownIcon />
             </TooltipTrigger>
-            <TooltipPopup>Shape tools</TooltipPopup>
+            <TooltipPopup>{ui("Shape tools", "Фигуры")}</TooltipPopup>
           </Tooltip>
           <MenuPopup side="top">
             {(["rectangle", "ellipse", "line", "arrow"] as const).map((value) => (
               <MenuItem key={value} onClick={() => chooseTool(value)}>
                 {value === "rectangle"
-                  ? "Rectangle (R)"
+                  ? ui("Rectangle (R)", "Прямоугольник (R)")
                   : value === "ellipse"
-                    ? "Ellipse (O)"
+                    ? ui("Ellipse (O)", "Эллипс (O)")
                     : value === "line"
-                      ? "Line (L)"
-                      : "Arrow"}
+                      ? ui("Line (L)", "Линия (L)")
+                      : ui("Arrow", "Стрелка")}
               </MenuItem>
             ))}
           </MenuPopup>
@@ -1947,7 +1975,7 @@ export function DesignCanvas({
                     <Button
                       size="sm"
                       variant={tool === "pen" || tool === "pencil" ? "secondary" : "ghost"}
-                      aria-label="Drawing tools"
+                      aria-label={ui("Drawing tools", "Рисование")}
                     />
                   }
                 />
@@ -1956,11 +1984,13 @@ export function DesignCanvas({
               {tool === "pencil" ? <PencilIcon /> : <PenToolIcon />}
               <ChevronDownIcon />
             </TooltipTrigger>
-            <TooltipPopup>Drawing tools</TooltipPopup>
+            <TooltipPopup>{ui("Drawing tools", "Рисование")}</TooltipPopup>
           </Tooltip>
           <MenuPopup side="top">
-            <MenuItem onClick={() => chooseTool("pen")}>Pen (P)</MenuItem>
-            <MenuItem onClick={() => chooseTool("pencil")}>Pencil (Shift P)</MenuItem>
+            <MenuItem onClick={() => chooseTool("pen")}>{ui("Pen (P)", "Перо (P)")}</MenuItem>
+            <MenuItem onClick={() => chooseTool("pencil")}>
+              {ui("Pencil (Shift P)", "Карандаш (Shift P)")}
+            </MenuItem>
           </MenuPopup>
         </Menu>
         {selected.length > 1 && onBoolean ? (
@@ -1969,29 +1999,49 @@ export function DesignCanvas({
               <TooltipTrigger
                 render={
                   <MenuTrigger
-                    render={<Button size="sm" variant="ghost" aria-label="Boolean operations" />}
+                    render={
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={ui("Boolean operations", "Операции с фигурами")}
+                      />
+                    }
                   />
                 }
               >
                 <PanelsTopLeftIcon />
                 <ChevronDownIcon />
               </TooltipTrigger>
-              <TooltipPopup>Boolean operations</TooltipPopup>
+              <TooltipPopup>{ui("Boolean operations", "Операции с фигурами")}</TooltipPopup>
             </Tooltip>
             <MenuPopup side="top">
-              <MenuItem onClick={() => onBoolean("union")}>Union selection</MenuItem>
-              <MenuItem onClick={() => onBoolean("flatten")}>Flatten selection</MenuItem>
-              <MenuItem onClick={() => onBoolean("subtract")}>Subtract selection</MenuItem>
-              <MenuItem onClick={() => onBoolean("intersect")}>Intersect selection</MenuItem>
-              <MenuItem onClick={() => onBoolean("exclude")}>Exclude selection</MenuItem>
+              <MenuItem onClick={() => onBoolean("union")}>
+                {ui("Union selection", "Объединить")}
+              </MenuItem>
+              <MenuItem onClick={() => onBoolean("flatten")}>
+                {ui("Flatten selection", "В один контур")}
+              </MenuItem>
+              <MenuItem onClick={() => onBoolean("subtract")}>
+                {ui("Subtract selection", "Вычесть")}
+              </MenuItem>
+              <MenuItem onClick={() => onBoolean("intersect")}>
+                {ui("Intersect selection", "Пересечь")}
+              </MenuItem>
+              <MenuItem onClick={() => onBoolean("exclude")}>
+                {ui("Exclude selection", "Исключить")}
+              </MenuItem>
             </MenuPopup>
           </Menu>
         ) : null}
-        <ToolButton label="Text (T)" active={tool === "text"} onClick={() => chooseTool("text")}>
+        <ToolButton
+          label={ui("Text (T)", "Текст (T)")}
+          active={tool === "text"}
+          onClick={() => chooseTool("text")}
+        >
           <TypeIcon />
         </ToolButton>
         <ToolButton
-          label="Place image"
+          label={ui("Place image", "Вставить фото")}
           active={imagePlacement !== null}
           onClick={() => {
             setTool("select");
@@ -2003,7 +2053,7 @@ export function DesignCanvas({
         </ToolButton>
         <span className="mx-1 h-5 w-px shrink-0 bg-border" />
         <ToolButton
-          label="Undo"
+          label={ui("Undo", "Отменить")}
           disabled={!canUndo}
           onClick={() => {
             onUndo();
@@ -2013,7 +2063,7 @@ export function DesignCanvas({
           <Undo2Icon />
         </ToolButton>
         <ToolButton
-          label="Redo"
+          label={ui("Redo", "Повторить")}
           disabled={!canRedo}
           onClick={() => {
             onRedo();
@@ -2034,7 +2084,10 @@ export function DesignCanvas({
               {placementCount > 1 ? ` · ${placementCount} remaining` : ""}
             </span>
             <span className="text-2xs text-muted-foreground">
-              Click for original size · Drag to resize · Shift for free sizing
+              {ui(
+                "Click for original size · Drag to resize · Shift for free sizing",
+                "Клик для исходного размера · Тяните для масштаба · Shift без пропорций",
+              )}
             </span>
           </p>
           {placementCount > 1 && onPlaceAllImages ? (
@@ -2049,11 +2102,11 @@ export function DesignCanvas({
                   );
               }}
             >
-              Place all
+              {ui("Place all", "Вставить всё")}
             </Button>
           ) : null}
           <Button size="xs" variant="ghost-muted" onClick={() => chooseTool("select")}>
-            Cancel
+            {ui("Cancel", "Отмена")}
           </Button>
         </div>
       ) : null}

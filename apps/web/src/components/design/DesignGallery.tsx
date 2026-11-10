@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { Link, useRouter } from "@tanstack/react-router";
 import {
   CodeIcon,
@@ -63,6 +64,7 @@ export function NewDesignDocumentDialog({
   readonly onCreate: (project: DesignProjectTarget | undefined, description: string) => void;
   readonly onClose: () => void;
 }) {
+  const ui = useUiText();
   const projects = useDesignFileProjects();
   const [projectKey, setProjectKey] = useState(() =>
     project ? designFileProjectKey(project) : "local",
@@ -80,10 +82,12 @@ export function NewDesignDocumentDialog({
     >
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>New design document</DialogTitle>
+          <DialogTitle>{ui("New design document", "Новый макет")}</DialogTitle>
           <DialogDescription>
-            Choose a project or keep the file in Local files. Use Sync in the editor to share the
-            file with agents.
+            {ui(
+              "Choose a project or keep the file in Local files. Use Sync in the editor to share the file with agents.",
+              "Выберите проект или оставьте макет локальным. Синхронизация откроет его агентам.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -100,8 +104,8 @@ export function NewDesignDocumentDialog({
               onChange={setProjectKey}
             />
             <Textarea
-              aria-label="Description"
-              placeholder="Description (optional)"
+              aria-label={ui("Description", "Описание")}
+              placeholder={ui("Description (optional)", "Описание")}
               value={description}
               maxLength={DESIGN_DESCRIPTION_LIMIT}
               onChange={(event) => setDescription(event.target.value)}
@@ -114,14 +118,14 @@ export function NewDesignDocumentDialog({
                 disabled={working}
                 onClick={onClose}
               >
-                Cancel
+                {ui("Cancel", "Отмена")}
               </Button>
               <Button
                 size="sm"
                 type="submit"
                 disabled={working || (projectKey !== "local" && !connection)}
               >
-                Create document
+                {ui("Create document", "Создать")}
               </Button>
             </div>
           </form>
@@ -229,6 +233,7 @@ function DesignFileCard({
   readonly onMove: () => void;
   readonly onDragging: (id: string | null) => void;
 }) {
+  const ui = useUiText();
   const { document } = record;
   const date = new Date(document.updatedAt);
   const project = record.location?.project;
@@ -296,7 +301,7 @@ function DesignFileCard({
                 {dateFormat.format(date)}
               </time>
             ) : null}
-            {project && needsSync ? <span>Needs sync</span> : null}
+            {project && needsSync ? <span>{ui("Needs sync", "Нужно обновить")}</span> : null}
           </div>
           {document.description ? (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
@@ -320,15 +325,18 @@ function DesignFileCard({
           </MenuTrigger>
           <MenuPopup align="end">
             <MenuItem onClick={onCopy}>
-              <LinkIcon /> Copy file link
+              <LinkIcon />
+              {ui("Copy file link", "Ссылка на файл")}
             </MenuItem>
             {project ? (
               <MenuItem onClick={copyAgentReference}>
-                <CodeIcon /> Copy reference for agent
+                <CodeIcon />
+                {ui("Copy reference for agent", "Ссылка для агента")}
               </MenuItem>
             ) : null}
             <MenuItem onClick={onMove}>
-              <FolderIcon /> Move to folder…
+              <FolderIcon />
+              {ui("Move to folder…", "В папку…")}
             </MenuItem>
           </MenuPopup>
         </Menu>
@@ -356,6 +364,7 @@ export function DesignGallery({
   readonly onTrash: () => void;
   readonly onMove: (id: string, location: DesignFileLocation) => void;
 }) {
+  const ui = useUiText();
   const router = useRouter();
   const projects = useDesignFileProjects();
   const { copyToClipboard } = useCopyToClipboard({ target: "Design file link" });
@@ -480,33 +489,40 @@ export function DesignGallery({
       <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-8 sm:py-8">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold">Design files</h1>
+            <h1 className="text-2xl font-semibold">{ui("Design files", "Макеты")}</h1>
             <p className="text-sm text-muted-foreground">
-              Open a design or find it by project and folder.
+              {ui(
+                "Open a design or find it by project and folder.",
+                "Откройте макет или найдите его в проектах.",
+              )}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="ghost-muted" onClick={onTrash}>
-              Recently deleted
+              {ui("Recently deleted", "Корзина")}
             </Button>
             <Button size="sm" variant="secondary" onClick={onOpen}>
-              Open file…
+              {ui("Open file…", "Открыть файл…")}
             </Button>
             {actions}
             <Button size="sm" disabled={working} onClick={onCreate}>
-              <FilePlus2Icon /> New design document
+              <FilePlus2Icon />
+              {ui("New design document", "Новый макет")}
             </Button>
           </div>
         </header>
         {unavailable ? (
           <p role="status" className="text-sm text-muted-foreground">
-            This file is unavailable on this device. Open a local copy or check Recently deleted.
+            {ui(
+              "This file is unavailable on this device. Open a local copy or check Recently deleted.",
+              "Макет недоступен. Откройте копию или проверьте корзину.",
+            )}
           </p>
         ) : null}
         <div className="max-w-xs">
           <Input
-            aria-label="Search Design files"
-            placeholder="Search files"
+            aria-label={ui("Search Design files", "Поиск макетов")}
+            placeholder={ui("Search files", "Поиск файлов")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -514,8 +530,11 @@ export function DesignGallery({
         {groups.size === 0 ? (
           <p className="border-t border-border py-8 text-sm text-muted-foreground">
             {term
-              ? "No files match your search."
-              : "Create or open a design document to get started."}
+              ? ui("No files match your search.", "Файлы не найдены")
+              : ui(
+                  "Create or open a design document to get started.",
+                  "Создайте или откройте макет.",
+                )}
           </p>
         ) : (
           [...groups].map(([key, group]) => {
@@ -600,10 +619,12 @@ export function DesignGallery({
       >
         <DialogPopup>
           <DialogHeader>
-            <DialogTitle>Move to folder</DialogTitle>
+            <DialogTitle>{ui("Move to folder", "В папку")}</DialogTitle>
             <DialogDescription>
-              Use a slash for a nested folder. Leave the path empty to move the file to the project
-              root.
+              {ui(
+                "Use a slash for a nested folder. Leave the path empty to move the file to the project root.",
+                "Для вложенной папки используйте /. Пустой путь перенесёт файл в корень проекта.",
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -623,17 +644,17 @@ export function DesignGallery({
               ) : null}
               <Input
                 autoFocus
-                aria-label="Folder path"
-                placeholder="Screens / Checkout"
+                aria-label={ui("Folder path", "Путь к папке")}
+                placeholder={ui("Screens / Checkout", "Экраны / Оплата")}
                 value={folder}
                 onChange={(event) => setFolder(event.target.value)}
               />
               <div className="flex justify-end gap-2">
                 <Button size="sm" type="button" variant="secondary" onClick={() => setMoving(null)}>
-                  Cancel
+                  {ui("Cancel", "Отмена")}
                 </Button>
                 <Button size="sm" type="submit" disabled={working}>
-                  Move file
+                  {ui("Move file", "Перенести")}
                 </Button>
               </div>
             </form>

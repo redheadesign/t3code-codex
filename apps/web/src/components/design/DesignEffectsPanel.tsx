@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useState } from "react";
 import { EyeIcon, EyeOffIcon, MinusIcon, PlusIcon, SquareStackIcon, XIcon } from "lucide-react";
 import { formatRgb, parse } from "culori";
@@ -26,6 +27,7 @@ export function DesignEffectsPanel({
   node: DesignNode;
   onChange: (effects: readonly DesignEffect[]) => void;
 }) {
+  const ui = useUiText();
   const effects = node.effects ?? [];
   const supportsSpread =
     (node.kind === "vector" && !node.vector) ||
@@ -49,13 +51,16 @@ export function DesignEffectsPanel({
     onChange(next);
   };
   return (
-    <section className="space-y-2 border-b border-border/60 px-3 py-2.5" aria-label="Effects">
+    <section
+      className="space-y-2 border-b border-border/60 px-3 py-2.5"
+      aria-label={ui("Effects", "Эффекты")}
+    >
       <div className="flex h-6 items-center justify-between">
-        <h3 className="text-xs font-medium">Effects</h3>
+        <h3 className="text-xs font-medium">{ui("Effects", "Эффекты")}</h3>
         <Button
           size="icon-xs"
           variant="ghost-muted"
-          aria-label="Add effect"
+          aria-label={ui("Add effect", "Добавить эффект")}
           disabled={!addKind}
           onClick={() => {
             if (!addKind) return;
@@ -130,7 +135,7 @@ export function DesignEffectsPanel({
               >
                 <SquareStackIcon />
               </TooltipTrigger>
-              <TooltipPopup>Effect settings</TooltipPopup>
+              <TooltipPopup>{ui("Effect settings", "Параметры эффекта")}</TooltipPopup>
             </Tooltip>
             <PopoverPopup side="left" align="start" width="sm" padding="compact">
               <div className="space-y-3">
@@ -141,7 +146,7 @@ export function DesignEffectsPanel({
                       <Button
                         size="icon-xs"
                         variant="ghost-muted"
-                        aria-label="Close effect settings"
+                        aria-label={ui("Close effect settings", "Закрыть параметры")}
                       />
                     }
                   >
@@ -153,7 +158,7 @@ export function DesignEffectsPanel({
                     <>
                       <DesignNumberField
                         compact
-                        label="Shadow X"
+                        label={ui("Shadow X", "Тень X")}
                         displayLabel="X"
                         prefix="X"
                         value={effect.x}
@@ -161,7 +166,7 @@ export function DesignEffectsPanel({
                       />
                       <DesignNumberField
                         compact
-                        label="Shadow Y"
+                        label={ui("Shadow Y", "Тень Y")}
                         displayLabel="Y"
                         prefix="Y"
                         value={effect.y}
@@ -171,7 +176,7 @@ export function DesignEffectsPanel({
                   ) : null}
                   <DesignNumberField
                     compact
-                    label="Effect blur"
+                    label={ui("Effect blur", "Размытие")}
                     displayLabel="Blur"
                     prefix="Blur"
                     min={0}
@@ -181,7 +186,7 @@ export function DesignEffectsPanel({
                   {effect.kind.endsWith("shadow") && supportsSpread ? (
                     <DesignNumberField
                       compact
-                      label="Shadow spread"
+                      label={ui("Shadow spread", "Размах")}
                       displayLabel="Spread"
                       prefix="Spread"
                       value={effect.spread}
@@ -193,9 +198,9 @@ export function DesignEffectsPanel({
                   <>
                     <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-end gap-2">
                       <div className="min-w-0 space-y-1">
-                        <p className="text-2xs text-muted-foreground">Color</p>
+                        <p className="text-2xs text-muted-foreground">{ui("Color", "Цвет")}</p>
                         <DesignInspectorColor
-                          label="Effect color"
+                          label={ui("Effect color", "Цвет эффекта")}
                           value={effect.color}
                           onChange={(color) => update(effect.effectId, { color })}
                         />
@@ -203,7 +208,7 @@ export function DesignEffectsPanel({
                       <DesignNumberField
                         compact
                         propertyLabels
-                        label="Effect opacity"
+                        label={ui("Effect opacity", "Плотность эффекта")}
                         displayLabel="Opacity"
                         prefix="%"
                         min={0}
@@ -226,7 +231,7 @@ export function DesignEffectsPanel({
                             update(effect.effectId, { showBehindTransparentAreas })
                           }
                         />
-                        Show behind transparent areas
+                        {ui("Show behind transparent areas", "Видно сквозь прозрачное")}
                       </label>
                     ) : null}
                   </>

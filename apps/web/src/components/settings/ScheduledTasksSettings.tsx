@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { connectionStatusTitle } from "@t3tools/client-runtime/connection";
 import { AsyncResult } from "effect/reactivity";
@@ -320,6 +321,7 @@ export function ScheduledTasksSettings(target: {
   readonly create?: boolean;
   readonly returnTo?: "automations";
 }) {
+  const ui = useUiText();
   const { scope, environments, connectedEnvironments, environment } = useSettingsScope();
   const [editor, setEditor] = useState<{
     environmentId: EnvironmentId;
@@ -441,7 +443,7 @@ export function ScheduledTasksSettings(target: {
   return (
     <SettingsPageContainer>
       <SettingsSection
-        title="Automations"
+        title={ui("Automations", "Автозадачи")}
         variant="plain"
         headerAction={
           <Button
@@ -662,6 +664,7 @@ function ScheduledTaskEnvironmentSection({
   readonly taskId?: ScheduledTaskId | undefined;
   readonly onEdit: (environmentId: EnvironmentId, task: ScheduledTask) => void;
 }) {
+  const ui = useUiText();
   const { scope } = useSettingsScope();
   const connected =
     environment.connection.phase === "connected" && environment.serverConfig !== null;
@@ -696,7 +699,7 @@ function ScheduledTaskEnvironmentSection({
       ) : tasksQuery.error ? (
         <SettingsRow title="Could not load automations" description={tasksQuery.error} />
       ) : !tasks ? (
-        <SettingsRow title="Loading automations…" role="status" />
+        <SettingsRow title={ui("Loading automations…", "Загрузка автозадач…")} role="status" />
       ) : (
         <>
           {taskId && !linkedTask ? (
@@ -736,6 +739,7 @@ function ScheduledTaskRow({
   readonly task: ScheduledTask;
   readonly onEdit: () => void;
 }) {
+  const ui = useUiText();
   const canOperate = useAtomValue(
     serverEnvironment.upsertScheduledTask.permissionAtom(environmentId),
   );
@@ -836,7 +840,7 @@ function ScheduledTaskRow({
               <MenuPopup align="end">
                 <MenuItem onClick={onEdit}>
                   <PencilIcon />
-                  Edit
+                  {ui("Edit", "Править")}
                 </MenuItem>
                 {isWebhook ? (
                   <MenuItem onClick={() => setDeliveriesOpen(true)}>
@@ -860,7 +864,7 @@ function ScheduledTaskRow({
                 <MenuSeparator />
                 <MenuItem onClick={() => setDeleteOpen(true)}>
                   <Trash2Icon />
-                  Delete
+                  {ui("Delete", "Удалить")}
                 </MenuItem>
               </MenuPopup>
             </Menu>
@@ -883,7 +887,9 @@ function ScheduledTaskRow({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button variant="outline" />}>
+              {ui("Cancel", "Отмена")}
+            </DialogClose>
             <Button
               variant="destructive"
               disabled={busy || !canOperate}
@@ -892,7 +898,7 @@ function ScheduledTaskRow({
                 void act("delete");
               }}
             >
-              Delete
+              {ui("Delete", "Удалить")}
             </Button>
           </DialogFooter>
         </DialogPopup>
@@ -910,6 +916,7 @@ function WebhookDeliveriesDialog({
   readonly task: ScheduledTask;
   readonly onClose: () => void;
 }) {
+  const ui = useUiText();
   const deliveriesQuery = useEnvironmentQuery(
     serverEnvironment.scheduledTaskWebhookDeliveries({
       environmentId,
@@ -1046,7 +1053,7 @@ function WebhookDeliveriesDialog({
         <DialogFooter>
           {selectedId !== null ? (
             <Button variant="outline" size="sm" onClick={() => setSelectedId(null)}>
-              Back
+              {ui("Back", "Назад")}
             </Button>
           ) : (
             <Button
@@ -1055,10 +1062,10 @@ function WebhookDeliveriesDialog({
               disabled={deliveriesQuery.isPending}
               onClick={deliveriesQuery.refresh}
             >
-              Refresh
+              {ui("Refresh", "Обновить")}
             </Button>
           )}
-          <DialogClose render={<Button size="sm" />}>Done</DialogClose>
+          <DialogClose render={<Button size="sm" />}>{ui("Done", "Готово")}</DialogClose>
         </DialogFooter>
       </DialogPopup>
     </Dialog>
@@ -1083,6 +1090,7 @@ function WebhookEndpointField({
   readonly environmentId: EnvironmentId;
   readonly task: ScheduledTask | null;
 }) {
+  const ui = useUiText();
   const canRotate = useAtomValue(
     serverEnvironment.rotateScheduledTaskWebhookToken.permissionAtom(environmentId),
   );
@@ -1134,7 +1142,7 @@ function WebhookEndpointField({
           onClick={() => copyToClipboard(url, undefined)}
         >
           <CopyIcon />
-          {isCopied ? "Copied" : "Copy"}
+          {isCopied ? ui("Copied", "Скопировано") : ui("Copy", "Копия")}
         </Button>
         <Button
           size="sm"
@@ -1143,7 +1151,7 @@ function WebhookEndpointField({
           disabled={rotating || !canRotate}
           onClick={() => void rotateUrl()}
         >
-          Rotate
+          {ui("Rotate", "Поворот")}
         </Button>
       </div>
       {note !== null ? <p className="text-xs text-muted-foreground">{note}</p> : null}
@@ -1279,6 +1287,7 @@ function ScheduledTaskEditorForm({
   readonly onSavingChange: (saving: boolean) => void;
   readonly onClose: (saved?: { environmentId: EnvironmentId; taskId: ScheduledTaskId }) => void;
 }) {
+  const ui = useUiText();
   const { scope, connectedEnvironments } = useSettingsScope();
   const [environmentId, setEnvironmentId] = useState(initialEnvironmentId);
   const environment = useEnvironment(environmentId);
@@ -1480,7 +1489,9 @@ function ScheduledTaskEditorForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{draft.editingId ? "Edit automation" : "New automation"}</DialogTitle>
+        <DialogTitle>
+          {draft.editingId ? ui("Edit automation", "Править автозадачу") : "New automation"}
+        </DialogTitle>
         <DialogDescription>
           Run a prompt automatically on an interval, at a fixed time, once at a set date, or when a
           webhook is called.
@@ -1565,7 +1576,7 @@ function ScheduledTaskEditorForm({
               This automation no longer exists.
             </p>
           ) : null}
-          <Field label="Name" htmlFor="scheduled-task-title">
+          <Field label={ui("Name", "Имя")} htmlFor="scheduled-task-title">
             <Input
               id="scheduled-task-title"
               placeholder="e.g. Check for Sentry issues"
@@ -1588,7 +1599,7 @@ function ScheduledTaskEditorForm({
           />
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Project" htmlFor="scheduled-task-project">
+            <Field label={ui("Project", "Проект")} htmlFor="scheduled-task-project">
               <Select
                 value={selectedProjectId}
                 onValueChange={(projectId) =>
@@ -1895,7 +1906,7 @@ function ScheduledTaskEditorForm({
                       <Input
                         id="scheduled-task-signature-prefix"
                         value={draft.signaturePrefix}
-                        placeholder="None"
+                        placeholder={ui("None", "Нет")}
                         onChange={(event) =>
                           setDraft((current) => ({
                             ...current,
@@ -2018,7 +2029,7 @@ function ScheduledTaskEditorForm({
 
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 space-y-1">
-              <Label htmlFor="scheduled-task-enabled">Enabled</Label>
+              <Label htmlFor="scheduled-task-enabled">{ui("Enabled", "Вкл.")}</Label>
               <p id="scheduled-task-enabled-description" className="text-sm text-muted-foreground">
                 Disabled tasks stay saved but do not run.
               </p>
@@ -2035,7 +2046,7 @@ function ScheduledTaskEditorForm({
 
       <DialogFooter>
         <DialogClose render={<Button variant="outline" size="sm" disabled={saving} />}>
-          Cancel
+          {ui("Cancel", "Отмена")}
         </DialogClose>
         <Button
           size="sm"

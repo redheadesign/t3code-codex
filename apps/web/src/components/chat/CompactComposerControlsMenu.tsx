@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { ProviderInteractionMode } from "@t3tools/contracts";
 import { memo } from "react";
 import { EllipsisIcon } from "lucide-react";
@@ -14,6 +15,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
   hidden?: boolean;
   onToggleInteractionMode: () => void;
 }) {
+  const ui = useUiText();
   const composerFloatingLayerProps = useComposerMenuProps();
   const size = props.size ?? "sm";
   const [open, setOpen] = useComposerMenuState(props.hidden);
@@ -22,7 +24,11 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
     <Menu open={open} onOpenChange={setOpen}>
       <MenuTrigger
         render={
-          <ComposerControl size={size} className="shrink-0" aria-label="More composer controls" />
+          <ComposerControl
+            size={size}
+            className="shrink-0"
+            aria-label={ui("More composer controls", "Ещё параметры")}
+          />
         }
       >
         <ComposerControlIcon icon={EllipsisIcon} size={size} />
@@ -30,7 +36,9 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
       <MenuPopup align="start" {...composerFloatingLayerProps}>
         {props.showInteractionModeToggle ? (
           <>
-            <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">Mode</div>
+            <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
+              {ui("Mode", "Режим")}
+            </div>
             <MenuRadioGroup
               value={props.interactionMode}
               onValueChange={(value) => {
@@ -38,8 +46,8 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
                 props.onToggleInteractionMode();
               }}
             >
-              <MenuRadioItem value="default">Chat</MenuRadioItem>
-              <MenuRadioItem value="plan">Plan</MenuRadioItem>
+              <MenuRadioItem value="default">{ui("Chat", "Чат")}</MenuRadioItem>
+              <MenuRadioItem value="plan">{ui("Plan", "План")}</MenuRadioItem>
             </MenuRadioGroup>
           </>
         ) : null}

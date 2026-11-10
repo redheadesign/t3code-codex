@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import {
   pullRequestLinkProject,
@@ -63,6 +64,7 @@ function LinkPullRequestDialog({
   projectId,
   onOpenChange,
 }: LinkPullRequestDialogProps) {
+  const ui = useUiText();
   const inputRef = useRef<HTMLInputElement>(null);
   const [reference, setReference] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -161,7 +163,7 @@ function LinkPullRequestDialog({
             onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            Cancel
+            {ui("Cancel", "Отмена")}
           </Button>
           <Button
             type="button"
@@ -169,7 +171,7 @@ function LinkPullRequestDialog({
             onClick={() => void submit()}
             disabled={pending || resolved === null || "error" in resolved}
           >
-            {pending ? "Linking..." : "Link"}
+            {pending ? "Linking..." : ui("Link", "Ссылка")}
           </Button>
         </DialogFooter>
       </DialogPopup>

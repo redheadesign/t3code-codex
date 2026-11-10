@@ -20,6 +20,7 @@ import {
   PlusIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useUiText } from "~/i18n";
 
 import { writeTextToClipboard } from "../../hooks/useCopyToClipboard";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
@@ -47,14 +48,15 @@ import { Textarea } from "../ui/textarea";
 import { toastManager } from "../ui/toast";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { LocalTaskDetails, TASK_TEXT_LIMIT, TASK_TITLE_LIMIT } from "./LocalTaskDetails";
-import { BOARD_COLUMNS, TaskBoard } from "./TaskBoard";
+import { BOARD_COLUMNS, TaskBoard, taskStatusLabel } from "./TaskBoard";
+import { TaskIdeaComposer } from "./TaskIdeaComposer";
 import { TaskMobileNavigation, TasksWorkspace } from "./TasksWorkspace";
 
 const TASK_VIEWS = [
-  { id: "board", label: "Board", icon: Columns3Icon },
-  { id: "archive", label: "Archive", icon: ArchiveIcon },
-  { id: "wiki", label: "Wiki", icon: BookOpenIcon },
-  { id: "jira", label: "Jira", icon: ListTodoIcon },
+  { id: "board", label: "Board", ru: "Доска", icon: Columns3Icon },
+  { id: "archive", label: "Archive", ru: "Архив", icon: ArchiveIcon },
+  { id: "wiki", label: "Wiki", ru: "Вики", icon: BookOpenIcon },
+  { id: "jira", label: "Jira", ru: "Jira", icon: ListTodoIcon },
 ] as const;
 
 type TaskView = (typeof TASK_VIEWS)[number]["id"];
@@ -75,6 +77,7 @@ type LocalTaskTarget = {
 };
 
 export function TaskTracker({ target }: { target: TasksSearch }) {
+  const text = useUiText();
   const navigate = useNavigate();
   const { environments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -129,18 +132,22 @@ export function TaskTracker({ target }: { target: TasksSearch }) {
   return (
     <div
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-background"
-      {...workspaceAreaProps("tasks", 0, "Tasks workspace")}
+      {...workspaceAreaProps("tasks", 0, text("Tasks workspace", "Задачи"))}
     >
       <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/70 px-4 py-3 md:px-6">
-        <h1 className="sr-only">Tasks</h1>
+        <h1 className="sr-only">{text("Tasks", "Задачи")}</h1>
         <div className="flex min-w-0 max-w-full items-center text-sm font-medium sm:max-w-72">
           <ProjectPicker
             items={pickerItems}
             selectedValue={selectedValue}
-            title={project?.title ?? "Choose a project"}
+            title={project?.title ?? text("Choose a project", "Выберите проект")}
             titleIcon={project ? <ProjectFavicon project={project} className="size-full" /> : null}
             titleTooltip={project?.title}
-            ariaLabel={project ? `Project: ${project.title}` : "Choose a project"}
+            ariaLabel={
+              project
+                ? text(`Project: ${project.title}`, `Проект: ${project.title}`)
+                : text("Choose a project", "Выбрать проект")
+            }
             onSelect={(item) => {
               if (item.value === selectedValue) return;
               void navigate({
@@ -167,17 +174,17 @@ export function TaskTracker({ target }: { target: TasksSearch }) {
           />
         </div>
         <ToggleGroup
-          aria-label="Task views"
+          aria-label={text("Task views", "Разделы задач")}
           value={[view]}
           onValueChange={([next]) => {
             const chosen = TASK_VIEWS.find((item) => item.id === next);
             if (chosen) void navigate({ to: "/tasks", search: { ...scope, view: chosen.id } });
           }}
         >
-          {TASK_VIEWS.map(({ id, label, icon: Icon }) => (
+          {TASK_VIEWS.map(({ id, label, ru, icon: Icon }) => (
             <ToggleGroupItem key={id} value={id}>
               <Icon />
-              {label}
+              {text(label, ru)}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -196,8 +203,14 @@ export function TaskTracker({ target }: { target: TasksSearch }) {
       ) : (
         <p className="m-auto max-w-sm p-6 text-center text-sm text-muted-foreground">
           {environment === undefined
-            ? "Select a connected environment to view tasks."
-            : "Add or select a project to view its tasks."}
+            ? text(
+                "Select a connected environment to view tasks.",
+                "Чтобы увидеть задачи, подключитесь к рабочей среде.",
+              )
+            : text(
+                "Add or select a project to view its tasks.",
+                "Добавьте или выберите проект, чтобы увидеть задачи.",
+              )}
         </p>
       )}
       {view !== "jira" ? <TaskMobileNavigation {...scope} /> : null}
@@ -215,12 +228,20 @@ function LocalTaskTracker({
   view: Exclude<TaskView, "jira">;
   target: TasksSearch;
 }) {
+  const text = useUiText();
   const navigate = useNavigate();
   const router = useRouter();
   const query = useEnvironmentQuery(
     taskWorkspaceRead({
       environmentId,
-      input: { environmentId, projectId, workspaceRoot, localOnly: true },
+      input: {
+        environmentId,
+        projectId,
+        workspaceRoot,
+        localOnly: true,
+        ...(target.localTaskId ? { taskId: target.localTaskId } : {}),
+        ...(target.threadId ? { threadId: target.threadId } : {}),
+      },
     }),
   );
   const { refresh } = query;
@@ -243,12 +264,24 @@ function LocalTaskTracker({
   const tasks = board?.tasks ?? [];
   const hasDetail =
     view !== "wiki" && (target.localTaskId !== undefined || target.threadId !== undefined);
-  const selectedTask = hasDetail
+  const selectedBoardTask = hasDetail
     ? tasks.find((task) =>
         target.localTaskId !== undefined
           ? task.id === target.localTaskId
           : task.threadId === target.threadId,
       )
+    : undefined;
+  const selectedContext = fromServer?.tasks.find((task) => task.id === selectedBoardTask?.id);
+  const selectedTask = selectedBoardTask
+    ? {
+        ...selectedBoardTask,
+        ...(selectedContext?.initialBrief !== undefined
+          ? { initialBrief: selectedContext.initialBrief }
+          : {}),
+        ...(selectedContext?.threadHistory !== undefined
+          ? { threadHistory: selectedContext.threadHistory }
+          : {}),
+      }
     : undefined;
   const disabled = !canCommand || pending;
 
@@ -280,7 +313,12 @@ function LocalTaskTracker({
     if (result._tag === "Failure") {
       const failure = squashAtomCommandFailure(result);
       setError(
-        failure instanceof Error ? failure.message : "The task action could not be completed.",
+        failure instanceof Error
+          ? failure.message
+          : text(
+              "The task action could not be completed.",
+              "Не удалось выполнить действие с задачей.",
+            ),
       );
       query.refresh();
       return null;
@@ -312,9 +350,15 @@ function LocalTaskTracker({
     const url = new URL(router.history.createHref(location.publicHref), window.location.href).href;
     try {
       await writeTextToClipboard(url, "task link");
-      toastManager.add({ type: "success", title: "Task link copied" });
+      toastManager.add({
+        type: "success",
+        title: text("Task link copied", "Ссылка на задачу скопирована"),
+      });
     } catch {
-      toastManager.add({ type: "error", title: "Could not copy the task link" });
+      toastManager.add({
+        type: "error",
+        title: text("Could not copy the task link", "Не удалось скопировать ссылку на задачу"),
+      });
     }
   };
   const showCreate = (status: TaskWorkspaceBoardStatus) => {
@@ -328,16 +372,21 @@ function LocalTaskTracker({
           <>
             <p role="alert">{query.error}</p>
             <Button size="sm" variant="outline" onClick={query.refresh}>
-              Retry
+              {text("Retry", "Повторить")}
             </Button>
           </>
         ) : query.isPending ? (
           <p role="status" className="flex items-center gap-2">
             <LoaderCircleIcon className="size-4 animate-spin" />
-            Loading tasks…
+            {text("Loading tasks…", "Загружаем задачи…")}
           </p>
         ) : (
-          <p>This environment does not support local tasks yet.</p>
+          <p>
+            {text(
+              "This environment does not support local tasks yet.",
+              "Эта рабочая среда пока не поддерживает локальные задачи.",
+            )}
+          </p>
         )}
       </div>
     );
@@ -358,16 +407,29 @@ function LocalTaskTracker({
         />
       ) : (
         <>
+          {view === "board" ? (
+            <TaskIdeaComposer
+              environmentId={environmentId}
+              projectId={projectId}
+              threadId={board.intakeThreadId}
+              disabled={disabled}
+              onSend={async (submission) =>
+                (await runCommand({ _tag: "submitLocalTaskIdeas", ...submission })) !== null
+              }
+            />
+          ) : null}
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 pt-4 md:px-6">
             <h2 className="text-sm font-medium">
-              {view === "archive" ? "Completed tasks" : "Board"}
+              {view === "archive"
+                ? text("Completed tasks", "Завершённые задачи")
+                : text("Board", "Доска")}
             </h2>
             <div className="flex flex-wrap items-center gap-2">
               <div className="min-w-36 flex-1 sm:w-48">
                 <Input
                   type="search"
-                  aria-label="Search project tasks"
-                  placeholder="Search tasks"
+                  aria-label={text("Search project tasks", "Поиск по задачам проекта")}
+                  placeholder={text("Search tasks", "Поиск задач")}
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
                 />
@@ -375,7 +437,7 @@ function LocalTaskTracker({
               {view === "board" ? (
                 <Button size="sm" disabled={disabled} onClick={() => showCreate("backlog")}>
                   <PlusIcon />
-                  New task
+                  {text("New task", "Новая задача")}
                 </Button>
               ) : null}
             </div>
@@ -392,6 +454,9 @@ function LocalTaskTracker({
             canMove={!disabled}
             onOpen={openTask}
             onCreate={showCreate}
+            onSendFeedback={(taskId, commentIds) =>
+              void runCommand({ _tag: "sendLocalTaskFeedback", taskId, commentIds })
+            }
             onMove={(taskId, status) =>
               void runCommand({ _tag: "updateLocalTask", taskId, status })
             }
@@ -422,14 +487,17 @@ function LocalTaskTracker({
         >
           <DialogPopup>
             <DialogHeader>
-              <DialogTitle>Task unavailable</DialogTitle>
+              <DialogTitle>{text("Task unavailable", "Задача недоступна")}</DialogTitle>
               <DialogDescription>
-                This task could not be found in the selected project.
+                {text(
+                  "This task could not be found in the selected project.",
+                  "В выбранном проекте нет такой задачи.",
+                )}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button size="sm" variant="outline" onClick={closeTask}>
-                Back to tasks
+                {text("Back to tasks", "Вернуться к задачам")}
               </Button>
             </DialogFooter>
           </DialogPopup>
@@ -469,6 +537,7 @@ function NewTaskDialog({
   onClose: () => void;
   onCreate: (title: string, description: string, status: TaskWorkspaceBoardStatus) => Promise<void>;
 }) {
+  const text = useUiText();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState(initialStatus);
@@ -481,8 +550,13 @@ function NewTaskDialog({
     >
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>New task</DialogTitle>
-          <DialogDescription>Plan work before starting a chat.</DialogDescription>
+          <DialogTitle>{text("New task", "Новая задача")}</DialogTitle>
+          <DialogDescription>
+            {text(
+              "Plan work before starting a chat.",
+              "Задачу можно создать заранее и открыть чат позже.",
+            )}
+          </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <form
@@ -494,7 +568,7 @@ function NewTaskDialog({
             }}
           >
             <label className="grid gap-1 text-sm">
-              Title
+              {text("Title", "Название")}
               <Input
                 required
                 maxLength={TASK_TITLE_LIMIT}
@@ -504,7 +578,7 @@ function NewTaskDialog({
               />
             </label>
             <label className="grid gap-1 text-sm">
-              Description
+              {text("Description", "Описание")}
               <Textarea
                 maxLength={TASK_TEXT_LIMIT}
                 value={description}
@@ -519,15 +593,17 @@ function NewTaskDialog({
                 if (value !== null) setStatus(value);
               }}
             >
-              <SelectTrigger size="sm" width="fluid" aria-label="Initial status">
-                <SelectValue>
-                  {(value) => BOARD_COLUMNS.find((column) => column.status === value)?.label}
-                </SelectValue>
+              <SelectTrigger
+                size="sm"
+                width="fluid"
+                aria-label={text("Initial status", "Начальный статус")}
+              >
+                <SelectValue>{(value) => (value ? taskStatusLabel(value, text) : "")}</SelectValue>
               </SelectTrigger>
               <SelectPopup>
                 {BOARD_COLUMNS.filter((entry) => entry.status !== "done").map((entry) => (
                   <SelectItem key={entry.status} value={entry.status}>
-                    {entry.label}
+                    {taskStatusLabel(entry.status, text)}
                   </SelectItem>
                 ))}
               </SelectPopup>
@@ -541,7 +617,7 @@ function NewTaskDialog({
         </DialogPanel>
         <DialogFooter>
           <Button size="sm" variant="ghost-muted" onClick={onClose}>
-            Cancel
+            {text("Cancel", "Отмена")}
           </Button>
           <Button
             type="submit"
@@ -549,7 +625,7 @@ function NewTaskDialog({
             size="sm"
             disabled={disabled || !title.trim()}
           >
-            Create task
+            {text("Create task", "Создать задачу")}
           </Button>
         </DialogFooter>
       </DialogPopup>
@@ -572,13 +648,14 @@ function ProjectWiki({
   error: string | null;
   onSave: (content: string) => Promise<boolean>;
 }) {
+  const text = useUiText();
   const [edit, setEdit] = useState<{ base: string; draft: string } | null>(null);
   const changedElsewhere = edit !== null && edit.base !== content;
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4 md:px-6">
       <section className="max-w-3xl space-y-4">
         <header className="flex flex-wrap items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold">Project wiki</h2>
+          <h2 className="text-lg font-semibold">{text("Project wiki", "Вики проекта")}</h2>
           {edit === null ? (
             <Button
               size="sm"
@@ -587,7 +664,7 @@ function ProjectWiki({
               onClick={() => setEdit({ base: content, draft: content })}
             >
               <PencilIcon />
-              Edit wiki
+              {text("Edit wiki", "Редактировать")}
             </Button>
           ) : null}
         </header>
@@ -608,7 +685,7 @@ function ProjectWiki({
             }}
           >
             <label className="grid gap-1 text-sm">
-              Wiki content
+              {text("Wiki content", "Содержимое вики")}
               <Textarea
                 size="lg"
                 value={edit.draft}
@@ -619,8 +696,10 @@ function ProjectWiki({
             </label>
             {changedElsewhere ? (
               <p role="alert" className="text-sm text-warning-foreground">
-                The wiki changed while you were editing. Copy your draft before reopening the latest
-                version.
+                {text(
+                  "The wiki changed while you were editing. Copy your draft before reopening the latest version.",
+                  "Вики обновилась. Скопируйте свой черновик, прежде чем открыть свежую версию.",
+                )}
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2">
@@ -629,10 +708,10 @@ function ProjectWiki({
                 type="submit"
                 disabled={disabled || changedElsewhere || edit.draft === content}
               >
-                Save wiki
+                {text("Save wiki", "Сохранить")}
               </Button>
               <Button size="sm" variant="ghost-muted" onClick={() => setEdit(null)}>
-                Cancel
+                {text("Cancel", "Отмена")}
               </Button>
             </div>
           </form>
@@ -645,7 +724,10 @@ function ProjectWiki({
           />
         ) : (
           <p className="text-sm text-muted-foreground">
-            Add project context, decisions, and handoff notes for people and agents.
+            {text(
+              "Add project context, decisions, and handoff notes for people and agents.",
+              "Добавляйте контекст проекта, решения и заметки для передачи работы.",
+            )}
           </p>
         )}
       </section>

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { PlusIcon, MinusIcon } from "lucide-react";
 import { formatHex8, parse } from "culori";
 import type { ReactNode } from "react";
@@ -49,6 +50,7 @@ export function DesignMultiInspector({
   onRotate: () => void;
   canTransform: boolean;
 }) {
+  const ui = useUiText();
   const byId = new Map(allNodes.map((node) => [node.nodeId, node]));
   const positionControlled = nodes.some((node) => {
     const parent = byId.get(node.parentId ?? "");
@@ -133,7 +135,7 @@ export function DesignMultiInspector({
   return (
     <fieldset className="min-w-0">
       <div className="flex h-12 items-center justify-between border-b border-border/60 px-3">
-        <h2 className="text-xs font-semibold">Selection</h2>
+        <h2 className="text-xs font-semibold">{ui("Selection", "Выделение")}</h2>
         <span className="text-2xs text-muted-foreground">{nodes.length} layers</span>
       </div>
       {section(
@@ -170,7 +172,9 @@ export function DesignMultiInspector({
             <DesignRotationControls onRotate={onRotate} onFlip={onFlip} disabled={!canTransform} />
           </div>
           {positionControlled ? (
-            <p className="text-2xs text-muted-foreground">Position controlled by auto layout.</p>
+            <p className="text-2xs text-muted-foreground">
+              {ui("Position controlled by auto layout.", "Позицию задаёт авторазметка.")}
+            </p>
           ) : null}
         </>,
       )}
@@ -250,7 +254,7 @@ export function DesignMultiInspector({
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <DesignInspectorColor
-                label="Fill"
+                label={ui("Fill", "Заливка")}
                 mixed={fillValue.mixed}
                 value={fillValue.value ?? "#000000"}
                 onChange={(color) => {
@@ -266,7 +270,7 @@ export function DesignMultiInspector({
             <Button
               size="icon-xs"
               variant="ghost-muted"
-              aria-label="Remove fill"
+              aria-label={ui("Remove fill", "Убрать заливку")}
               onClick={() => {
                 onChange((node) => ({
                   fill: null,
@@ -284,7 +288,7 @@ export function DesignMultiInspector({
           <Button
             size="icon-xs"
             variant="ghost-muted"
-            aria-label="Add fill"
+            aria-label={ui("Add fill", "Добавить заливку")}
             onClick={() => {
               onChange((node) => ({
                 fill: node.kind === "text" ? "#000000" : "#d9d9d9",
@@ -305,7 +309,7 @@ export function DesignMultiInspector({
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
                 <DesignInspectorColor
-                  label="Stroke"
+                  label={ui("Stroke", "Обводка")}
                   mixed={strokeValue.mixed}
                   value={strokeValue.value ?? "#000000"}
                   onChange={(color) => {
@@ -319,7 +323,7 @@ export function DesignMultiInspector({
               <Button
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label="Remove stroke"
+                aria-label={ui("Remove stroke", "Убрать обводку")}
                 onClick={() => {
                   onChange((node) => ({
                     border: null,
@@ -351,7 +355,7 @@ export function DesignMultiInspector({
           <Button
             size="icon-xs"
             variant="ghost-muted"
-            aria-label="Add stroke"
+            aria-label={ui("Add stroke", "Добавить обводку")}
             onClick={() => {
               onChange((node) => ({
                 border: "#000000",
@@ -383,11 +387,11 @@ export function DesignMultiInspector({
         section(
           "Effects",
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            Mixed
+            {ui("Mixed", "Разные значения")}
             <Button
               size="icon-xs"
               variant="ghost-muted"
-              aria-label="Remove effects"
+              aria-label={ui("Remove effects", "Убрать эффекты")}
               onClick={() => {
                 onChange(() => ({ effects: [] }));
               }}
@@ -398,7 +402,7 @@ export function DesignMultiInspector({
           <Button
             size="icon-xs"
             variant="ghost-muted"
-            aria-label="Add effect"
+            aria-label={ui("Add effect", "Добавить эффект")}
             disabled={nodes.some(
               (node) =>
                 (node.effects ?? []).filter((effect) => effect.kind === "drop-shadow").length >= 8,

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { DesignAssetPayload, ThreadId } from "@t3tools/contracts";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
@@ -299,6 +300,7 @@ function LayerRow({
   locked: boolean;
   parentLocked: boolean;
 }) {
+  const ui = useUiText();
   const [dropPosition, setDropPosition] = useState<"before" | "inside" | "after" | null>(null);
   const dropAt = (event: DragEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -363,13 +365,15 @@ function LayerRow({
       ) : null}
       {dropPosition === "inside" ? (
         <span className="pointer-events-none absolute end-1 top-0 bg-primary px-1 text-3xs text-primary-foreground">
-          Inside
+          {ui("Inside", "Внутри")}
         </span>
       ) : null}
       <button
         type="button"
         className="size-4 shrink-0"
-        aria-label={expanded ? "Collapse layer" : "Expand layer"}
+        aria-label={
+          expanded ? ui("Collapse layer", "Свернуть слой") : ui("Expand layer", "Раскрыть слой")
+        }
         aria-expanded={hasChildren ? expanded : undefined}
         onClick={onToggleExpand}
         disabled={!hasChildren}
@@ -387,7 +391,7 @@ function LayerRow({
         <div className="min-w-0 flex-1">
           <Input
             size="sm"
-            aria-label="Layer name"
+            aria-label={ui("Layer name", "Имя слоя")}
             autoFocus
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -438,7 +442,11 @@ function LayerRow({
       >
         <button
           type="button"
-          aria-label={node.visible === false ? "Show layer" : "Hide layer"}
+          aria-label={
+            node.visible === false
+              ? ui("Show layer", "Показать слой")
+              : ui("Hide layer", "Скрыть слой")
+          }
           className="inline-flex size-5 shrink-0 items-center justify-center "
           onClick={onToggleVisibility}
         >
@@ -456,10 +464,10 @@ function LayerRow({
               type="button"
               aria-label={
                 parentLocked
-                  ? "Locked by parent"
+                  ? ui("Locked by parent", "Родитель закреплён")
                   : node.locked === true
-                    ? "Unlock layer"
-                    : "Lock layer"
+                    ? ui("Unlock layer", "Открепить слой")
+                    : ui("Lock layer", "Закрепить слой")
               }
               disabled={parentLocked}
               className="inline-flex size-5 shrink-0 items-center justify-center"
@@ -470,10 +478,10 @@ function LayerRow({
           </TooltipTrigger>
           <TooltipPopup>
             {parentLocked
-              ? "Unlock the parent to unlock this layer"
+              ? ui("Unlock the parent to unlock this layer", "Открепите родительский слой")
               : node.locked
-                ? "Unlock layer"
-                : "Lock layer"}
+                ? ui("Unlock layer", "Открепить слой")
+                : ui("Lock layer", "Закрепить слой")}
           </TooltipPopup>
         </Tooltip>
         <Menu>
@@ -491,7 +499,10 @@ function LayerRow({
           <MenuPopup align="start">
             {locked ? (
               <p className="px-2 py-1 text-2xs text-muted-foreground">
-                Unlock the layer to move, group or delete it.
+                {ui(
+                  "Unlock the layer to move, group or delete it.",
+                  "Открепите слой, чтобы перенести, сгруппировать или удалить.",
+                )}
               </p>
             ) : null}
             <MenuItem
@@ -501,46 +512,48 @@ function LayerRow({
                 setRenaming(true);
               }}
             >
-              Rename
+              {ui("Rename", "Имя")}
             </MenuItem>
-            <MenuItem onClick={() => onAction("copy-link")}>Copy layer link</MenuItem>
+            <MenuItem onClick={() => onAction("copy-link")}>
+              {ui("Copy layer link", "Ссылка на слой")}
+            </MenuItem>
             {canReferenceAgent ? (
               <MenuItem onClick={() => onAction("copy-reference")}>
-                Copy reference for agent
+                {ui("Copy reference for agent", "Ссылка для агента")}
               </MenuItem>
             ) : null}
-            <MenuItem onClick={() => onAction("duplicate")}>Duplicate</MenuItem>
+            <MenuItem onClick={() => onAction("duplicate")}>{ui("Duplicate", "Дубликат")}</MenuItem>
             <MenuItem disabled={locked} onClick={() => onAction("up")}>
-              Move up
+              {ui("Move up", "Выше")}
             </MenuItem>
             <MenuItem disabled={locked} onClick={() => onAction("down")}>
-              Move down
+              {ui("Move down", "Ниже")}
             </MenuItem>
             <MenuItem disabled={locked} onClick={() => onAction("flip-horizontal")}>
-              Flip horizontal
+              {ui("Flip horizontal", "Отразить по X")}
             </MenuItem>
             <MenuItem disabled={locked} onClick={() => onAction("flip-vertical")}>
-              Flip vertical
+              {ui("Flip vertical", "Отразить по Y")}
             </MenuItem>
             <MenuItem disabled={locked} onClick={() => onAction("group")}>
-              Group selection
+              {ui("Group selection", "Сгруппировать")}
             </MenuItem>
             {node.kind === "group" ? (
               <MenuItem disabled={locked} onClick={() => onAction("ungroup")}>
-                Ungroup
+                {ui("Ungroup", "Разгруппировать")}
               </MenuItem>
             ) : null}
             {node.kind === "instance" ? (
               <MenuItem disabled={locked} onClick={() => onAction("detach")}>
-                Detach instance
+                {ui("Detach instance", "Отвязать экземпляр")}
               </MenuItem>
             ) : node.kind !== "component" && !node.section && !node.slice ? (
               <MenuItem disabled={locked} onClick={() => onAction("create-component")}>
-                Create component
+                {ui("Create component", "Создать компонент")}
               </MenuItem>
             ) : null}
             <MenuItem disabled={locked} onClick={() => onAction("delete")}>
-              Delete
+              {ui("Delete", "Удалить")}
             </MenuItem>
           </MenuPopup>
         </Menu>
@@ -564,6 +577,7 @@ function PageRow({
   onRename: (name: string) => void;
   onDelete: () => void;
 }) {
+  const ui = useUiText();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const cancelled = useRef(false);
@@ -581,7 +595,7 @@ function PageRow({
       {editing ? (
         <Input
           size="sm"
-          aria-label="Page name"
+          aria-label={ui("Page name", "Имя страницы")}
           autoFocus
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -626,10 +640,10 @@ function PageRow({
               setEditing(true);
             }}
           >
-            Rename page
+            {ui("Rename page", "Имя страницы")}
           </MenuItem>
           <MenuItem disabled={!canDelete} onClick={onDelete}>
-            Delete page
+            {ui("Delete page", "Удалить страницу")}
           </MenuItem>
         </MenuPopup>
       </Menu>
@@ -692,6 +706,7 @@ function LayersPanel({
   onRemoveAsset: (assetId: string) => void;
   onImportAsset: () => void;
 }) {
+  const ui = useUiText();
   const roots = nodeForPage(document);
   const [tab, setTab] = useState<"layers" | "assets">("layers");
   const [layerQuery, setLayerQuery] = useState("");
@@ -783,7 +798,7 @@ function LayersPanel({
     >
       <div
         role="tablist"
-        aria-label="Design resources"
+        aria-label={ui("Design resources", "Ресурсы макета")}
         className="flex h-10 shrink-0 items-center gap-1 border-b border-sidebar-border/50 px-3"
       >
         {(["layers", "assets"] as const).map((value) => (
@@ -800,14 +815,14 @@ function LayersPanel({
             )}
             onClick={() => setTab(value)}
           >
-            {value === "layers" ? "File" : "Assets"}
+            {value === "layers" ? ui("File", "Файл") : ui("Assets", "Ресурсы")}
           </button>
         ))}
       </div>
       {tab === "layers" ? (
         <>
           <section
-            aria-label="Pages"
+            aria-label={ui("Pages", "Страницы")}
             className="shrink-0 border-b border-sidebar-border/50 px-2 py-2"
           >
             <div className="mb-1 flex h-6 items-center gap-1 px-1">
@@ -821,10 +836,10 @@ function LayersPanel({
                 <ChevronDownIcon
                   className={cn("size-3 text-muted-foreground", !pagesOpen && "-rotate-90")}
                 />
-                Pages
+                {ui("Pages", "Страницы")}
               </button>
               <Button
-                aria-label="Find layers"
+                aria-label={ui("Find layers", "Найти слой")}
                 size="icon-xs"
                 variant="ghost-muted"
                 aria-pressed={searchOpen}
@@ -836,7 +851,7 @@ function LayersPanel({
                 <SearchIcon />
               </Button>
               <Button
-                aria-label="Add page"
+                aria-label={ui("Add page", "Страница")}
                 size="icon-xs"
                 variant="ghost-muted"
                 onClick={() => {
@@ -864,12 +879,12 @@ function LayersPanel({
             ) : null}
           </section>
           <div className="flex h-10 shrink-0 items-center justify-between px-3">
-            <h2 className="text-xs font-medium">Layers</h2>
+            <h2 className="text-xs font-medium">{ui("Layers", "Слои")}</h2>
             <div className="flex items-center gap-1">
               <Button
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label="Collapse layers"
+                aria-label={ui("Collapse layers", "Свернуть слои")}
                 onClick={() => setExpanded(new Set())}
               >
                 <ChevronsUpIcon />
@@ -877,15 +892,21 @@ function LayersPanel({
               <Menu>
                 <MenuTrigger
                   render={
-                    <Button size="icon-xs" variant="ghost-muted" aria-label="Layer actions" />
+                    <Button
+                      size="icon-xs"
+                      variant="ghost-muted"
+                      aria-label={ui("Layer actions", "Действия со слоем")}
+                    />
                   }
                 >
                   <MoreHorizontalIcon />
                 </MenuTrigger>
                 <MenuPopup align="start">
-                  <MenuItem onClick={onAddFrame}>Add frame</MenuItem>
-                  <MenuItem onClick={onAddLayer}>Add layer</MenuItem>
-                  <MenuItem onClick={onAddComponent}>Create component</MenuItem>
+                  <MenuItem onClick={onAddFrame}>{ui("Add frame", "Фрейм")}</MenuItem>
+                  <MenuItem onClick={onAddLayer}>{ui("Add layer", "Слой")}</MenuItem>
+                  <MenuItem onClick={onAddComponent}>
+                    {ui("Create component", "Создать компонент")}
+                  </MenuItem>
                   <MenuSeparator />
                   {document.nodes
                     .filter((node) => node.kind === "component")
@@ -895,7 +916,12 @@ function LayersPanel({
                       </MenuItem>
                     ))}
                   {!document.nodes.some((node) => node.kind === "component") ? (
-                    <MenuItem disabled>Create a component to insert instances</MenuItem>
+                    <MenuItem disabled>
+                      {ui(
+                        "Create a component to insert instances",
+                        "Создайте компонент, чтобы вставить экземпляры.",
+                      )}
+                    </MenuItem>
                   ) : null}
                 </MenuPopup>
               </Menu>
@@ -907,8 +933,8 @@ function LayersPanel({
           <Input
             size="sm"
             type="search"
-            aria-label="Search assets"
-            placeholder="Search assets"
+            aria-label={ui("Search assets", "Поиск ресурсов")}
+            placeholder={ui("Search assets", "Поиск ресурсов")}
             value={assetQuery}
             onChange={(event) => setAssetQuery(event.target.value)}
           />
@@ -927,8 +953,8 @@ function LayersPanel({
                   autoFocus
                   size="sm"
                   type="search"
-                  aria-label="Find layers"
-                  placeholder="Find layers"
+                  aria-label={ui("Find layers", "Найти слой")}
+                  placeholder={ui("Find layers", "Найти слой")}
                   value={layerQuery}
                   onChange={(event) => setLayerQuery(event.target.value)}
                   onKeyDown={(event) => {
@@ -942,7 +968,9 @@ function LayersPanel({
               </label>
             ) : null}
             {layerQuery.trim() && layerRows.length === 0 ? (
-              <p className="px-2 py-4 text-xs text-muted-foreground">No layers found.</p>
+              <p className="px-2 py-4 text-xs text-muted-foreground">
+                {ui("No layers found.", "Нет слоёв")}
+              </p>
             ) : null}
             <DesignLayerList
               rows={layerRows}
@@ -967,15 +995,15 @@ function LayersPanel({
                 node.name.toLocaleLowerCase().includes(assetQuery.trim().toLocaleLowerCase()),
             ) ? (
               <p role="status" className="px-2 py-2 text-xs text-muted-foreground">
-                No assets found.
+                {ui("No assets found.", "Нет ресурсов")}
               </p>
             ) : null}
             <div className="flex items-center justify-between px-2">
-              <p className="text-2xs text-muted-foreground">Images</p>
+              <p className="text-2xs text-muted-foreground">{ui("Images", "Изображения")}</p>
               <Button
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label="Import images"
+                aria-label={ui("Import images", "Импорт изображений")}
                 onClick={onImportAsset}
               >
                 <PlusIcon />
@@ -999,10 +1027,15 @@ function LayersPanel({
               ))}
             {!document.assets.some((asset) => asset.mimeType.startsWith("image/")) ? (
               <p className="px-2 text-xs text-muted-foreground">
-                Import images to reuse them in this file.
+                {ui(
+                  "Import images to reuse them in this file.",
+                  "Импортируйте изображения для этого макета.",
+                )}
               </p>
             ) : null}
-            <p className="px-2 text-2xs text-muted-foreground">Local components</p>
+            <p className="px-2 text-2xs text-muted-foreground">
+              {ui("Local components", "Компоненты файла")}
+            </p>
             {document.nodes
               .filter(
                 (node) =>
@@ -1023,7 +1056,10 @@ function LayersPanel({
               ))}
             {!document.nodes.some((node) => node.kind === "component") ? (
               <p className="px-2 text-xs leading-5 text-muted-foreground">
-                Create a component to reuse it across your design.
+                {ui(
+                  "Create a component to reuse it across your design.",
+                  "Создайте компонент, чтобы использовать его в макете.",
+                )}
               </p>
             ) : null}
           </div>
@@ -1134,6 +1170,7 @@ function Inspector({
   onRotate: () => void;
   canTransform: boolean;
 }) {
+  const ui = useUiText();
   const interactionSequence = useRef(0);
   const parent = nodes.find((candidate) => candidate.nodeId === node?.parentId);
   const parentFlows = parent?.layoutModel !== undefined && parent.layoutModel.kind !== "absolute";
@@ -1239,7 +1276,11 @@ function Inspector({
                 onChange({ layoutSizing: { ...sizing, [axis]: value as "fixed" | "hug" | "fill" } })
               }
             >
-              {value === "fixed" ? "Fixed" : value === "hug" ? "Hug contents" : "Fill container"}
+              {value === "fixed"
+                ? ui("Fixed", "Фиксировано")
+                : value === "hug"
+                  ? ui("Hug contents", "По содержимому")
+                  : ui("Fill container", "Заполнить")}
               {sizing[axis] === value ? " ✓" : ""}
             </MenuItem>
           ))}
@@ -1250,7 +1291,7 @@ function Inspector({
               : (["minHeight", "maxHeight"] as const)
             ).map((field) => (
               <label key={field} className="grid gap-1 text-2xs text-muted-foreground">
-                {field.startsWith("min") ? "Minimum" : "Maximum"}
+                {field.startsWith("min") ? ui("Minimum", "Минимум") : ui("Maximum", "Максимум")}
                 <Input
                   size="sm"
                   type="number"
@@ -1286,7 +1327,7 @@ function Inspector({
   );
   return (
     <aside
-      aria-label="Inspector"
+      aria-label={ui("Inspector", "Свойства")}
       className="flex min-h-0 w-60 min-w-60 flex-col border-l border-border/70 bg-sidebar"
     >
       <div
@@ -1312,18 +1353,20 @@ function Inspector({
             role="status"
           >
             <p className="font-medium">
-              {conflict.nodeId === null ? "Document sync conflict" : "Layer sync conflict"}
+              {conflict.nodeId === null
+                ? ui("Document sync conflict", "Конфликт макета")
+                : ui("Layer sync conflict", "Конфликт слоя")}
             </p>
             <div className="flex flex-wrap gap-1">
               <Button size="xs" variant="secondary" onClick={() => onResolveConflict("keep-local")}>
-                Keep local
+                {ui("Keep local", "Оставить локальный")}
               </Button>
               <Button
                 size="xs"
                 variant="ghost-muted"
                 onClick={() => onResolveConflict("use-server")}
               >
-                Use server
+                {ui("Use server", "Взять с сервера")}
               </Button>
               {conflict.nodeId !== null ? (
                 <Button
@@ -1331,7 +1374,7 @@ function Inspector({
                   variant="ghost-muted"
                   onClick={() => onResolveConflict("duplicate-node")}
                 >
-                  Duplicate
+                  {ui("Duplicate", "Дубликат")}
                 </Button>
               ) : null}
             </div>
@@ -1343,8 +1386,14 @@ function Inspector({
             className="border-b border-border px-4 py-3 text-xs text-muted-foreground"
           >
             {selectionCount > 1
-              ? "Some layers are locked on canvas. Properties remain editable."
-              : "Locked on canvas. You can edit properties here."}
+              ? ui(
+                  "Some layers are locked on canvas. Properties remain editable.",
+                  "Некоторые слои закреплены. Свойства можно менять.",
+                )
+              : ui(
+                  "Locked on canvas. You can edit properties here.",
+                  "Слой закреплён. Свойства доступны.",
+                )}
           </p>
         ) : null}
         {node && selectionCount === 1 ? (
@@ -1356,7 +1405,11 @@ function Inspector({
               <Menu modal={false}>
                 <MenuTrigger
                   render={
-                    <Button size="icon-xs" variant="ghost-muted" aria-label="Layer properties" />
+                    <Button
+                      size="icon-xs"
+                      variant="ghost-muted"
+                      aria-label={ui("Layer properties", "Свойства слоя")}
+                    />
                   }
                 >
                   <MoreHorizontalIcon />
@@ -1369,7 +1422,7 @@ function Inspector({
                     }}
                   >
                     <label className="grid gap-1 text-2xs text-muted-foreground">
-                      Name
+                      {ui("Name", "Имя")}
                       <Input
                         size="sm"
                         value={node.name}
@@ -1378,7 +1431,7 @@ function Inspector({
                     </label>
                     {node.kind === "text" ? (
                       <label className="mt-2 grid gap-1 text-2xs text-muted-foreground">
-                        Content
+                        {ui("Content", "Содержимое")}
                         <Input
                           size="sm"
                           value={node.text ?? ""}
@@ -1412,7 +1465,7 @@ function Inspector({
                     <div className="grid grid-cols-2 gap-2">
                       {inFlow ? (
                         <p className="col-span-2 text-2xs text-muted-foreground">
-                          Positioned by auto layout
+                          {ui("Positioned by auto layout", "Позиция по авторазметке")}
                         </p>
                       ) : (
                         <>
@@ -1438,7 +1491,7 @@ function Inspector({
                       <div
                         className="flex rounded-md bg-input/25 p-0.5"
                         role="group"
-                        aria-label="Layout direction"
+                        aria-label={ui("Layout direction", "Направление")}
                       >
                         {(
                           [
@@ -1554,11 +1607,11 @@ function Inspector({
                     {["frame", "component", "instance"].includes(node.kind) ? (
                       <label className="flex items-center gap-2 text-xs">
                         <Checkbox
-                          aria-label="Clip content"
+                          aria-label={ui("Clip content", "Обрезать содержимое")}
                           checked={node.clipContent === true}
                           onCheckedChange={(clipContent) => onChange({ clipContent })}
                         />
-                        Clip content
+                        {ui("Clip content", "Обрезать содержимое")}
                       </label>
                     ) : null}
                     {parentFlows
@@ -1639,7 +1692,9 @@ function Inspector({
                       size="icon-xs"
                       variant="ghost-muted"
                       aria-label={
-                        node.visible === false ? "Show selected layer" : "Hide selected layer"
+                        node.visible === false
+                          ? ui("Show selected layer", "Показать слой")
+                          : ui("Hide selected layer", "Скрыть слой")
                       }
                       onClick={() => onChange({ visible: node.visible === false })}
                     >
@@ -1654,7 +1709,7 @@ function Inspector({
                                 <Button
                                   size="icon-xs"
                                   variant="ghost-muted"
-                                  aria-label="Apply blend mode"
+                                  aria-label={ui("Apply blend mode", "Режим наложения")}
                                 />
                               }
                             />
@@ -1759,7 +1814,7 @@ function Inspector({
                         </p>
                         <div className="flex flex-wrap gap-1">
                           <Button size="xs" variant="secondary" onClick={onReplaceImage}>
-                            Replace image…
+                            {ui("Replace image…", "Заменить…")}
                           </Button>
                           <Button
                             size="xs"
@@ -1779,7 +1834,7 @@ function Inspector({
                                 });
                             }}
                           >
-                            Original size
+                            {ui("Original size", "Исходный размер")}
                           </Button>
                         </div>
                       </>,
@@ -1813,12 +1868,15 @@ function Inspector({
                       onClick={() => onSetStart(startNodeId === node.nodeId ? null : node.nodeId)}
                     >
                       {startNodeId === node.nodeId
-                        ? "Remove starting point"
-                        : "Set as starting point"}
+                        ? ui("Remove starting point", "Убрать старт")
+                        : ui("Set as starting point", "Начать отсюда")}
                     </Button>
                   ) : null}
                   <p className="text-2xs leading-5 text-muted-foreground">
-                    Connect a layer to a frame, then use Present to test navigation.
+                    {ui(
+                      "Connect a layer to a frame, then use Present to test navigation.",
+                      "Свяжите слой с фреймом и запустите показ, чтобы проверить переход.",
+                    )}
                   </p>
                   {(node.interactions ?? []).map((interaction, index) => (
                     <div
@@ -1854,7 +1912,7 @@ function Inspector({
                         : null}
                       {interaction.trigger === "key-press" ? (
                         <label className="grid gap-1 text-2xs text-muted-foreground">
-                          Key
+                          {ui("Key", "Клавиша")}
                           <Input
                             size="sm"
                             value={interaction.key ?? ""}
@@ -1897,7 +1955,7 @@ function Inspector({
                       )}
                       {interaction.action === "open-url" ? (
                         <label className="grid gap-1 text-2xs text-muted-foreground">
-                          URL
+                          {ui("URL", "Адрес")}
                           <Input
                             size="sm"
                             type="url"
@@ -2023,7 +2081,9 @@ function Inspector({
                                   </div>
                                 ) : null}
                                 <label className="flex items-center justify-between gap-2 text-2xs text-muted-foreground">
-                                  <span>Close when clicking outside</span>
+                                  <span>
+                                    {ui("Close when clicking outside", "Закрывать по клику вне")}
+                                  </span>
                                   <Switch
                                     checked={overlay.dismissOnOutside ?? true}
                                     onCheckedChange={(dismissOnOutside) =>
@@ -2032,7 +2092,7 @@ function Inspector({
                                   />
                                 </label>
                                 <label className="flex items-center justify-between gap-2 text-2xs text-muted-foreground">
-                                  <span>Background behind overlay</span>
+                                  <span>{ui("Background behind overlay", "Подложка")}</span>
                                   <Switch
                                     checked={overlay.background ?? true}
                                     onCheckedChange={(background) => changeOverlay({ background })}
@@ -2041,7 +2101,7 @@ function Inspector({
                                 {overlay.background !== false ? (
                                   <div className="grid grid-cols-2 gap-2">
                                     <label className="grid gap-1 text-2xs text-muted-foreground">
-                                      Backdrop color
+                                      {ui("Backdrop color", "Цвет подложки")}
                                       <Input
                                         size="sm"
                                         value={overlay.backgroundColor ?? "#000000"}
@@ -2072,7 +2132,7 @@ function Inspector({
                           })
                         }
                       >
-                        Remove interaction
+                        {ui("Remove interaction", "Убрать переход")}
                       </Button>
                     </div>
                   ))}
@@ -2101,7 +2161,7 @@ function Inspector({
                       });
                     }}
                   >
-                    Add interaction
+                    {ui("Add interaction", "Добавить переход")}
                   </Button>
                 </>,
               )
@@ -2143,7 +2203,7 @@ function Inspector({
                   { fit: "Fit to window", actual: "Actual size" },
                 )}
                 <label className="grid gap-1 text-2xs text-muted-foreground">
-                  Presentation background
+                  {ui("Presentation background", "Фон показа")}
                   <Input
                     size="sm"
                     value={prototypeSettings.background ?? "#e5e7eb"}
@@ -2156,7 +2216,10 @@ function Inspector({
               "Viewport",
               <>
                 <p className="text-2xs leading-5 text-muted-foreground">
-                  Uses the current frame size unless you set a custom viewport.
+                  {ui(
+                    "Uses the current frame size unless you set a custom viewport.",
+                    "По умолчанию показ использует размер фрейма.",
+                  )}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {number(
@@ -2182,7 +2245,7 @@ function Inspector({
                       onPrototypeSettings({ viewportWidth: undefined, viewportHeight: undefined })
                     }
                   >
-                    Use frame size
+                    {ui("Use frame size", "Размер фрейма")}
                   </Button>
                   {prototypeSettings.viewportWidth && prototypeSettings.viewportHeight ? (
                     <Button
@@ -2195,7 +2258,7 @@ function Inspector({
                         })
                       }
                     >
-                      Rotate
+                      {ui("Rotate", "Поворот")}
                     </Button>
                   ) : null}
                 </div>
@@ -2220,13 +2283,16 @@ function Inspector({
             "Canvas",
             <div className="space-y-2">
               <p className="text-2xs leading-5 text-muted-foreground">
-                Page-level settings apply when no layer is selected.
+                {ui(
+                  "Page-level settings apply when no layer is selected.",
+                  "Снимите выделение, чтобы настроить страницу.",
+                )}
               </p>
               {page.background ? (
                 <div className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
                     <DesignInspectorColor
-                      label="Canvas background"
+                      label={ui("Canvas background", "Фон холста")}
                       value={page.background}
                       onChange={(background) => onPageChange({ background })}
                     />
@@ -2234,7 +2300,7 @@ function Inspector({
                   <Button
                     size="icon-xs"
                     variant="ghost-muted"
-                    aria-label="Remove canvas background"
+                    aria-label={ui("Remove canvas background", "Убрать фон")}
                     onClick={() => onPageChange({ background: undefined })}
                   >
                     <MinusIcon />
@@ -2246,7 +2312,7 @@ function Inspector({
                   variant="secondary"
                   onClick={() => onPageChange({ background: "#1f232b" })}
                 >
-                  Add canvas background
+                  {ui("Add canvas background", "Добавить фон")}
                 </Button>
               )}
             </div>,
@@ -2285,6 +2351,7 @@ export function DesignWorkspace({
   shellIntegrated = false,
   syncTarget = null,
 }: DesignWorkspaceProps) {
+  const ui = useUiText();
   const storage = useDesignDocument(documentId);
   const navigate = useNavigate();
   const [showTrash, setShowTrash] = useState(false);
@@ -2326,12 +2393,19 @@ export function DesignWorkspace({
     <Dialog open={showTrash} onOpenChange={setShowTrash}>
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>Recently deleted</DialogTitle>
-          <DialogDescription>Files stay on this device until you restore them.</DialogDescription>
+          <DialogTitle>{ui("Recently deleted", "Корзина")}</DialogTitle>
+          <DialogDescription>
+            {ui(
+              "Files stay on this device until you restore them.",
+              "Файлы в корзине хранятся на этом устройстве.",
+            )}
+          </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           {storage.trashed.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No deleted files.</p>
+            <p className="text-sm text-muted-foreground">
+              {ui("No deleted files.", "Корзина пуста")}
+            </p>
           ) : (
             <ul className="space-y-2">
               {storage.trashed.map((file) => (
@@ -2349,7 +2423,7 @@ export function DesignWorkspace({
                       })
                     }
                   >
-                    Restore
+                    {ui("Restore", "Вернуть")}
                   </Button>
                 </li>
               ))}
@@ -2379,7 +2453,7 @@ export function DesignWorkspace({
                 storage.retry(saveError[0]);
               }}
             >
-              Retry saving
+              {ui("Retry saving", "Сохранить снова")}
             </Button>
           ) : null}
           <Button
@@ -2393,7 +2467,7 @@ export function DesignWorkspace({
               })
             }
           >
-            Save recovery copy
+            {ui("Save recovery copy", "Сохранить копию")}
           </Button>
           <Button
             size="xs"
@@ -2409,7 +2483,7 @@ export function DesignWorkspace({
               })
             }
           >
-            Download recovery file
+            {ui("Download recovery file", "Скачать копию")}
           </Button>
         </div>
       ) : null}
@@ -2428,7 +2502,7 @@ export function DesignWorkspace({
           </p>
           {storage.phase === "error" ? (
             <Button variant="secondary" size="sm" onClick={() => run(storage.reload)}>
-              Try again
+              {ui("Try again", "Повторить")}
             </Button>
           ) : null}
         </div>
@@ -2463,7 +2537,7 @@ export function DesignWorkspace({
           actions={
             canImportDesignWebsite() ? (
               <Button size="sm" variant="secondary" onClick={() => setShowWebsiteImport(true)}>
-                Import website…
+                {ui("Import website…", "Импорт сайта…")}
               </Button>
             ) : null
           }
@@ -2478,7 +2552,7 @@ export function DesignWorkspace({
         ref={fileInput}
         className="hidden"
         accept="application/json,.design.json"
-        aria-label="Design document file"
+        aria-label={ui("Design document file", "Файл макета")}
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
@@ -2545,6 +2619,7 @@ function DesignEditor({
   readonly onDownload: () => void;
   readonly onTrash: () => void;
 }) {
+  const ui = useUiText();
   const { setDocument, documents } = storage;
   const navigate = useNavigate();
   const router = useRouter();
@@ -3469,7 +3544,7 @@ function DesignEditor({
   const designFileMenuItems = (
     <>
       <MenuSub>
-        <MenuSubTrigger>Switch file</MenuSubTrigger>
+        <MenuSubTrigger>{ui("Switch file", "Сменить файл")}</MenuSubTrigger>
         <MenuSubPopup>
           {documents.map((candidate) => (
             <MenuItem key={candidate.documentId} onClick={() => openDocument(candidate.documentId)}>
@@ -3480,13 +3555,13 @@ function DesignEditor({
         </MenuSubPopup>
       </MenuSub>
       <MenuSeparator />
-      <MenuItem onClick={onCreate}>New design document</MenuItem>
-      <MenuItem onClick={onOpenFile}>Open Design file…</MenuItem>
-      <MenuItem onClick={onDownload}>Save a local copy…</MenuItem>
-      <MenuItem onClick={() => copyDesignLink()}>Copy file link</MenuItem>
+      <MenuItem onClick={onCreate}>{ui("New design document", "Новый макет")}</MenuItem>
+      <MenuItem onClick={onOpenFile}>{ui("Open Design file…", "Открыть макет…")}</MenuItem>
+      <MenuItem onClick={onDownload}>{ui("Save a local copy…", "Сохранить копию…")}</MenuItem>
+      <MenuItem onClick={() => copyDesignLink()}>{ui("Copy file link", "Ссылка на файл")}</MenuItem>
       {syncTarget ? (
         <MenuItem onClick={() => copyAgentReference(selectedNodeId ?? undefined)}>
-          Copy reference for agent
+          {ui("Copy reference for agent", "Ссылка для агента")}
         </MenuItem>
       ) : null}
       <MenuItem
@@ -3496,25 +3571,31 @@ function DesignEditor({
           setRenamingDocument(true);
         }}
       >
-        Rename document
+        {ui("Rename document", "Имя макета")}
       </MenuItem>
       <MenuItem onClick={() => setDescriptionDraft(document.description ?? "")}>
-        Edit description…
+        {ui("Edit description…", "Описание…")}
       </MenuItem>
       <MenuSub>
-        <MenuSubTrigger>Import</MenuSubTrigger>
+        <MenuSubTrigger>{ui("Import", "Импорт")}</MenuSubTrigger>
         <MenuSubPopup>
           <MenuItem
             onClick={() => {
               openAssetPicker();
             }}
           >
-            Place image…
+            {ui("Place image…", "Вставить фото…")}
           </MenuItem>
-          <MenuItem onClick={() => void pasteMarkup()}>Paste HTML…</MenuItem>
-          <MenuItem onClick={() => setReactPasteOpen(true)}>Paste as React…</MenuItem>
+          <MenuItem onClick={() => void pasteMarkup()}>
+            {ui("Paste HTML…", "Вставить HTML…")}
+          </MenuItem>
+          <MenuItem onClick={() => setReactPasteOpen(true)}>
+            {ui("Paste as React…", "Вставить React…")}
+          </MenuItem>
           {canImportDesignWebsite() ? (
-            <MenuItem onClick={() => setWebsiteImportOpen(true)}>Import website…</MenuItem>
+            <MenuItem onClick={() => setWebsiteImportOpen(true)}>
+              {ui("Import website…", "Импорт сайта…")}
+            </MenuItem>
           ) : null}
         </MenuSubPopup>
       </MenuSub>
@@ -3526,17 +3607,21 @@ function DesignEditor({
           }
           onClick={linkSource}
         >
-          Link source
+          {ui("Link source", "Привязать источник")}
         </MenuItem>
       ) : null}
       {document.provenance?.mode === "linked" ? (
-        <MenuItem onClick={() => void refreshSource()}>Refresh from source</MenuItem>
+        <MenuItem onClick={() => void refreshSource()}>
+          {ui("Refresh from source", "Обновить из источника")}
+        </MenuItem>
       ) : null}
       {serverDocument && serverDocument.documentId === document.documentId ? (
-        <MenuItem onClick={() => void loadServerCopy()}>Load server copy</MenuItem>
+        <MenuItem onClick={() => void loadServerCopy()}>
+          {ui("Load server copy", "Версия с сервера")}
+        </MenuItem>
       ) : null}
       <MenuSub>
-        <MenuSubTrigger>Project connection</MenuSubTrigger>
+        <MenuSubTrigger>{ui("Project connection", "Привязка к проекту")}</MenuSubTrigger>
         <MenuSubPopup>
           {syncTarget ? (
             <>
@@ -3546,10 +3631,12 @@ function DesignEditor({
                 </MenuGroupLabel>
                 <MenuItem disabled={syncing} onClick={() => void syncDocument()}>
                   <CloudUploadIcon />
-                  {syncing ? "Syncing…" : "Sync now"}
+                  {syncing ? ui("Syncing…", "Обновляем…") : ui("Sync now", "Обновить")}
                 </MenuItem>
               </MenuGroup>
-              <MenuItem onClick={() => void disconnectProject()}>Disconnect project</MenuItem>
+              <MenuItem onClick={() => void disconnectProject()}>
+                {ui("Disconnect project", "Отвязать проект")}
+              </MenuItem>
             </>
           ) : projectOptions.length > 0 ? (
             projectOptions.map((project) => (
@@ -3558,20 +3645,20 @@ function DesignEditor({
               </MenuItem>
             ))
           ) : (
-            <MenuItem disabled>No projects connected</MenuItem>
+            <MenuItem disabled>{ui("No projects connected", "Нет проектов")}</MenuItem>
           )}
         </MenuSubPopup>
       </MenuSub>
       <MenuSeparator />
-      <MenuItem onClick={onTrash}>Move file to trash</MenuItem>
-      <MenuItem onClick={onOpenTrash}>Recently deleted</MenuItem>
+      <MenuItem onClick={onTrash}>{ui("Move file to trash", "В корзину")}</MenuItem>
+      <MenuItem onClick={onOpenTrash}>{ui("Recently deleted", "Корзина")}</MenuItem>
     </>
   );
 
   const designFileToolbar = (
     <div
       role="group"
-      aria-label="Design file toolbar"
+      aria-label={ui("Design file toolbar", "Панель макета")}
       data-design-toolbar=""
       className={
         shellIntegrated
@@ -3586,7 +3673,7 @@ function DesignEditor({
             search={{}}
             className="shrink-0 text-foreground/90 hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           >
-            Design
+            {ui("Design", "Дизайн")}
           </Link>
           <span aria-hidden="true" className="shrink-0 text-muted-foreground/50">
             /
@@ -3598,7 +3685,7 @@ function DesignEditor({
           <Input
             size="sm"
             autoFocus
-            aria-label="Document name"
+            aria-label={ui("Document name", "Имя макета")}
             value={documentTitle}
             onChange={(event) => setDocumentTitle(event.target.value)}
             onBlur={() => {
@@ -3617,7 +3704,13 @@ function DesignEditor({
         ) : shellIntegrated ? (
           <Menu>
             <MenuTrigger
-              render={<Button size="sm" variant="ghost-muted" aria-label="Design file menu" />}
+              render={
+                <Button
+                  size="sm"
+                  variant="ghost-muted"
+                  aria-label={ui("Design file menu", "Меню макета")}
+                />
+              }
             >
               <span className="block max-w-44 truncate">{document.title}</span>
               <ChevronDownIcon />
@@ -3639,17 +3732,17 @@ function DesignEditor({
         <p className={shellIntegrated ? "sr-only" : "text-2xs text-muted-foreground"}>
           {document.provenance?.mode === "snapshot" ? "Imported snapshot · " : ""}
           {storage.errors.has(document.documentId)
-            ? "Changes not saved"
+            ? ui("Changes not saved", "Правки не сохранены")
             : storage.pending.has(document.documentId)
-              ? "Saving…"
-              : "Saved on this device"}
+              ? ui("Saving…", "Сохраняем…")
+              : ui("Saved on this device", "Сохранено здесь")}
         </p>
       </div>
       {shellIntegrated ? <span className="min-w-0 flex-1" /> : null}
       {!shellIntegrated ? (
         <Select value={document.documentId} onValueChange={openDocument}>
-          <SelectTrigger size="xs" variant="ghost" aria-label="Design document">
-            <SelectValue>Files</SelectValue>
+          <SelectTrigger size="xs" variant="ghost" aria-label={ui("Design document", "Макет")}>
+            <SelectValue>{ui("Files", "Файлы")}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="start" alignItemWithTrigger={false}>
             {documents.map((candidate) => (
@@ -3667,11 +3760,12 @@ function DesignEditor({
               <Button
                 size={shellIntegrated ? "sm" : "xs"}
                 variant="ghost-muted"
-                aria-label="File actions"
+                aria-label={ui("File actions", "Действия с файлом")}
               />
             }
           >
-            File <ChevronDownIcon />
+            {ui("File", "Файл")}
+            <ChevronDownIcon />
           </MenuTrigger>
           <MenuPopup align="end">{designFileMenuItems}</MenuPopup>
         </Menu>
@@ -3697,16 +3791,17 @@ function DesignEditor({
               disabled={syncing}
               onClick={() => void syncDocument()}
             >
-              <CloudUploadIcon /> {syncing ? "Syncing…" : "Sync"}
+              <CloudUploadIcon />{" "}
+              {syncing ? ui("Syncing…", "Обновляем…") : ui("Sync", "Синхронизация")}
             </Button>
           ) : projectOptions.length > 0 ? (
             <Select onValueChange={connectProject}>
               <SelectTrigger
                 size={shellIntegrated ? "sm" : "xs"}
                 variant="ghost"
-                aria-label="Connect Design to a project"
+                aria-label={ui("Connect Design to a project", "Связать макет с проектом")}
               >
-                <SelectValue placeholder="Connect" />
+                <SelectValue placeholder={ui("Connect", "Подключить")} />
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 {projectOptions.map((project) => (
@@ -3727,7 +3822,7 @@ function DesignEditor({
       ) : null}
       <div
         role="group"
-        aria-label="Design output actions"
+        aria-label={ui("Design output actions", "Вывод макета")}
         className="flex shrink-0 items-center gap-0.5"
       >
         <Tooltip>
@@ -3736,7 +3831,7 @@ function DesignEditor({
               <Button
                 size={shellIntegrated ? "icon-sm" : "xs"}
                 variant={shellIntegrated ? "ghost-muted" : "secondary"}
-                aria-label="Present"
+                aria-label={ui("Present", "Показ")}
                 disabled={!nodeForPage(document).some((node) => node.kind === "frame")}
                 onClick={() => {
                   const selectedFrame = document.nodes.find(
@@ -3755,11 +3850,11 @@ function DesignEditor({
                 }}
               >
                 <PlayIcon />
-                {!shellIntegrated ? "Present" : null}
+                {!shellIntegrated ? ui("Present", "Показ") : null}
               </Button>
             }
           />
-          <TooltipPopup>Present</TooltipPopup>
+          <TooltipPopup>{ui("Present", "Показ")}</TooltipPopup>
         </Tooltip>
 
         <Menu>
@@ -3771,11 +3866,16 @@ function DesignEditor({
               />
             }
           >
-            Export <ChevronDownIcon />
+            {ui("Export", "Экспорт")}
+            <ChevronDownIcon />
           </MenuTrigger>
           <MenuPopup align="end">
-            <MenuItem onClick={() => void copyPortableExport("html")}>Copy HTML</MenuItem>
-            <MenuItem onClick={() => void copyPortableExport("react")}>Copy React</MenuItem>
+            <MenuItem onClick={() => void copyPortableExport("html")}>
+              {ui("Copy HTML", "HTML")}
+            </MenuItem>
+            <MenuItem onClick={() => void copyPortableExport("react")}>
+              {ui("Copy React", "React")}
+            </MenuItem>
             <MenuItem
               onClick={() => {
                 void exportDesignPatchPortable(documentRef.current)
@@ -3787,7 +3887,7 @@ function DesignEditor({
                   );
               }}
             >
-              Copy patch
+              {ui("Copy patch", "Патч")}
             </MenuItem>
             {selectedSlice ? (
               <>
@@ -3803,7 +3903,7 @@ function DesignEditor({
                     }
                   }}
                 >
-                  Copy selected slice HTML
+                  {ui("Copy selected slice HTML", "HTML области")}
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
@@ -3817,7 +3917,7 @@ function DesignEditor({
                     }
                   }}
                 >
-                  Copy selected slice SVG
+                  {ui("Copy selected slice SVG", "SVG области")}
                 </MenuItem>
               </>
             ) : null}
@@ -3829,7 +3929,7 @@ function DesignEditor({
         type="file"
         accept="image/*"
         multiple
-        aria-label="Design asset file"
+        aria-label={ui("Design asset file", "Файл ресурса")}
         className="hidden"
         onChange={(event) => {
           void importAsset(event).catch((error: unknown) =>
@@ -3872,7 +3972,7 @@ function DesignEditor({
           role="status"
           className="shrink-0 border-b border-border px-4 py-2 text-xs text-muted-foreground"
         >
-          Preparing images…
+          {ui("Preparing images…", "Готовим изображения…")}
         </p>
       ) : null}
       {presenting ? (
@@ -4080,12 +4180,12 @@ function DesignEditor({
                         if (variant) setSelectedNodeIds([variant.nodeId]);
                       }}
                     >
-                      Add variant
+                      {ui("Add variant", "Вариант")}
                     </Button>
                   </div>
                 ) : variantOptions.length > 1 ? (
                   <div className="grid gap-1 border-b border-border/60 px-3 py-3 text-2xs text-muted-foreground">
-                    <span>Variant</span>
+                    <span>{ui("Variant", "Вариант")}</span>
                     <Select
                       value={selectedNode.instanceOfNodeId}
                       onValueChange={(value) => {
@@ -4101,7 +4201,10 @@ function DesignEditor({
                         commitDocument(next);
                       }}
                     >
-                      <SelectTrigger size="xs" aria-label="Component variant">
+                      <SelectTrigger
+                        size="xs"
+                        aria-label={ui("Component variant", "Вариант компонента")}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectPopup>
@@ -4214,10 +4317,12 @@ function DesignEditor({
       >
         <DialogPopup>
           <DialogHeader>
-            <DialogTitle>Edit description</DialogTitle>
+            <DialogTitle>{ui("Edit description", "Править описание")}</DialogTitle>
             <DialogDescription>
-              Describe what this file contains so collaborators and agents can find the right
-              design.
+              {ui(
+                "Describe what this file contains so collaborators and agents can find the right design.",
+                "Коротко опишите макет, чтобы его могли найти люди и агенты.",
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -4232,7 +4337,7 @@ function DesignEditor({
             >
               <Textarea
                 autoFocus
-                aria-label="Description"
+                aria-label={ui("Description", "Описание")}
                 value={descriptionDraft ?? ""}
                 maxLength={DESIGN_DESCRIPTION_LIMIT}
                 onChange={(event) => setDescriptionDraft(event.target.value)}
@@ -4244,10 +4349,10 @@ function DesignEditor({
                   type="button"
                   onClick={() => setDescriptionDraft(null)}
                 >
-                  Cancel
+                  {ui("Cancel", "Отмена")}
                 </Button>
                 <Button size="sm" type="submit">
-                  Save description
+                  {ui("Save description", "Сохранить")}
                 </Button>
               </div>
             </form>

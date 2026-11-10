@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   capitalizeTerm,
   sourceControlClients,
@@ -358,6 +359,7 @@ function PullRequestCodeTab({
   backgroundRefreshToken?: number;
   revealRequest?: { readonly path: string; readonly nonce: number } | null;
 }) {
+  const ui = useUiText();
   const resolvedTheme = useRenderedAppearance();
   // Initialize the shared tokenizer and workers while the diff request is still pending.
   useDiffWorkerPool();
@@ -866,7 +868,7 @@ function PullRequestCodeTab({
           <>
             <span>The rest of this diff could not be loaded.</span>
             <Button size="xs" variant="outline" onClick={() => diffQuery.refresh()}>
-              Retry
+              {ui("Retry", "Повторить")}
             </Button>
           </>
         ) : diffQuery.isPending ? (
@@ -882,7 +884,11 @@ function PullRequestCodeTab({
         size="icon-micro"
         variant="ghost-muted"
         aria-expanded={!collapsed}
-        aria-label={collapsed ? "Expand diff" : "Collapse diff"}
+        aria-label={
+          collapsed
+            ? ui("Expand diff", "Развернуть правки")
+            : ui("Collapse diff", "Свернуть правки")
+        }
         className="mr-1"
         onClick={(event) => {
           event.stopPropagation();
@@ -1238,7 +1244,7 @@ function PullRequestCodeTab({
               checked={ignoreWhitespace}
               onCheckedChange={(checked) => changeIgnoreWhitespace(checked)}
             >
-              Hide whitespace changes
+              {ui("Hide whitespace changes", "Скрывать правки пробелов")}
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={wordWrap}
@@ -1270,7 +1276,9 @@ function PullRequestCodeTab({
               render={
                 <Toggle
                   aria-label={
-                    ignoreWhitespace ? "Show whitespace changes" : "Hide whitespace changes"
+                    ignoreWhitespace
+                      ? ui("Show whitespace changes", "Правки пробелов")
+                      : ui("Hide whitespace changes", "Скрывать правки пробелов")
                   }
                   variant="ghost"
                   size="sm"
@@ -1282,11 +1290,13 @@ function PullRequestCodeTab({
               <PilcrowIcon className="size-3.5" />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {ignoreWhitespace ? "Show whitespace changes" : "Hide whitespace changes"}
+              {ignoreWhitespace
+                ? ui("Show whitespace changes", "Правки пробелов")
+                : ui("Hide whitespace changes", "Скрывать правки пробелов")}
             </TooltipPopup>
           </Tooltip>
           <ToggleGroup
-            aria-label="Diff layout"
+            aria-label={ui("Diff layout", "Вид правок")}
             className="shrink-0"
             variant="segmented"
             value={[diffLayout]}
@@ -1297,10 +1307,10 @@ function PullRequestCodeTab({
               }
             }}
           >
-            <Toggle aria-label="Stacked diff view" value="stacked">
+            <Toggle aria-label={ui("Stacked diff view", "В столбик")} value="stacked">
               <Rows3Icon className="size-3.5" />
             </Toggle>
-            <Toggle aria-label="Split diff view" value="split">
+            <Toggle aria-label={ui("Split diff view", "Рядом")} value="split">
               <Columns2Icon className="size-3.5" />
             </Toggle>
           </ToggleGroup>
@@ -1308,7 +1318,11 @@ function PullRequestCodeTab({
             <TooltipTrigger
               render={
                 <Toggle
-                  aria-label={wordWrap ? "Disable diff line wrapping" : "Enable diff line wrapping"}
+                  aria-label={
+                    wordWrap
+                      ? ui("Disable diff line wrapping", "Выключить перенос строк")
+                      : ui("Enable diff line wrapping", "Включить перенос строк")
+                  }
                   variant="ghost"
                   size="sm"
                   pressed={wordWrap}
@@ -1321,7 +1335,9 @@ function PullRequestCodeTab({
               <TextWrapIcon className="size-3.5" />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {wordWrap ? "Disable line wrapping" : "Enable line wrapping"}
+              {wordWrap
+                ? ui("Disable line wrapping", "Выключить перенос")
+                : ui("Enable line wrapping", "Включить перенос")}
             </TooltipPopup>
           </Tooltip>
         </div>
@@ -1333,7 +1349,11 @@ function PullRequestCodeTab({
                   type="button"
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={allFilesCollapsed ? "Expand all files" : "Collapse all files"}
+                  aria-label={
+                    allFilesCollapsed
+                      ? ui("Expand all files", "Раскрыть файлы")
+                      : ui("Collapse all files", "Свернуть файлы")
+                  }
                   onClick={toggleAllFiles}
                 />
               }
@@ -1344,7 +1364,9 @@ function PullRequestCodeTab({
               />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {allFilesCollapsed ? "Expand all files" : "Collapse all files"}
+              {allFilesCollapsed
+                ? ui("Expand all files", "Раскрыть файлы")
+                : ui("Collapse all files", "Свернуть файлы")}
             </TooltipPopup>
           </Tooltip>
         ) : null}
@@ -1353,7 +1375,7 @@ function PullRequestCodeTab({
             <TooltipTrigger
               render={
                 <Toggle
-                  aria-label="Hide test files"
+                  aria-label={ui("Hide test files", "Скрыть тесты")}
                   variant="ghost"
                   size="sm"
                   pressed={hideTestFiles}
@@ -1364,7 +1386,7 @@ function PullRequestCodeTab({
               <FlaskConicalOffIcon className="size-3.5" />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {hideTestFiles ? "Show test files" : "Hide test files"}
+              {hideTestFiles ? "Show test files" : ui("Hide test files", "Скрыть тесты")}
             </TooltipPopup>
           </Tooltip>
         ) : null}
@@ -1373,7 +1395,11 @@ function PullRequestCodeTab({
             <TooltipTrigger
               render={
                 <Toggle
-                  aria-label={fileTreeOpen ? "Hide file tree" : "Show file tree"}
+                  aria-label={
+                    fileTreeOpen
+                      ? ui("Hide file tree", "Скрыть дерево")
+                      : ui("Show file tree", "Показать дерево")
+                  }
                   variant="ghost"
                   size="sm"
                   pressed={fileTreeOpen}
@@ -1384,7 +1410,9 @@ function PullRequestCodeTab({
               <FolderTreeIcon className="size-3.5" />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {fileTreeOpen ? "Hide file tree" : "Show file tree"}
+              {fileTreeOpen
+                ? ui("Hide file tree", "Скрыть дерево")
+                : ui("Show file tree", "Показать дерево")}
             </TooltipPopup>
           </Tooltip>
         ) : null}
@@ -1582,7 +1610,7 @@ function PullRequestCodeTab({
                       onClick={diffQuery.error !== null ? () => diffQuery.refresh() : loadNextSlice}
                     >
                       {diffQuery.error !== null
-                        ? "Retry"
+                        ? ui("Retry", "Повторить")
                         : diffQuery.isPending
                           ? "Loading more files..."
                           : "Load more files"}

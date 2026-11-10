@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import type {
@@ -61,6 +62,7 @@ const MODE_OPTIONS: Record<SourceControlWritingStyleMode, { label: string; descr
   };
 
 export function SourceControlWritingSettingsSection() {
+  const ui = useUiText();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const mixedReviewGuidesEnabled = useScopedSettingsMixed(["reviewGuidesEnabled"]);
@@ -210,7 +212,7 @@ export function SourceControlWritingSettingsSection() {
             <SelectTrigger
               size="sm"
               className="w-full sm:w-56"
-              aria-label="Source control writing style"
+              aria-label={ui("Source control writing style", "Тексты в Git")}
             >
               <SelectValue>
                 {(value: SourceControlWritingStyleMode | null) =>
@@ -426,7 +428,7 @@ export function SourceControlWritingSettingsSection() {
             <div className="mt-3 max-w-2xl pb-3.5">
               <Textarea
                 key={`${scopeKey}:${mixedReviewGuideInstructions}:${settings.reviewGuideInstructions}`}
-                aria-label="Review guide instructions"
+                aria-label={ui("Review guide instructions", "Инструкции к ревью")}
                 onChange={() => {
                   reviewGuideInstructionsEdited.current = true;
                 }}
@@ -489,7 +491,7 @@ export function SourceControlWritingSettingsSection() {
                   },
                 })
               }
-              aria-label="Follow change request templates"
+              aria-label={ui("Follow change request templates", "Шаблоны PR")}
             />
           }
         />
@@ -508,7 +510,7 @@ export function SourceControlWritingSettingsSection() {
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {usesDedicatedModel && !canEnableDedicatedModel ? (
                   <span className="text-sm text-muted-foreground">
-                    No text generation providers available.
+                    {ui("No text generation providers available.", "Нет подходящих агентов.")}
                   </span>
                 ) : null}
                 {usesDedicatedModel && canEnableDedicatedModel ? (

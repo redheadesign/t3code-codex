@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { observeResize } from "~/lib/observeResize";
@@ -9,6 +10,7 @@ export function DraftHeroProjectHeading({
   children: ReactNode;
   projectName: string;
 }) {
+  const ui = useUiText();
   const containerRef = useRef<HTMLDivElement>(null);
   const inlineRef = useRef<HTMLSpanElement>(null);
   const [fitsInline, setFitsInline] = useState(false);
@@ -39,7 +41,7 @@ export function DraftHeroProjectHeading({
           ref={inlineRef}
           className="flex w-max items-baseline gap-2 whitespace-nowrap font-normal text-3xl tracking-tight"
         >
-          <span>What should we build in</span>
+          <span>{ui("What should we build in", "Что сделаем в")}</span>
           <span className="flex items-baseline">
             <span className="flex items-baseline gap-1 font-medium">
               <span className="size-[1em] shrink-0 self-center" />
@@ -51,9 +53,11 @@ export function DraftHeroProjectHeading({
       </span>
       <h1 className="flex w-full flex-col items-center justify-center gap-2 text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl lg:group-data-[inline=true]/draft-hero:flex-row lg:group-data-[inline=true]/draft-hero:items-baseline">
         <span className="max-w-full lg:group-data-[inline=true]/draft-hero:shrink-0">
-          What should we build
+          {ui("What should we build", "Что сделаем")}
           <span className="lg:group-data-[inline=true]/draft-hero:hidden">?</span>
-          <span className="hidden lg:group-data-[inline=true]/draft-hero:inline"> in</span>
+          <span className="hidden lg:group-data-[inline=true]/draft-hero:inline">
+            {ui("in", "в")}
+          </span>
         </span>
         <span className="flex min-w-0 max-w-full items-baseline justify-center text-base tracking-normal lg:group-data-[inline=true]/draft-hero:text-3xl lg:group-data-[inline=true]/draft-hero:tracking-tight">
           <span className="min-w-0">{children}</span>

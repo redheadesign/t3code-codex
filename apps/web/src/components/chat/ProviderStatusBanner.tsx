@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   type EnvironmentId,
   type ProviderInstanceId,
@@ -104,6 +105,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   onOpenProviderSetup?: (instanceId: ProviderInstanceId) => void;
   status: ServerProvider | null;
 }) {
+  const ui = useUiText();
   const canRefresh = useAtomValue(serverEnvironment.refreshProviders.permissionAtom(environmentId));
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
     label: "Refresh provider status",
@@ -160,7 +162,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
             <div className="flex flex-wrap items-center justify-end gap-3">
               {onOpenProviderSetup && hasProviderSetup(status) ? (
                 <InlineButton onClick={() => onOpenProviderSetup(status.instanceId)}>
-                  Open provider setup
+                  {ui("Open provider setup", "Настроить агента")}
                 </InlineButton>
               ) : null}
               <Button
@@ -171,7 +173,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
                 variant="outline"
               >
                 <RefreshIcon />
-                {isRefreshing ? "Refreshing..." : "Refresh"}
+                {isRefreshing ? ui("Refreshing...", "Обновляем…") : ui("Refresh", "Обновить")}
               </Button>
             </div>
           </div>

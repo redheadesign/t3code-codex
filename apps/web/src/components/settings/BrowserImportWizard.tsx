@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { PermissionChecklist, PermissionContinueButton } from "../permissions/PermissionChecklist";
 import { usePermissionStatus } from "../permissions/usePermissionStatus";
 import type { BrowserImportSource } from "@t3tools/contracts";
@@ -189,6 +190,7 @@ function QuitStep({
   readonly onCancel: () => void;
   readonly onRechecked: () => void;
 }) {
+  const ui = useUiText();
   return (
     <>
       <DialogHeader>
@@ -199,7 +201,7 @@ function QuitStep({
       </DialogHeader>
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>
-          Cancel
+          {ui("Cancel", "Отмена")}
         </Button>
         <Button onClick={onRechecked}>I&rsquo;ve quit it</Button>
       </DialogFooter>
@@ -246,6 +248,7 @@ function FullDiskAccessStep({
   readonly onGranted: () => void;
   readonly stillRequired: boolean;
 }) {
+  const ui = useUiText();
   const [opening, setOpening] = useState(false);
   const [openingError, setOpeningError] = useState<string | null>(null);
   const permission = usePermissionStatus(async () => ({ fullDiskAccess: await onCheck() }), {
@@ -304,14 +307,14 @@ function FullDiskAccessStep({
       </DialogPanel>
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>
-          Cancel
+          {ui("Cancel", "Отмена")}
         </Button>
         <PermissionContinueButton
           ready={permission.isReady(["fullDiskAccess"])}
           busy={opening}
           onClick={onGranted}
         >
-          Continue
+          {ui("Continue", "Далее")}
         </PermissionContinueButton>
       </DialogFooter>
     </>
@@ -330,6 +333,7 @@ function ConfigureStep({
   onCancel,
   onImport,
 }: ConfigureStepProps) {
+  const ui = useUiText();
   const targetMissing =
     target.kind === "existing" &&
     !targetProfiles.some((profile) => profile.id === target.profileId);
@@ -396,13 +400,13 @@ function ConfigureStep({
       </DialogPanel>
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>
-          Cancel
+          {ui("Cancel", "Отмена")}
         </Button>
         <Button
           disabled={sourceProfileDirectory === "" || targetMissing || targetUncreatable}
           onClick={onImport}
         >
-          Import
+          {ui("Import", "Импорт")}
         </Button>
       </DialogFooter>
     </>
@@ -453,6 +457,7 @@ function SelectableTile({
 }
 
 function ImportingStep() {
+  const ui = useUiText();
   return (
     <>
       <DialogHeader>
@@ -462,7 +467,7 @@ function ImportingStep() {
       <DialogPanel>
         <div className="flex items-center gap-3 py-2">
           <Spinner size="md" tone="muted" />
-          <span className="text-sm text-muted-foreground">Importing…</span>
+          <span className="text-sm text-muted-foreground">{ui("Importing…", "Импорт…")}</span>
         </div>
       </DialogPanel>
     </>
@@ -513,6 +518,7 @@ function DoneStep({
   readonly destinationEnvironmentName: string;
   readonly onClose: () => void;
 }) {
+  const ui = useUiText();
   return (
     <>
       <DialogHeader>
@@ -539,7 +545,7 @@ function DoneStep({
       ) : null}
       <DialogFooter>
         <DialogClose render={<Button />} onClick={onClose}>
-          Done
+          {ui("Done", "Готово")}
         </DialogClose>
       </DialogFooter>
     </>
@@ -559,6 +565,7 @@ function BlockedStep({
   readonly onClose: () => void;
   readonly onRetry: (() => void) | undefined;
 }) {
+  const ui = useUiText();
   return (
     <>
       <DialogHeader>
@@ -567,9 +574,9 @@ function BlockedStep({
       </DialogHeader>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
-          Close
+          {ui("Close", "Закрыть")}
         </Button>
-        {onRetry ? <Button onClick={onRetry}>Try again</Button> : null}
+        {onRetry ? <Button onClick={onRetry}>{ui("Try again", "Повторить")}</Button> : null}
       </DialogFooter>
     </>
   );

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import type { OtlpEndpointCheckResult, OtlpSignal, ServerObservability } from "@t3tools/contracts";
 import { useEffect, useEffectEvent, useState } from "react";
@@ -72,10 +73,14 @@ function endpointStatus(url: string, check: EndpointCheck | undefined) {
 }
 
 export function TelemetryExportSettings() {
+  const ui = useUiText();
   const { environment, scope } = useSettingsScope();
   if (scope.kind !== "environment" || !environment) {
     return (
-      <SettingsSection title="OpenTelemetry export" id="telemetry-export">
+      <SettingsSection
+        title={ui("OpenTelemetry export", "Экспорт OpenTelemetry")}
+        id="telemetry-export"
+      >
         <SettingsScopeNotice target="environment">
           Choose one environment to configure its telemetry exports.
         </SettingsScopeNotice>
@@ -86,6 +91,7 @@ export function TelemetryExportSettings() {
 }
 
 function TelemetryExportForm() {
+  const ui = useUiText();
   const { environment } = useSettingsScope();
   const saved = useScopedSettings((settings) => settings.observability);
   const [draft, setDraft] = useState<Partial<typeof saved>>({});
@@ -143,7 +149,10 @@ function TelemetryExportForm() {
   }, [canCheck]);
 
   return (
-    <SettingsSection title="OpenTelemetry export" id="telemetry-export">
+    <SettingsSection
+      title={ui("OpenTelemetry export", "Экспорт OpenTelemetry")}
+      id="telemetry-export"
+    >
       <form
         className="grid gap-4 px-4 py-4 sm:px-5"
         onSubmit={async (event) => {
@@ -269,7 +278,7 @@ function TelemetryExportForm() {
               Discard
             </Button>
             <Button type="submit" size="xs" disabled={!changed || saving || !canEdit}>
-              {saving ? "Saving…" : "Save"}
+              {saving ? ui("Saving…", "Сохраняем…") : ui("Save", "Сохранить")}
             </Button>
           </div>
         </div>

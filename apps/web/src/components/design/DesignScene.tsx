@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { ImageOffIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import {
@@ -63,6 +64,7 @@ export function DesignSceneNode({
   outlines?: boolean;
   canvasZoom?: number;
 }) {
+  const ui = useUiText();
   const [editing, setEditing] = useState(false);
   const effectId = `design-filter-${useId().replace(/[^a-zA-Z0-9_-]/gu, "")}`;
   const cancelEdit = useRef(false);
@@ -283,7 +285,7 @@ export function DesignSceneNode({
         {node.vector?.points && selected.length === 1 && selected[0] === node.nodeId ? (
           <svg
             className="pointer-events-none absolute inset-0 size-full overflow-visible"
-            aria-label="Vector curve handles"
+            aria-label={ui("Vector curve handles", "Ручки кривой")}
           >
             {node.vector.points.map((point, index) => {
               const handles = [
@@ -328,7 +330,7 @@ export function DesignSceneNode({
                   <circle
                     role="button"
                     tabIndex={0}
-                    aria-label="Vector point"
+                    aria-label={ui("Vector point", "Узел")}
                     cx={point.x}
                     cy={point.y}
                     r={4}
@@ -365,7 +367,9 @@ export function DesignSceneNode({
           >
             <ImageOffIcon className="size-5" />
             <span>
-              {node.assetId && asset?.id !== node.assetId ? "Loading image…" : "Image unavailable"}
+              {node.assetId && asset?.id !== node.assetId
+                ? "Loading image…"
+                : ui("Image unavailable", "Нет изображения")}
             </span>
           </div>
         ) : editing ? null : node.text && node.typography?.listStyle === "bulleted" ? (
@@ -404,7 +408,7 @@ export function DesignSceneNode({
             return (
               <svg
                 className="pointer-events-none absolute inset-0 size-full overflow-visible"
-                aria-label="Gradient handles"
+                aria-label={ui("Gradient handles", "Ручки градиента")}
               >
                 <line
                   x1={center.x}
@@ -418,7 +422,7 @@ export function DesignSceneNode({
                 <circle
                   role="button"
                   tabIndex={0}
-                  aria-label="Gradient direction handle"
+                  aria-label={ui("Gradient direction handle", "Направление градиента")}
                   cx={end.x}
                   cy={end.y}
                   r={5}

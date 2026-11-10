@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   capitalizeTerm,
   sourceControlClients,
@@ -39,6 +40,7 @@ export function PullRequestComposer({
   onReviewSubmitted: () => void;
   openReviewRequest?: number | undefined;
 }) {
+  const ui = useUiText();
   const term = sourceControlClients.get(detail.provider).changeRequest.singular;
   const [open, setOpen] = useState(false);
   const [reviewPending, setReviewPending] = useState(false);
@@ -118,7 +120,9 @@ export function PullRequestComposer({
             >
               <Toggle value="comment">Comment</Toggle>
               <Toggle value="review">
-                {pendingComments.length > 0 ? `Review (${pendingComments.length})` : "Review"}
+                {pendingComments.length > 0
+                  ? `Review (${pendingComments.length})`
+                  : ui("Review", "Проверить")}
               </Toggle>
             </ToggleGroup>
           ) : (

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { ToolCallDiffTarget } from "../../diffPanelStore";
 import type { EnvironmentId, OrchestrationV2ProjectedTurnItem } from "@t3tools/contracts";
 import {
@@ -151,6 +152,7 @@ interface ToolOutputState {
 }
 
 function ToolOutput(props: ToolOutputState) {
+  const ui = useUiText();
   const images = props.images.map((resource) => (
     <ChatMarkdownAssetImage
       key={resource.index}
@@ -164,11 +166,11 @@ function ToolOutput(props: ToolOutputState) {
   const text = props.output ? (
     <div className="max-h-80 overflow-auto text-muted-foreground">{props.output}</div>
   ) : props.pending ? (
-    <div className="text-muted-foreground italic">Loading output…</div>
+    <div className="text-muted-foreground italic">{ui("Loading output…", "Загружаем вывод…")}</div>
   ) : props.error ? (
     <div className="text-destructive">Couldn&apos;t load output: {props.error}</div>
   ) : props.empty && images.length === 0 ? (
-    <div className="text-muted-foreground italic">No output.</div>
+    <div className="text-muted-foreground italic">{ui("No output.", "Нет вывода")}</div>
   ) : null;
   return (
     <>
@@ -230,6 +232,7 @@ function ToolCallBody(
 }
 
 export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspectorProps) {
+  const ui = useUiText();
   // Command rows stream their output, including the final output, from the server.
   const environmentStreamsOutput = useCommandOutputStreaming(props.environmentId);
   const streamsOutput =
@@ -303,7 +306,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
                   })
                 }
               >
-                Open diff
+                {ui("Open diff", "Открыть правки")}
               </Button>
             ) : null}
           </div>

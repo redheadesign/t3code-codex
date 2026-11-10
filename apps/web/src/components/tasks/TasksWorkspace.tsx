@@ -43,6 +43,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 
+import { useUiText } from "~/i18n";
 import { cn } from "../../lib/utils";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
 import { useEnvironmentQuery } from "../../state/query";
@@ -79,31 +80,42 @@ type TaskWorkspaceSearch = {
   readonly taskId?: string;
 };
 
-const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
-const DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+const DATE_FORMATTERS = {
+  en: new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }),
+  ru: new Intl.DateTimeFormat("ru", { month: "short", day: "numeric" }),
+};
+const DATE_TIME_FORMATTERS = {
+  en: new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }),
+  ru: new Intl.DateTimeFormat("ru", { dateStyle: "medium", timeStyle: "short" }),
+};
 
-function formatDate(value: string | null | undefined) {
-  if (value === null || value === undefined) return "N/A";
+function formatDate(value: string | null | undefined, text: ReturnType<typeof useUiText>) {
+  if (value === null || value === undefined) return text("N/A", "Нет данных");
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "N/A" : DATE_FORMATTER.format(date);
+  return Number.isNaN(date.getTime())
+    ? text("N/A", "Нет данных")
+    : DATE_FORMATTERS[text("en", "ru") === "ru" ? "ru" : "en"].format(date);
 }
 
-function formatDateTime(value: string | null | undefined) {
-  if (value === null || value === undefined) return "N/A";
+function formatDateTime(value: string | null | undefined, text: ReturnType<typeof useUiText>) {
+  if (value === null || value === undefined) return text("N/A", "Нет данных");
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "N/A" : DATE_TIME_FORMATTER.format(date);
+  return Number.isNaN(date.getTime())
+    ? text("N/A", "Нет данных")
+    : DATE_TIME_FORMATTERS[text("en", "ru") === "ru" ? "ru" : "en"].format(date);
 }
 
-function taskState(task: TaskWorkspaceTask) {
-  if (task.run?.status === "queued") return { label: "Queued", tone: "info" as const };
-  if (task.run?.status === "running") return { label: "Processing", tone: "info" as const };
-  if (task.run?.status === "failed") return { label: "Processing failed", tone: "error" as const };
+function taskState(task: TaskWorkspaceTask, text: ReturnType<typeof useUiText>) {
+  if (task.run?.status === "queued")
+    return { label: text("Queued", "В очереди"), tone: "info" as const };
+  if (task.run?.status === "running")
+    return { label: text("Processing", "Выполняется"), tone: "info" as const };
+  if (task.run?.status === "failed")
+    return { label: text("Processing failed", "Ошибка выполнения"), tone: "error" as const };
   if (task.run?.status === "succeeded")
-    return { label: "Ready for review", tone: "success" as const };
-  if (task.run?.status === "cancelled") return { label: "Cancelled", tone: "muted" as const };
+    return { label: text("Ready for review", "Готово к проверке"), tone: "success" as const };
+  if (task.run?.status === "cancelled")
+    return { label: text("Cancelled", "Отменено"), tone: "muted" as const };
   const category = (task.issue.status.category ?? "").toLocaleLowerCase();
   const tone =
     category.includes("done") || category.includes("готов") || category.includes("complete")
@@ -114,15 +126,22 @@ function taskState(task: TaskWorkspaceTask) {
   return { label: task.issue.status.name, tone };
 }
 
-function scenarioGraphError(stages: ReadonlyArray<TaskWorkspaceStage>): string | null {
+function scenarioGraphError(
+  stages: ReadonlyArray<TaskWorkspaceStage>,
+  text: ReturnType<typeof useUiText>,
+): string | null {
   const ids = new Set<string>();
   for (const stage of stages) {
-    if (ids.has(stage.id)) return "Stage IDs must be unique.";
+    if (ids.has(stage.id))
+      return text("Stage IDs must be unique.", "У каждого этапа должен быть свой ID.");
     ids.add(stage.id);
   }
   for (const stage of stages) {
     if (stage.dependsOn.some((dependency) => dependency === stage.id || !ids.has(dependency)))
-      return `Dependencies for ${stage.name} contain an unknown or self-referencing stage.`;
+      return text(
+        `Dependencies for ${stage.name} contain an unknown or self-referencing stage.`,
+        `Этап «${stage.name}» ссылается на себя или на неизвестный этап.`,
+      );
   }
   const visiting = new Set<string>();
   const visited = new Set<string>();
@@ -136,7 +155,9 @@ function scenarioGraphError(stages: ReadonlyArray<TaskWorkspaceStage>): string |
     if (valid) visited.add(id);
     return valid;
   };
-  return stages.every((stage) => visit(stage.id)) ? null : "Stage dependencies contain a cycle.";
+  return stages.every((stage) => visit(stage.id))
+    ? null
+    : text("Stage dependencies contain a cycle.", "Этапы ссылаются друг на друга по кругу.");
 }
 
 function statusVariant(tone: "info" | "error" | "success" | "muted") {
@@ -163,6 +184,7 @@ function StageRow({
   task: TaskWorkspaceTask;
   onRetry: (stageId: string) => void;
 }) {
+  const text = useUiText();
   const run = task.run;
   const active = task.run?.currentStageId === stage.id && task.run.status === "running";
   return (
@@ -175,7 +197,7 @@ function StageRow({
           <span className="truncate">{stage.name}</span>
           {stage.parallel ? (
             <Badge variant="outline" size="sm">
-              Parallel
+              {text("Parallel", "Параллельно")}
             </Badge>
           ) : null}
         </span>
@@ -188,7 +210,7 @@ function StageRow({
       </span>
       {run?.status === "failed" && run.currentStageId === stage.id ? (
         <Button size="xs" variant="ghost-muted" onClick={() => onRetry(stage.id)}>
-          Retry stage
+          {text("Retry stage", "Повторить этап")}
         </Button>
       ) : null}
     </li>
@@ -206,12 +228,13 @@ function ScenarioCard({
   onRetry: (stageId: string) => void;
   commandDisabled: boolean;
 }) {
+  const text = useUiText();
   const [open, setOpen] = useState(true);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.scenario);
   const scenario = task.scenario;
   const invalidStage = draft.stages.some((stage) => stage.name.trim() === "");
-  const graphError = scenarioGraphError(draft.stages);
+  const graphError = scenarioGraphError(draft.stages, text);
   const updateStage = (stageId: string, patch: Partial<TaskWorkspaceStage>) => {
     setDraft((current) => ({
       ...current,
@@ -236,7 +259,7 @@ function ScenarioCard({
         ...current.stages,
         {
           id: stageId,
-          name: "New check stage",
+          name: text("New check stage", "Новый этап проверки"),
           kind: "check",
           dependsOn: current.stages.at(-1)?.id ? [current.stages.at(-1)!.id] : [],
           parallel: false,
@@ -247,7 +270,10 @@ function ScenarioCard({
           command: null,
           required: true,
           rules: [],
-          prompt: "Run the configured project check.",
+          prompt: text(
+            "Run the configured project check.",
+            "Выполни настроенную проверку проекта.",
+          ),
           timeoutMs: 900_000,
         },
       ],
@@ -287,7 +313,7 @@ function ScenarioCard({
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-sm font-semibold">{scenario.name}</h2>
             <Badge variant={scenario.enabled ? "secondary" : "outline"}>
-              {scenario.enabled ? "Enabled" : "Disabled"}
+              {scenario.enabled ? text("Enabled", "Включено") : text("Disabled", "Выключено")}
             </Badge>
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -298,7 +324,7 @@ function ScenarioCard({
         <Button
           size="icon-sm"
           variant="ghost-muted"
-          aria-label="Configure scenario"
+          aria-label={text("Configure scenario", "Настроить сценарий")}
           onClick={() => setEditing((value) => !value)}
           disabled={commandDisabled}
         >
@@ -316,12 +342,12 @@ function ScenarioCard({
       {editing ? (
         <div
           className="mt-4 space-y-3 rounded-xl border border-border/60 bg-background/55 p-3"
-          aria-label="Scenario editor"
+          aria-label={text("Scenario editor", "Редактор сценария")}
         >
           <fieldset disabled={commandDisabled} className="contents">
             <div className="grid gap-3 sm:grid-cols-4">
               <label className="text-xs text-muted-foreground">
-                Variants
+                {text("Variants", "Варианты")}
                 <Input
                   type="number"
                   min={1}
@@ -336,7 +362,7 @@ function ScenarioCard({
                 />
               </label>
               <label className="text-xs text-muted-foreground">
-                Retries
+                {text("Retries", "Повторные попытки")}
                 <Input
                   type="number"
                   min={0}
@@ -357,9 +383,9 @@ function ScenarioCard({
                   onCheckedChange={(checked) =>
                     setDraft((current) => ({ ...current, enabled: checked }))
                   }
-                  aria-label="Scenario enabled"
+                  aria-label={text("Scenario enabled", "Сценарий включён")}
                 />
-                Enabled
+                {text("Enabled", "Включено")}
               </label>
               <label className="flex items-center gap-2 self-end pb-1 text-xs text-foreground">
                 <Switch
@@ -368,9 +394,12 @@ function ScenarioCard({
                   onCheckedChange={(checked) =>
                     setDraft((current) => ({ ...current, autoStart: checked }))
                   }
-                  aria-label="Auto-start matching Jira tasks"
+                  aria-label={text(
+                    "Auto-start matching Jira tasks",
+                    "Автозапуск подходящих задач Jira",
+                  )}
                 />
-                Auto-start matching Jira tasks
+                {text("Auto-start matching Jira tasks", "Автозапуск подходящих задач Jira")}
               </label>
             </div>
             <div className="space-y-2">
@@ -378,7 +407,7 @@ function ScenarioCard({
                 <div key={stage.id} className="rounded-lg border border-border/60 p-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="grid min-w-48 flex-1 gap-1 text-2xs text-muted-foreground">
-                      Stage name
+                      {text("Stage name", "Название этапа")}
                       <Input
                         aria-label={`${stage.name} name`}
                         value={stage.name}
@@ -416,12 +445,12 @@ function ScenarioCard({
                       onClick={() => removeStage(stage.id)}
                       disabled={commandDisabled || draft.stages.length <= 1}
                     >
-                      Remove
+                      {text("Remove", "Убрать")}
                     </Button>
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     <div className="grid gap-1 text-2xs text-muted-foreground sm:col-span-2">
-                      <span>Depends on</span>
+                      <span>{text("Depends on", "Зависит от")}</span>
                       <div
                         className="flex flex-wrap gap-1.5"
                         aria-label={`${stage.name} dependencies`}
@@ -442,7 +471,10 @@ function ScenarioCard({
                           ))}
                       </div>
                       <span className="text-2xs text-muted-foreground/70">
-                        Select the stages that must finish first.
+                        {text(
+                          "Select the stages that must finish first.",
+                          "Выберите этапы, которые должны завершиться первыми.",
+                        )}
                       </span>
                     </div>
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -452,7 +484,7 @@ function ScenarioCard({
                         onCheckedChange={(parallel) => updateStage(stage.id, { parallel })}
                         aria-label={`${stage.name} parallel`}
                       />
-                      Parallel
+                      {text("Parallel", "Параллельно")}
                     </label>
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Switch
@@ -461,15 +493,15 @@ function ScenarioCard({
                         onCheckedChange={(required) => updateStage(stage.id, { required })}
                         aria-label={`${stage.name} required`}
                       />
-                      Required
+                      {text("Required", "Обязательный этап")}
                     </label>
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     <p className="sm:col-span-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Execution inputs
+                      {text("Execution inputs", "Параметры запуска")}
                     </p>
                     <label className="grid gap-1 text-2xs text-muted-foreground">
-                      Provider
+                      {text("Provider", "Провайдер")}
                       <Input
                         aria-label={`${stage.name} provider`}
                         value={stage.provider ?? ""}
@@ -480,11 +512,11 @@ function ScenarioCard({
                       />
                     </label>
                     <label className="grid gap-1 text-2xs text-muted-foreground">
-                      Model
+                      {text("Model", "Модель")}
                       <Input
                         aria-label={`${stage.name} model`}
                         value={stage.model ?? ""}
-                        placeholder="Default model"
+                        placeholder={text("Default model", "Модель по умолчанию")}
                         onChange={(event) =>
                           updateStage(stage.id, { model: event.target.value || null })
                         }
@@ -493,10 +525,10 @@ function ScenarioCard({
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     <p className="sm:col-span-2 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Checks and extensions
+                      {text("Checks and extensions", "Проверки и расширения")}
                     </p>
                     <label className="grid gap-1 text-2xs text-muted-foreground">
-                      Check command
+                      {text("Check command", "Команда проверки")}
                       <Input
                         aria-label={`${stage.name} command`}
                         value={stage.command ?? ""}
@@ -507,11 +539,11 @@ function ScenarioCard({
                       />
                     </label>
                     <label className="grid gap-1 text-2xs text-muted-foreground">
-                      Skills
+                      {text("Skills", "Навыки")}
                       <Input
                         aria-label={`${stage.name} skills`}
                         value={stage.skills.join(", ")}
-                        placeholder="Comma separated"
+                        placeholder={text("Comma separated", "Через запятую")}
                         onChange={(event) =>
                           updateStage(stage.id, {
                             skills: event.target.value
@@ -523,11 +555,11 @@ function ScenarioCard({
                       />
                     </label>
                     <label className="grid gap-1 text-2xs text-muted-foreground">
-                      Connectors
+                      {text("Connectors", "Коннекторы")}
                       <Input
                         aria-label={`${stage.name} connectors`}
                         value={stage.connectors.join(", ")}
-                        placeholder="Comma separated"
+                        placeholder={text("Comma separated", "Через запятую")}
                         onChange={(event) =>
                           updateStage(stage.id, {
                             connectors: event.target.value
@@ -539,11 +571,11 @@ function ScenarioCard({
                       />
                     </label>
                     <label className="grid gap-1 text-2xs text-muted-foreground">
-                      Rules
+                      {text("Rules", "Правила")}
                       <Input
                         aria-label={`${stage.name} rules`}
                         value={stage.rules.join(", ")}
-                        placeholder="Comma separated"
+                        placeholder={text("Comma separated", "Через запятую")}
                         onChange={(event) =>
                           updateStage(stage.id, {
                             rules: event.target.value
@@ -556,12 +588,12 @@ function ScenarioCard({
                     </label>
                   </div>
                   <label className="mt-2 grid gap-1 text-2xs text-muted-foreground">
-                    Prompt
+                    {text("Prompt", "Промпт")}
                     <Textarea
                       className="min-h-20"
                       aria-label={`${stage.name} prompt`}
                       value={stage.prompt}
-                      placeholder="Stage prompt"
+                      placeholder={text("Stage prompt", "Промпт этапа")}
                       onChange={(event) => updateStage(stage.id, { prompt: event.target.value })}
                     />
                   </label>
@@ -591,7 +623,7 @@ function ScenarioCard({
               ))}
             </div>
             <Button size="xs" variant="outline" onClick={addStage} disabled={commandDisabled}>
-              Add stage
+              {text("Add stage", "Добавить этап")}
             </Button>
             {graphError ? (
               <p className="text-xs text-destructive" role="alert">
@@ -601,7 +633,10 @@ function ScenarioCard({
           </fieldset>
           {commandDisabled ? (
             <p className="text-xs text-muted-foreground">
-              Read-only: you do not have permission to change this workspace.
+              {text(
+                "Read-only: you do not have permission to change this workspace.",
+                "Доступен только просмотр. У вас нет прав на изменение задач.",
+              )}
             </p>
           ) : null}
           <div className="flex justify-end gap-2">
@@ -613,7 +648,7 @@ function ScenarioCard({
                 setEditing(false);
               }}
             >
-              Cancel
+              {text("Cancel", "Отмена")}
             </Button>
             <Button
               size="xs"
@@ -623,18 +658,21 @@ function ScenarioCard({
                 setEditing(false);
               }}
             >
-              Save scenario
+              {text("Save scenario", "Сохранить сценарий")}
             </Button>
           </div>
           <p className="text-2xs text-muted-foreground">
-            Saved as a revisioned local scenario. Stages run only when you start the scenario.
+            {text(
+              "Saved as a revisioned local scenario. Stages run only when you start the scenario.",
+              "Сценарий сохраняется локально с номером версии. Этапы выполняются при запуске.",
+            )}
           </p>
         </div>
       ) : null}
       {open ? (
         <ol
           className="mt-4 space-y-1 border-s border-border/70 ps-3"
-          aria-label="Processing stages"
+          aria-label={text("Processing stages", "Этапы выполнения")}
         >
           {scenario.stages.map((stage) => (
             <StageRow key={stage.id} stage={stage} task={task} onRetry={onRetry} />
@@ -646,6 +684,7 @@ function ScenarioCard({
 }
 
 function CommentRow({ comment }: { comment: TaskWorkspaceComment }) {
+  const text = useUiText();
   return (
     <li className="rounded-xl border border-border/60 bg-background/45 p-3">
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -656,7 +695,7 @@ function CommentRow({ comment }: { comment: TaskWorkspaceComment }) {
             {comment.source}
           </Badge>
         </span>
-        <time dateTime={comment.createdAt}>{formatDateTime(comment.createdAt)}</time>
+        <time dateTime={comment.createdAt}>{formatDateTime(comment.createdAt, text)}</time>
       </div>
       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">
         {comment.body}
@@ -672,6 +711,7 @@ function ArtifactCard({
   artifact: TaskWorkspaceArtifact;
   onLaunch: () => void;
 }) {
+  const text = useUiText();
   return (
     <li className="rounded-xl border border-border/60 bg-background/45 p-3">
       <div className="flex items-start gap-3">
@@ -685,12 +725,13 @@ function ArtifactCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{artifact.label}</p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {artifact.kind} · {artifact.storyId ?? artifact.path ?? "No location"}
+            {artifact.kind} ·{" "}
+            {artifact.storyId ?? artifact.path ?? text("No location", "Расположение не указано")}
           </p>
           <p className="mt-1 text-2xs text-muted-foreground">
             {artifact.sourceSha
               ? `source ${artifact.sourceSha.slice(0, 8)}`
-              : "Source revision unavailable"}
+              : text("Source revision unavailable", "Исходная версия недоступна")}
           </p>
         </div>
         {artifact.kind === "story" && artifact.storyId ? (
@@ -703,7 +744,7 @@ function ArtifactCard({
             size="icon-sm"
             variant="ghost-muted"
             render={<a href={artifact.url} target="_blank" rel="noreferrer" />}
-            aria-label="Open artifact"
+            aria-label={text("Open artifact", "Открыть результат")}
           >
             <ExternalLinkIcon />
           </Button>
@@ -724,6 +765,7 @@ function VariantRow({
   artifacts: ReadonlyArray<TaskWorkspaceArtifact>;
   onLaunchArtifact: (artifact: TaskWorkspaceArtifact) => void;
 }) {
+  const text = useUiText();
   const tone =
     variant.status === "succeeded"
       ? "success"
@@ -772,7 +814,7 @@ function VariantRow({
       {variant.output ? (
         <details className="mt-2 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2">
           <summary className="cursor-pointer text-2xs font-medium text-muted-foreground">
-            Agent output
+            {text("Agent output", "Результат агента")}
           </summary>
           <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-2xs text-muted-foreground">
             {variant.output}
@@ -788,7 +830,7 @@ function VariantRow({
               params={{ environmentId, threadId }}
               className="text-info underline-offset-2 hover:underline"
             >
-              Open agent thread
+              {text("Open agent thread", "Открыть чат агента")}
             </Link>
           ))}
         </div>
@@ -856,6 +898,7 @@ function TaskList({
   onSync: () => void;
   syncDisabled: boolean;
 }) {
+  const text = useUiText();
   const needle = filter.trim().toLocaleLowerCase();
   const visible =
     needle.length === 0
@@ -880,30 +923,35 @@ function TaskList({
   assigneeVisible
     .toSorted((a, b) => b.issue.createdAt.localeCompare(a.issue.createdAt))
     .forEach((task) => {
-      const key = task.issue.sprint?.name ?? "Without sprint";
+      const key = task.issue.sprint?.name ?? text("Without sprint", "Без спринта");
       const group = groups.get(key) ?? [];
       group.push(task);
       groups.set(key, group);
     });
   return (
     <aside
-      {...workspaceAreaProps("tasks-sidebar", 0, "Tasks list")}
+      {...workspaceAreaProps("tasks-sidebar", 0, text("Tasks list", "Список задач"))}
       className="flex h-full min-h-0 w-full shrink-0 flex-col border-b border-border/70 bg-sidebar md:w-(--automations-sidebar-width) md:border-e md:border-b-0"
-      aria-label="Tasks"
+      aria-label={text("Tasks", "Задачи")}
     >
       <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border/70 px-4">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold">Tasks</h2>
+          <h2 className="truncate text-sm font-semibold">{text("Tasks", "Задачи")}</h2>
           <p className="truncate text-xs text-muted-foreground">{contextLabel}</p>
           <p className="truncate text-2xs text-muted-foreground/70">
-            {lastSyncedAt ? `Synced ${formatDateTime(lastSyncedAt)}` : "Not synchronized yet"}
+            {lastSyncedAt
+              ? text(
+                  `Synced ${formatDateTime(lastSyncedAt, text)}`,
+                  `Синхронизировано ${formatDateTime(lastSyncedAt, text)}`,
+                )
+              : text("Not synchronized yet", "Ещё не синхронизировано")}
           </p>
         </div>
         <Badge variant="secondary">{assigneeVisible.length}</Badge>
         <Button
           size="icon-sm"
           variant="ghost-muted"
-          aria-label="Sync tasks"
+          aria-label={text("Sync tasks", "Синхронизировать задачи")}
           onClick={onSync}
           disabled={syncDisabled}
         >
@@ -915,8 +963,8 @@ function TaskList({
           type="search"
           value={filter}
           onChange={(event) => onFilterChange(event.target.value)}
-          placeholder="Search tasks"
-          aria-label="Search tasks"
+          placeholder={text("Search tasks", "Поиск задач")}
+          aria-label={text("Search tasks", "Поиск задач")}
         />
       </label>
       <div className="grid gap-2 border-b border-border/70 px-3 pb-3 sm:grid-cols-2 md:grid-cols-1">
@@ -926,8 +974,8 @@ function TaskList({
               value={environmentId}
               onValueChange={(value) => value && onEnvironmentChange(value as EnvironmentId)}
             >
-              <SelectTrigger size="sm" aria-label="Environment">
-                <SelectValue placeholder="Environment" />
+              <SelectTrigger size="sm" aria-label={text("Environment", "Рабочая среда")}>
+                <SelectValue placeholder={text("Environment", "Рабочая среда")} />
               </SelectTrigger>
               <SelectPopup>
                 {environmentOptions.map((entry) => (
@@ -941,8 +989,8 @@ function TaskList({
               value={projectId}
               onValueChange={(value) => value && onProjectChange(value as ProjectId)}
             >
-              <SelectTrigger size="sm" aria-label="Project">
-                <SelectValue placeholder="Project" />
+              <SelectTrigger size="sm" aria-label={text("Project", "Проект")}>
+                <SelectValue placeholder={text("Project", "Проект")} />
               </SelectTrigger>
               <SelectPopup>
                 {projectOptions.map((entry) => (
@@ -958,11 +1006,11 @@ function TaskList({
           value={assigneeFilter || "all"}
           onValueChange={(value) => onAssigneeChange(value === "all" ? "" : (value ?? ""))}
         >
-          <SelectTrigger size="sm" aria-label="Jira assignee">
-            <SelectValue placeholder="All assignees" />
+          <SelectTrigger size="sm" aria-label={text("Jira assignee", "Исполнитель в Jira")}>
+            <SelectValue placeholder={text("All assignees", "Все исполнители")} />
           </SelectTrigger>
           <SelectPopup>
-            <SelectItem value="all">All assignees</SelectItem>
+            <SelectItem value="all">{text("All assignees", "Все исполнители")}</SelectItem>
             {assigneeOptions.map((entry) => (
               <SelectItem key={entry.id} value={entry.id}>
                 {entry.label}
@@ -974,11 +1022,11 @@ function TaskList({
           value={statusFilter || "all"}
           onValueChange={(value) => onStatusFilterChange(value === "all" ? "" : (value ?? ""))}
         >
-          <SelectTrigger size="sm" aria-label="Jira status">
-            <SelectValue placeholder="All Jira statuses" />
+          <SelectTrigger size="sm" aria-label={text("Jira status", "Статус Jira")}>
+            <SelectValue placeholder={text("All Jira statuses", "Все статусы Jira")} />
           </SelectTrigger>
           <SelectPopup>
-            <SelectItem value="all">All Jira statuses</SelectItem>
+            <SelectItem value="all">{text("All Jira statuses", "Все статусы Jira")}</SelectItem>
             {statusOptions.map((status) => (
               <SelectItem key={status} value={status}>
                 {status}
@@ -990,7 +1038,9 @@ function TaskList({
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-20 md:pb-3">
         {assigneeVisible.length === 0 ? (
           <p className="px-2 py-8 text-center text-xs text-muted-foreground">
-            {tasks.length === 0 ? "No Jira tasks are available." : "No tasks match these filters."}
+            {tasks.length === 0
+              ? text("No Jira tasks are available.", "Нет доступных задач Jira.")
+              : text("No tasks match these filters.", "По этим фильтрам задач нет.")}
           </p>
         ) : null}
         {[...groups.entries()]
@@ -1017,7 +1067,7 @@ function TaskList({
               </h2>
               <ul className="space-y-0.5">
                 {entries.map((task) => {
-                  const state = taskState(task);
+                  const state = taskState(task, text);
                   return (
                     <li key={task.id}>
                       <button
@@ -1045,7 +1095,7 @@ function TaskList({
                           </span>
                           <span className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                             <span>{task.issue.key}</span>
-                            <span>{formatDate(task.issue.createdAt)}</span>
+                            <span>{formatDate(task.issue.createdAt, text)}</span>
                           </span>
                           <span className="mt-1 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
                             <span className="truncate">{task.issue.status.name}</span>
@@ -1083,6 +1133,7 @@ function TaskDetails({
   commandError: string | null;
   commandNotice: string | null;
 }) {
+  const text = useUiText();
   const [draftSummary, setDraftSummary] = useState(task.draft?.summary ?? task.issue.summary);
   const [draftDescription, setDraftDescription] = useState(
     task.draft?.description ?? task.issue.description,
@@ -1097,7 +1148,7 @@ function TaskDetails({
   const [runConfirmOpen, setRunConfirmOpen] = useState(false);
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
-  const state = taskState(task);
+  const state = taskState(task, text);
   const run = task.run;
   const selectedVariant = run?.variants.find((variant) => variant.id === selectedVariantId);
   const selectedArtifact = task.artifacts.find(
@@ -1159,7 +1210,7 @@ function TaskDetails({
   }, [commandDisabled, onCommand, selectedArtifactId, task.id]);
   return (
     <main
-      {...workspaceAreaProps("tasks-main", 1, "Task details")}
+      {...workspaceAreaProps("tasks-main", 1, text("Task details", "Карточка задачи"))}
       className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-both bg-background"
       data-task-workspace-main=""
     >
@@ -1168,7 +1219,7 @@ function TaskDetails({
           size="icon-sm"
           variant="ghost-muted"
           className="md:hidden"
-          aria-label="Back to tasks"
+          aria-label={text("Back to tasks", "Вернуться к задачам")}
           onClick={onBack}
         >
           <ArrowLeftIcon />
@@ -1180,7 +1231,9 @@ function TaskDetails({
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           <Badge variant="outline">{task.issue.status.name}</Badge>
           {task.run ? <Badge variant={statusVariant(state.tone)}>{state.label}</Badge> : null}
-          {task.draft?.dirty ? <Badge variant="secondary">Local draft</Badge> : null}
+          {task.draft?.dirty ? (
+            <Badge variant="secondary">{text("Local draft", "Локальный черновик")}</Badge>
+          ) : null}
         </div>
         <Button
           size="xs"
@@ -1189,7 +1242,9 @@ function TaskDetails({
           disabled={commandDisabled}
         >
           <SlidersHorizontalIcon />
-          {editing ? "Close edit" : "Edit draft"}
+          {editing
+            ? text("Close edit", "Закрыть редактор")
+            : text("Edit draft", "Редактировать черновик")}
         </Button>
         {task.draft?.dirty ? (
           <Button
@@ -1198,7 +1253,7 @@ function TaskDetails({
             onClick={() => setDiscardConfirmOpen(true)}
             disabled={commandDisabled}
           >
-            Discard draft
+            {text("Discard draft", "Удалить черновик")}
           </Button>
         ) : null}
         {run?.status === "running" || run?.status === "queued" ? (
@@ -1209,7 +1264,7 @@ function TaskDetails({
             disabled={commandDisabled}
           >
             <XCircleIcon />
-            Cancel run
+            {text("Cancel run", "Отменить запуск")}
           </Button>
         ) : (
           <Button
@@ -1219,7 +1274,9 @@ function TaskDetails({
             disabled={commandDisabled}
           >
             <PlayIcon />
-            {run?.status === "failed" ? "Retry scenario" : "Run scenario"}
+            {run?.status === "failed"
+              ? text("Retry scenario", "Повторить запуск")
+              : text("Run scenario", "Запустить сценарий")}
           </Button>
         )}
       </header>
@@ -1243,7 +1300,7 @@ function TaskDetails({
       <div className="mx-auto flex w-full max-w-(--chat-content-max-width) flex-col gap-4 p-4 pb-20 md:p-6">
         <section className="rounded-2xl border border-border/70 bg-muted/15 p-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold">Original task</h2>
+            <h2 className="text-sm font-semibold">{text("Original task", "Исходная задача")}</h2>
             {task.issue.browseUrl ? (
               <a
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
@@ -1251,10 +1308,12 @@ function TaskDetails({
                 target="_blank"
                 rel="noreferrer"
               >
-                Open Jira <ExternalLinkIcon className="size-3.5" />
+                {text("Open Jira", "Открыть в Jira")} <ExternalLinkIcon className="size-3.5" />
               </a>
             ) : (
-              <span className="text-xs text-muted-foreground">Jira link unavailable</span>
+              <span className="text-xs text-muted-foreground">
+                {text("Jira link unavailable", "Ссылка на Jira недоступна")}
+              </span>
             )}
           </div>
           {editing ? (
@@ -1262,39 +1321,48 @@ function TaskDetails({
               <Input
                 value={draftSummary}
                 onChange={(event) => setDraftSummary(event.target.value)}
-                aria-label="Task summary draft"
+                aria-label={text("Task summary draft", "Черновик названия")}
               />
               <Textarea
                 value={draftDescription}
                 onChange={(event) => setDraftDescription(event.target.value)}
-                aria-label="Task description draft"
+                aria-label={text("Task description draft", "Черновик описания")}
                 className="min-h-32"
               />
               <div className="flex justify-end gap-2">
                 <Button size="xs" variant="ghost-muted" onClick={() => setEditing(false)}>
-                  Cancel
+                  {text("Cancel", "Отмена")}
                 </Button>
                 <Button size="xs" onClick={saveDraft} disabled={commandDisabled}>
-                  Save local draft
+                  {text("Save local draft", "Сохранить черновик")}
                 </Button>
               </div>
               <p className="text-2xs text-muted-foreground">
-                Local draft only · Jira remains unchanged until publish.
+                {text(
+                  "Local draft only · Jira remains unchanged until publish.",
+                  "Черновик сохранится локально. Задача в Jira обновится при публикации.",
+                )}
               </p>
             </div>
           ) : (
             <>
               {task.draft?.dirty ? (
                 <p className="mt-3 text-2xs font-medium uppercase tracking-wide text-info">
-                  Local draft preview · Jira source remains unchanged
+                  {text(
+                    "Local draft preview · Jira source remains unchanged",
+                    "Предпросмотр локального черновика",
+                  )}
                 </p>
               ) : null}
               <h3 className="mt-2 text-base font-medium">{visibleSummary}</h3>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/85">
-                {visibleDescription || "No description provided."}
+                {visibleDescription || text("No description provided.", "Нет описания.")}
               </p>
               {task.issue.attachments && task.issue.attachments.length > 0 ? (
-                <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Jira attachments">
+                <ul
+                  className="mt-3 flex flex-wrap gap-1.5"
+                  aria-label={text("Jira attachments", "Вложения Jira")}
+                >
                   {task.issue.attachments.map((attachment) => (
                     <li key={attachment.id}>
                       {attachment.url ? (
@@ -1320,11 +1388,11 @@ function TaskDetails({
               {task.draft?.dirty ? (
                 <details className="mt-3 rounded-lg border border-border/60 bg-background/55 p-2.5 text-xs">
                   <summary className="cursor-pointer font-medium text-muted-foreground">
-                    Jira source version
+                    {text("Jira source version", "Исходная версия в Jira")}
                   </summary>
                   <h4 className="mt-2 font-medium text-foreground">{task.issue.summary}</h4>
                   <p className="mt-1 whitespace-pre-wrap leading-5 text-muted-foreground">
-                    {task.issue.description || "No description provided."}
+                    {task.issue.description || text("No description provided.", "Нет описания.")}
                   </p>
                 </details>
               ) : null}
@@ -1332,20 +1400,20 @@ function TaskDetails({
           )}
           <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-xs sm:grid-cols-4">
             <div>
-              <dt className="text-muted-foreground">Assignee</dt>
+              <dt className="text-muted-foreground">{text("Assignee", "Исполнитель")}</dt>
               <dd className="mt-0.5 font-medium">{task.issue.assignee ?? "Unassigned"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Priority</dt>
+              <dt className="text-muted-foreground">{text("Priority", "Приоритет")}</dt>
               <dd className="mt-0.5 font-medium">{task.issue.priority ?? "N/A"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Sprint</dt>
+              <dt className="text-muted-foreground">{text("Sprint", "Спринт")}</dt>
               <dd className="mt-0.5 font-medium">{task.issue.sprint?.name ?? "N/A"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Updated</dt>
-              <dd className="mt-0.5 font-medium">{formatDate(task.issue.updatedAt)}</dd>
+              <dt className="text-muted-foreground">{text("Updated", "Обновлено")}</dt>
+              <dd className="mt-0.5 font-medium">{formatDate(task.issue.updatedAt, text)}</dd>
             </div>
           </dl>
         </section>
@@ -1371,13 +1439,13 @@ function TaskDetails({
               onClick={() => setRunConfirmOpen(true)}
               disabled={commandDisabled}
             >
-              Retry
+              {text("Retry", "Повторить")}
             </Button>
           </div>
         ) : null}
         <section className="rounded-2xl border border-border/70 bg-muted/15 p-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold">Generated results</h2>
+            <h2 className="text-sm font-semibold">{text("Generated results", "Результаты")}</h2>
             <span className="text-xs text-muted-foreground">
               {run?.variants.length ?? 0} variants · {task.artifacts.length} artifacts
             </span>
@@ -1398,14 +1466,19 @@ function TaskDetails({
             </ul>
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">
-              No generated variants yet. Run the scenario to create local candidates.
+              {text(
+                "No generated variants yet. Run the scenario to create local candidates.",
+                "Вариантов пока нет. Запустите сценарий, чтобы их создать.",
+              )}
             </p>
           )}
         </section>
         <section className="rounded-2xl border border-border/70 bg-muted/15 p-4">
-          <h2 className="text-sm font-semibold">Comments</h2>
+          <h2 className="text-sm font-semibold">{text("Comments", "Комментарии")}</h2>
           {task.comments.length === 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">No comments have been recorded.</p>
+            <p className="mt-4 text-sm text-muted-foreground">
+              {text("No comments have been recorded.", "Пока нет комментариев.")}
+            </p>
           ) : (
             <ul className="mt-3 space-y-2">
               {task.comments.map((comment) => (
@@ -1417,11 +1490,13 @@ function TaskDetails({
         <section className="rounded-2xl border border-border/70 bg-muted/15 p-4">
           <div className="flex items-center gap-2">
             <RocketIcon className="size-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Publish</h2>
+            <h2 className="text-sm font-semibold">{text("Publish", "Опубликовать")}</h2>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Pushes the selected variant first, then sends prepared Jira comments. Partial failures
-            stay visible for retry.
+            {text(
+              "Pushes the selected variant first, then sends prepared Jira comments. Partial failures stay visible for retry.",
+              "Сначала отправится выбранный вариант, затем комментарии в Jira. Если один из шагов завершится ошибкой, его можно повторить.",
+            )}
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <Select
@@ -1436,7 +1511,7 @@ function TaskDetails({
               }}
             >
               <SelectTrigger size="sm" className="min-w-52">
-                <SelectValue placeholder="Choose a generated variant" />
+                <SelectValue placeholder={text("Choose a generated variant", "Выберите вариант")} />
               </SelectTrigger>
               <SelectPopup>
                 {(run?.variants ?? []).map((variant) => (
@@ -1447,11 +1522,11 @@ function TaskDetails({
               </SelectPopup>
             </Select>
             <label className="grid gap-1 text-xs text-muted-foreground">
-              Publish branch
+              {text("Publish branch", "Ветка для публикации")}
               <Input
                 value={branch}
                 onChange={(event) => setBranch(event.target.value)}
-                aria-label="Publish branch"
+                aria-label={text("Publish branch", "Ветка для публикации")}
               />
             </label>
             <Button
@@ -1464,7 +1539,7 @@ function TaskDetails({
               onClick={() => setPublishConfirmOpen(true)}
             >
               <GitBranchIcon />
-              Publish
+              {text("Publish", "Опубликовать")}
             </Button>
           </div>
           {task.publishes.length > 0 ? (
@@ -1493,37 +1568,50 @@ function TaskDetails({
             </ul>
           ) : null}
           <p className="mt-2 text-2xs text-muted-foreground">
-            Storybook shortcut: ⌘/Ctrl + Shift + S. Publishing remains a separate, explicit action.
+            {text(
+              "Open Storybook with ⌘/Ctrl + Shift + S. Publishing is a separate action.",
+              "Чтобы открыть Storybook, нажмите ⌘/Ctrl + Shift + S. Публикация запускается отдельно.",
+            )}
           </p>
         </section>
         <section className="rounded-2xl border border-border/70 bg-muted/15 p-4">
-          <h2 className="text-sm font-semibold">Activity</h2>
+          <h2 className="text-sm font-semibold">{text("Activity", "Активность")}</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Source updated {formatDateTime(task.issue.updatedAt)} · local processing state updated{" "}
-            {formatDateTime(task.updatedAt)}
+            {text("Jira updated", "Обновлено в Jira")} {formatDateTime(task.issue.updatedAt, text)}{" "}
+            · {text("Local state updated", "Обновлено локально")}{" "}
+            {formatDateTime(task.updatedAt, text)}
           </p>
         </section>
       </div>
       <AlertDialog open={runConfirmOpen} onOpenChange={setRunConfirmOpen}>
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Start {task.scenario.maxVariants} task variants?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {text(
+                `Start ${task.scenario.maxVariants} task variants?`,
+                `Запустить варианты задачи (${task.scenario.maxVariants})?`,
+              )}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This starts independent agent threads in separate worktrees. The scenario will use{" "}
-              {task.scenario.stages.find((stage) => stage.kind === "agent")?.provider ?? "codex"}{" "}
-              with full workspace access. Audit and checks remain pending until their workers report
-              results.
+              {text(
+                "Each variant runs in its own worktree with full workspace access.",
+                "Каждый вариант запустится в своей рабочей копии в режиме полного доступа.",
+              )}{" "}
+              {text("Provider", "Провайдер")}{" "}
+              {task.scenario.stages.find((stage) => stage.kind === "agent")?.provider ?? "codex"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {text("Cancel", "Отмена")}
+            </AlertDialogClose>
             <Button
               onClick={() => {
                 setRunConfirmOpen(false);
                 onCommand({ _tag: "runScenario", taskId: task.id });
               }}
             >
-              Start scenario
+              {text("Start scenario", "Запустить сценарий")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -1531,29 +1619,49 @@ function TaskDetails({
       <AlertDialog open={publishConfirmOpen} onOpenChange={setPublishConfirmOpen}>
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Publish {selectedVariant?.label ?? "this variant"}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {selectedVariant
+                ? text(
+                    `Publish ${selectedVariant.label}?`,
+                    `Опубликовать «${selectedVariant.label}»?`,
+                  )
+                : text("Publish this variant?", "Опубликовать этот вариант?")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Push the selected worktree to <strong>{branch}</strong>, then send{" "}
-              {task.comments.filter((comment) => comment.source === "agent").length} prepared Jira
-              comments. A partial failure keeps the push receipt for recovery.
+              {text(
+                "The selected worktree will be pushed to",
+                "Рабочая копия будет отправлена в ветку",
+              )}{" "}
+              <strong>{branch}</strong>.{" "}
+              {text("Prepared Jira comments to send", "Подготовлено комментариев для Jira")}{" "}
+              {task.comments.filter((comment) => comment.source === "agent").length}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
-            <Button onClick={publish}>Publish</Button>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {text("Cancel", "Отмена")}
+            </AlertDialogClose>
+            <Button onClick={publish}>{text("Publish", "Опубликовать")}</Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
       </AlertDialog>
       <AlertDialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Discard this local draft?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {text("Discard this local draft?", "Удалить локальный черновик?")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The saved Jira source remains unchanged. Your local draft text will be removed.
+              {text(
+                "The saved Jira source remains unchanged. Your local draft text will be removed.",
+                "Текст черновика будет удалён. Исходная задача в Jira сохранится.",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {text("Cancel", "Отмена")}
+            </AlertDialogClose>
             <Button
               variant="destructive"
               onClick={() => {
@@ -1561,7 +1669,7 @@ function TaskDetails({
                 onCommand({ _tag: "discardDraft", taskId: task.id });
               }}
             >
-              Discard draft
+              {text("Discard draft", "Удалить черновик")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -1602,29 +1710,30 @@ export function TaskMobileNavigation({
   readonly environmentId?: EnvironmentId;
   readonly projectId?: ProjectId;
 }) {
+  const text = useUiText();
   const pullRequestsSupported = usePullRequestsSupported();
   return (
     <nav
-      aria-label="Workspace navigation"
+      aria-label={text("Workspace navigation", "Разделы рабочей области")}
       className="fixed inset-x-0 bottom-0 z-20 flex h-14 items-center justify-around border-t border-border/70 bg-background/95 px-2 backdrop-blur md:hidden"
     >
       <Link
         to="/"
-        aria-label="Home"
+        aria-label={text("Home", "Главная")}
         className="rounded-lg p-2 text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <HomeIcon className="size-5" />
       </Link>
       <Link
         to="/automations"
-        aria-label="Automations"
+        aria-label={text("Automations", "Автоматизации")}
         className="rounded-lg p-2 text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <CalendarClockIcon className="size-5" />
       </Link>
       <Link
         to="/design"
-        aria-label="Design"
+        aria-label={text("Design", "Дизайн")}
         className="rounded-lg p-2 text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <PaletteIcon className="size-5" />
@@ -1633,7 +1742,7 @@ export function TaskMobileNavigation({
         <Link
           to="/pull-requests"
           search={readPullRequestListPreferences()}
-          aria-label="Pull requests"
+          aria-label={text("Pull requests", "Пул-реквесты")}
           className="rounded-lg p-2 text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <PullRequestGlyph.pullRequest className="size-5" />
@@ -1646,14 +1755,14 @@ export function TaskMobileNavigation({
           ...(projectId === undefined ? {} : { projectId }),
         }}
         aria-current="page"
-        aria-label="Tasks"
+        aria-label={text("Tasks", "Задачи")}
         className="rounded-lg bg-secondary p-2 text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <ListTodoIcon className="size-5" />
       </Link>
       <Link
         to="/usage"
-        aria-label="Usage"
+        aria-label={text("Usage", "Использование")}
         className="rounded-lg p-2 text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <GaugeIcon className="size-5" />
@@ -1661,7 +1770,7 @@ export function TaskMobileNavigation({
       <SidebarUpdatePill rail />
       <Link
         to="/settings"
-        aria-label="Settings"
+        aria-label={text("Settings", "Настройки")}
         className="rounded-lg p-2 text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <SettingsIcon className="size-5" />
@@ -1677,6 +1786,7 @@ export function TasksWorkspace({
   target: TaskWorkspaceSearch;
   scopeInHeader?: boolean;
 }) {
+  const text = useUiText();
   const navigate = useNavigate();
   const { environments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -1784,32 +1894,58 @@ export function TasksWorkspace({
     if (result._tag === "Failure") {
       const failure = squashAtomCommandFailure(result);
       setCommandError(
-        failure instanceof Error ? failure.message : "The task action could not be completed.",
+        failure instanceof Error
+          ? failure.message
+          : text(
+              "The task action could not be completed.",
+              "Не удалось выполнить действие с задачей.",
+            ),
       );
     } else {
       const notices: Partial<Record<TaskWorkspaceCommand["_tag"], string>> = {
-        sync: "Jira task list synchronized.",
-        saveDraft: "Local draft saved.",
-        discardDraft: "Local draft discarded.",
-        configureScenario: "Scenario revision saved.",
-        runScenario: "Scenario started in isolated worktrees.",
-        cancelRun: "Worker cancellation requested.",
-        publishVariant: "Publish request accepted; receipt is being updated.",
+        sync: text("Jira task list synchronized.", "Список задач Jira обновлён."),
+        saveDraft: text("Local draft saved.", "Черновик сохранён."),
+        discardDraft: text("Local draft discarded.", "Черновик удалён."),
+        configureScenario: text("Scenario revision saved.", "Версия сценария сохранена."),
+        runScenario: text(
+          "Scenario started in isolated worktrees.",
+          "Сценарий запущен в изолированных рабочих копиях.",
+        ),
+        cancelRun: text("Worker cancellation requested.", "Запрошена отмена запуска."),
+        publishVariant: text(
+          "Publish request accepted; receipt is being updated.",
+          "Публикация началась. Статус обновится после завершения.",
+        ),
       };
-      setCommandNotice(notices[payload._tag] ?? "Task action completed.");
+      setCommandNotice(notices[payload._tag] ?? text("Task action completed.", "Готово."));
     }
     query.refresh();
     setCommandPending(false);
   };
   if (environmentId === undefined)
-    return unavailableState("Select a connected environment to view tasks.");
+    return unavailableState(
+      text(
+        "Select a connected environment to view tasks.",
+        "Чтобы увидеть задачи, подключитесь к рабочей среде.",
+      ),
+    );
   if (environment === undefined || environment.connection.phase !== "connected")
-    return unavailableState("Connect an environment to view tasks.");
+    return unavailableState(
+      text(
+        "Connect an environment to view tasks.",
+        "Подключите рабочую среду, чтобы увидеть задачи.",
+      ),
+    );
   if (projectId === undefined || workspaceRoot === undefined)
-    return unavailableState("Select a project with a connected task source.");
+    return unavailableState(
+      text(
+        "Select a project with a connected task source.",
+        "Выберите проект с подключённой Jira.",
+      ),
+    );
   if (query.error)
     return unavailableState(query.error, {
-      label: "Retry",
+      label: text("Retry", "Повторить"),
       onClick: query.refresh,
       disabled: !canCommand,
     });
@@ -1821,7 +1957,7 @@ export function TasksWorkspace({
           role="status"
         >
           <LoaderCircleIcon className="mr-2 size-4 animate-spin" />
-          Loading tasks…
+          {text("Loading tasks…", "Загружаем задачи…")}
         </div>
         <TaskMobileNavigation environmentId={environmentId} projectId={projectId} />
       </>
@@ -1831,37 +1967,41 @@ export function TasksWorkspace({
       <>
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto scrollbar-gutter-both p-6 pb-20">
           <div className="w-full max-w-lg rounded-2xl border border-border/70 bg-muted/15 p-5">
-            <h1 className="text-base font-semibold">Connect Jira task source</h1>
+            <h1 className="text-base font-semibold">
+              {text("Connect Jira task source", "Подключить Jira")}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Store only the Jira URL and a server-side secret reference. The token never enters the
-              browser or local task snapshot.
+              {text(
+                "Store only the Jira URL and a server-side secret reference. The token never enters the browser or local task snapshot.",
+                "Укажите адрес Jira и ссылку на секрет на сервере. Токен хранится на сервере.",
+              )}
             </p>
             <div className="mt-4 grid gap-3">
               <Input
                 value={jiraUrl || snapshot?.connection.url || ""}
                 onChange={(event) => setJiraUrl(event.target.value)}
                 placeholder="https://jira.example.com"
-                aria-label="Jira URL"
+                aria-label={text("Jira URL", "Адрес Jira")}
               />
               <div className="grid gap-2 sm:grid-cols-2">
                 <Input
                   value={secretProvider}
                   onChange={(event) => setSecretProvider(event.target.value)}
-                  placeholder="Secret provider"
-                  aria-label="Secret provider"
+                  placeholder={text("Secret provider", "Провайдер секретов")}
+                  aria-label={text("Secret provider", "Провайдер секретов")}
                 />
                 <Input
                   value={secretPath}
                   onChange={(event) => setSecretPath(event.target.value)}
-                  placeholder="Secret reference"
-                  aria-label="Secret reference"
+                  placeholder={text("Secret reference", "Ссылка на секрет")}
+                  aria-label={text("Secret reference", "Ссылка на секрет")}
                 />
               </div>
               <Input
                 value={jiraProjectKey}
                 onChange={(event) => setJiraProjectKey(event.target.value)}
-                placeholder="Jira project key, for example NEUROKEY"
-                aria-label="Jira project key"
+                placeholder={text("Jira project key, for example NEUROKEY", "Например, NEUROKEY")}
+                aria-label={text("Jira project key", "Ключ проекта Jira")}
               />
               {snapshot?.error ? (
                 <p className="text-sm text-destructive">{snapshot.error}</p>
@@ -1885,7 +2025,7 @@ export function TasksWorkspace({
                   })
                 }
               >
-                Connect and sync
+                {text("Connect and sync", "Подключить и синхронизировать")}
               </Button>
             </div>
           </div>
@@ -1905,7 +2045,7 @@ export function TasksWorkspace({
             onClick={() => void runCommand({ _tag: "sync" })}
             disabled={commandPending || !canCommand}
           >
-            Retry sync
+            {text("Retry sync", "Повторить синхронизацию")}
           </Button>
         </div>
       ) : null}
@@ -1976,8 +2116,14 @@ export function TasksWorkspace({
         ) : (
           unavailableState(
             target.taskId
-              ? "This task is no longer in the selected project."
-              : "Select a task to inspect its source and processing scenario.",
+              ? text(
+                  "This task is no longer in the selected project.",
+                  "В выбранном проекте больше нет этой задачи.",
+                )
+              : text(
+                  "Select a task to inspect its source and processing scenario.",
+                  "Выберите задачу, чтобы открыть её описание и сценарий.",
+                ),
             undefined,
             false,
             "max-md:hidden",

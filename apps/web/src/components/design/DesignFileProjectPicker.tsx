@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useEnvironments } from "../../state/environments";
 import { useProjects } from "../../state/entities";
 import { ProjectFavicon } from "../ProjectFavicon";
@@ -37,15 +38,18 @@ export function DesignFileProjectPicker({
   readonly value: string;
   readonly onChange: (value: string) => void;
 }) {
+  const ui = useUiText();
   return (
     <Select value={value} onValueChange={(next) => onChange(next ?? "local")}>
-      <SelectTrigger aria-label="Design project">
+      <SelectTrigger aria-label={ui("Design project", "Проект макета")}>
         <SelectValue>
-          {value === "local" ? "No project" : (projects.get(value)?.label ?? "Unavailable project")}
+          {value === "local"
+            ? ui("No project", "Без проекта")
+            : (projects.get(value)?.label ?? "Unavailable project")}
         </SelectValue>
       </SelectTrigger>
       <SelectPopup alignItemWithTrigger={false}>
-        <SelectItem value="local">No project</SelectItem>
+        <SelectItem value="local">{ui("No project", "Без проекта")}</SelectItem>
         {[...projects].map(([key, { project, label }]) => (
           <SelectItem key={key} value={key} label={label}>
             <span className="flex items-center gap-2">

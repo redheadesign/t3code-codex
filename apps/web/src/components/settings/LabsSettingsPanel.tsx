@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAuth } from "@clerk/react";
 import { Link } from "@tanstack/react-router";
 import { managedCapabilityDenial } from "@t3tools/contracts";
@@ -32,6 +33,7 @@ export function LabsSettingsPanel() {
 }
 
 function BoringSidebarRow() {
+  const ui = useUiText();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
@@ -45,7 +47,7 @@ function BoringSidebarRow() {
           onCheckedChange={(checked) =>
             updateSettings({ boringSidebarEnabled: Boolean(checked), legacySidebarEnabled: false })
           }
-          aria-label="Group chats by project"
+          aria-label={ui("Group chats by project", "Группы по проектам")}
         />
       }
     />
@@ -53,6 +55,7 @@ function BoringSidebarRow() {
 }
 
 function BoringSidebarMultilineRow() {
+  const ui = useUiText();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
@@ -65,7 +68,7 @@ function BoringSidebarMultilineRow() {
           onCheckedChange={(checked) =>
             updateSettings({ boringSidebarMultilineRows: Boolean(checked) })
           }
-          aria-label="Two-line folder rows"
+          aria-label={ui("Two-line folder rows", "Две строки на папку")}
         />
       }
     />
@@ -74,6 +77,7 @@ function BoringSidebarMultilineRow() {
 
 /** Signed out of T3 Connect, the row offers to sign in instead of its switch. */
 function GuestLinksRowWithSignIn() {
+  const ui = useUiText();
   const { isSignedIn } = useAuth();
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
   // `isSignedIn` is undefined until Clerk loads.
@@ -84,7 +88,7 @@ function GuestLinksRowWithSignIn() {
       description="Share a thread with a guest who watches it live in their browser and sends messages you approve. Sign in to T3 Connect to use guest links."
       control={
         <Button size="sm" variant="outline" onClick={openAuthPrompt}>
-          Sign in
+          {ui("Sign in", "Войти")}
         </Button>
       }
     />
@@ -92,6 +96,7 @@ function GuestLinksRowWithSignIn() {
 }
 
 function GuestLinksRow() {
+  const ui = useUiText();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const scope = useOptionalSettingsScope();
@@ -125,7 +130,7 @@ function GuestLinksRow() {
           settingKeys={["guestSharingEnabled"]}
           checked={settings.guestSharingEnabled}
           onCheckedChange={(checked) => updateSettings({ guestSharingEnabled: Boolean(checked) })}
-          aria-label="Guest links"
+          aria-label={ui("Guest links", "Гостевые ссылки")}
         />
       }
     />
@@ -133,6 +138,7 @@ function GuestLinksRow() {
 }
 
 function LinkedEnvironmentsRow() {
+  const ui = useUiText();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
@@ -157,7 +163,7 @@ function LinkedEnvironmentsRow() {
           onCheckedChange={(checked) =>
             updateSettings({ linkedEnvironmentsEnabled: Boolean(checked) })
           }
-          aria-label="Linked environments"
+          aria-label={ui("Linked environments", "Связанные среды")}
         />
       }
     />
@@ -165,6 +171,7 @@ function LinkedEnvironmentsRow() {
 }
 
 function SimlockHostsRow() {
+  const ui = useUiText();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
@@ -185,7 +192,7 @@ function SimlockHostsRow() {
           </a>{" "}
           pool, added in{" "}
           <Link to="/settings/devices" className="underline underline-offset-2">
-            Devices
+            {ui("Devices", "Устройства")}
           </Link>
           . An alpha that may change or break. T3 Code never installs Simlock.
         </>

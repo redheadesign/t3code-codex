@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { Check, Copy } from "lucide";
 import { useRef, type ComponentProps } from "react";
 
@@ -14,6 +15,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { reportMarkdownActionFailure } from "./markdownActionFailure";
 
 export function MarkdownTable({ children, ...props }: ComponentProps<"table">) {
+  const ui = useUiText();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const { copyToClipboard, isCopied: copied } = useCopyToClipboard<"markdown" | "csv">({
     timeout: 1200,
@@ -61,8 +63,12 @@ export function MarkdownTable({ children, ...props }: ComponentProps<"table">) {
             <TooltipPopup side="top">{copyLabel}</TooltipPopup>
           </Tooltip>
           <MenuPopup align="end">
-            <MenuItem onClick={() => handleCopy("markdown")}>Copy as Markdown</MenuItem>
-            <MenuItem onClick={() => handleCopy("csv")}>Copy as CSV</MenuItem>
+            <MenuItem onClick={() => handleCopy("markdown")}>
+              {ui("Copy as Markdown", "Копировать Markdown")}
+            </MenuItem>
+            <MenuItem onClick={() => handleCopy("csv")}>
+              {ui("Copy as CSV", "Копировать CSV")}
+            </MenuItem>
           </MenuPopup>
         </Menu>
       </div>

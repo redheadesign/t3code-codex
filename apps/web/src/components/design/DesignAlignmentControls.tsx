@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   AlignStartVerticalIcon,
   AlignCenterVerticalIcon,
@@ -24,8 +25,9 @@ export function DesignAlignmentControls({
   onDistribute?: (axis: "horizontal" | "vertical") => void;
   distributeDisabled?: boolean;
 }) {
+  const ui = useUiText();
   return (
-    <div className="flex gap-2" role="group" aria-label="Align layers">
+    <div className="flex gap-2" role="group" aria-label={ui("Align layers", "Выровнять слои")}>
       {(
         [
           [
@@ -64,16 +66,22 @@ export function DesignAlignmentControls({
       {onDistribute ? (
         <Menu>
           <MenuTrigger
-            render={<Button size="icon-xs" variant="ghost-muted" aria-label="Alignment options" />}
+            render={
+              <Button
+                size="icon-xs"
+                variant="ghost-muted"
+                aria-label={ui("Alignment options", "Выравнивание")}
+              />
+            }
           >
             <MoreHorizontalIcon />
           </MenuTrigger>
           <MenuPopup align="end">
             <MenuItem disabled={distributeDisabled} onClick={() => onDistribute("horizontal")}>
-              Distribute horizontal spacing
+              {ui("Distribute horizontal spacing", "Равные интервалы по X")}
             </MenuItem>
             <MenuItem disabled={distributeDisabled} onClick={() => onDistribute("vertical")}>
-              Distribute vertical spacing
+              {ui("Distribute vertical spacing", "Равные интервалы по Y")}
             </MenuItem>
           </MenuPopup>
         </Menu>

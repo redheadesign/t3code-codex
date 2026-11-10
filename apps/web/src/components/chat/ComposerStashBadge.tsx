@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { BookmarkIcon } from "lucide-react";
 import { memo } from "react";
 
@@ -11,6 +12,7 @@ export const ComposerStashBadge = memo(function ComposerStashBadge(props: {
   pulseKey: number;
   onToggleMenu: () => void;
 }) {
+  const ui = useUiText();
   if (props.count === 0) return null;
   const pulsed = props.pulseKey > 0;
   const count = (
@@ -54,7 +56,7 @@ export const ComposerStashBadge = memo(function ComposerStashBadge(props: {
         <ComposerBanner.Icon>
           <BookmarkIcon />
         </ComposerBanner.Icon>
-        <ComposerBanner.Content>Stash</ComposerBanner.Content>
+        <ComposerBanner.Content>{ui("Stash", "Отложить")}</ComposerBanner.Content>
         <ComposerBanner.Actions>{count}</ComposerBanner.Actions>
       </ComposerBanner.Row>
     </ComposerBanner.Root>

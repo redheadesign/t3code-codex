@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useState } from "react";
 import { Input } from "../ui/input";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
@@ -58,6 +59,7 @@ export function DesignScalePanel({
   selected: readonly string[];
   onCommit: (next: DesignDocument) => void;
 }) {
+  const ui = useUiText();
   const [anchor, setAnchor] = useState({ x: 0, y: 0 });
   const roots = designScalableRoots(document, selected);
   const frame = designSelectionFrame(
@@ -70,33 +72,39 @@ export function DesignScalePanel({
   };
   return (
     <aside
-      aria-label="Inspector"
+      aria-label={ui("Inspector", "Свойства")}
       className="flex min-h-0 w-60 min-w-60 flex-col overflow-y-auto border-l border-border/70 bg-sidebar"
     >
       <div className="flex h-10 shrink-0 items-center border-b border-border px-3 text-xs font-medium">
-        Scale
+        {ui("Scale", "Масштаб")}
       </div>
       {frame ? (
         <div className="space-y-4 p-4">
           <div className="grid grid-cols-2 gap-2">
             <ScaleField
-              label="Scale width"
+              label={ui("Scale width", "По ширине")}
               value={frame.width}
               onApply={(value) => apply(value / frame.width)}
             />
             <ScaleField
-              label="Scale height"
+              label={ui("Scale height", "По высоте")}
               value={frame.height}
               onApply={(value) => apply(value / frame.height)}
             />
           </div>
           <div className="flex items-end gap-1">
             <div className="min-w-0 flex-1">
-              <ScaleField label="Multiplier" value={1} onApply={apply} />
+              <ScaleField label={ui("Multiplier", "Множитель")} value={1} onApply={apply} />
             </div>
             <Menu>
               <MenuTrigger
-                render={<Button size="icon-sm" variant="outline" aria-label="Scale presets" />}
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    aria-label={ui("Scale presets", "Масштаб")}
+                  />
+                }
               >
                 <ChevronDownIcon />
               </MenuTrigger>
@@ -110,8 +118,14 @@ export function DesignScalePanel({
             </Menu>
           </div>
           <fieldset className="space-y-2">
-            <legend className="text-2xs text-muted-foreground">Anchor point</legend>
-            <div className="grid w-fit grid-cols-3 gap-1" role="group" aria-label="Scale anchor">
+            <legend className="text-2xs text-muted-foreground">
+              {ui("Anchor point", "Опорная точка")}
+            </legend>
+            <div
+              className="grid w-fit grid-cols-3 gap-1"
+              role="group"
+              aria-label={ui("Scale anchor", "Опора")}
+            >
               {[0, 0.5, 1].flatMap((y, row) =>
                 [0, 0.5, 1].map((x, column) => (
                   <button
@@ -134,19 +148,28 @@ export function DesignScalePanel({
             </div>
           </fieldset>
           <p className="text-2xs leading-5 text-muted-foreground">
-            Scales contents, text, strokes and spacing together. Press Enter to apply.
+            {ui(
+              "Scales contents, text, strokes and spacing together. Press Enter to apply.",
+              "Меняет масштаб текста, слоёв, обводок и отступов. Enter применит.",
+            )}
           </p>
           {roots.length < selectionRoots(document, selected).length ? (
             <p role="status" className="text-2xs leading-5 text-muted-foreground">
-              Locked layers and layers inside instances are excluded.
+              {ui(
+                "Locked layers and layers inside instances are excluded.",
+                "Пропустит закреплённые слои и слои внутри экземпляров.",
+              )}
             </p>
           ) : null}
         </div>
       ) : (
         <p role="status" className="p-4 text-xs leading-5 text-muted-foreground">
           {selected.length
-            ? "Locked layers and layers inside instances cannot be scaled."
-            : "Select a layer to scale."}
+            ? ui(
+                "Locked layers and layers inside instances cannot be scaled.",
+                "Масштаб этих слоёв изменить нельзя.",
+              )
+            : ui("Select a layer to scale.", "Выберите слой.")}
         </p>
       )}
     </aside>

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useState } from "react";
 import * as Option from "effect/Option";
 import type { SshDeviceHostConfig } from "@t3tools/contracts";
@@ -75,6 +76,7 @@ function DeviceHostEditorForm({
   onSave: (host: SshDeviceHostConfig) => void;
   onClose: () => void;
 }) {
+  const ui = useUiText();
   const [draft, setDraft] = useState(host);
   const [expandedChecks, setExpandedChecks] = useState<{ key: string; open: boolean } | null>(null);
   const { checks, testConnection } = useHostConnectionChecks(targets);
@@ -113,7 +115,7 @@ function DeviceHostEditorForm({
       </DialogHeader>
       <DialogPanel>
         <label className="block space-y-1.5 text-sm">
-          <span>Name</span>
+          <span>{ui("Name", "Имя")}</span>
           <Input
             autoFocus
             required
@@ -175,7 +177,7 @@ function DeviceHostEditorForm({
                     return port ? { ...rest, port: Number(port) } : rest;
                   });
                 }}
-                placeholder="Default"
+                placeholder={ui("Default", "По умолчанию")}
               />
             </label>
           </div>
@@ -251,7 +253,8 @@ function DeviceHostEditorForm({
                           </>
                         ) : (
                           <>
-                            <CheckIcon className="size-3" /> Connected
+                            <CheckIcon className="size-3" />
+                            {ui("Connected", "Подключено")}
                           </>
                         )}
                       </span>
@@ -278,7 +281,7 @@ function DeviceHostEditorForm({
       </DialogPanel>
       <DialogFooter>
         <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
-          Cancel
+          {ui("Cancel", "Отмена")}
         </Button>
         <Button type="submit" disabled={busy || checking || !valid || !draft.label.trim()}>
           {busy ? <Spinner size="xs" /> : null} Save host

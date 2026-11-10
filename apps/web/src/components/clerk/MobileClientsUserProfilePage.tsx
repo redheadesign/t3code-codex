@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { RelayClientDeviceRecord } from "@t3tools/contracts/relay";
 import { SmartphoneIcon } from "lucide-react";
 
@@ -26,9 +27,10 @@ function MobileClientStatusBadge({
   readonly enabled: boolean;
   readonly label: string;
 }) {
+  const ui = useUiText();
   return (
     <Badge variant={enabled ? "success" : "outline"}>
-      {label}: {enabled ? "On" : "Off"}
+      {label}: {enabled ? ui("On", "Вкл.") : ui("Off", "Выкл.")}
     </Badge>
   );
 }
@@ -103,6 +105,7 @@ function EmptyMobileClients() {
 }
 
 export function MobileClientsUserProfilePage() {
+  const ui = useUiText();
   const devicesState = useManagedRelayDevices();
   const devices = devicesState.data ?? [];
   const isInitialLoad =
@@ -133,7 +136,7 @@ export function MobileClientsUserProfilePage() {
               <p className="mt-0.5 text-xs text-muted-foreground">{devicesState.error}</p>
             </div>
             <Button size="xs" variant="outline" onClick={devicesState.refresh}>
-              Try again
+              {ui("Try again", "Повторить")}
             </Button>
           </div>
         ) : null}

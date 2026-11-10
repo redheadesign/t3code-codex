@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { ComposerPermissionsButton } from "./ComposerPermissionsButton";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
 import { insertAttachmentReferencesForDraft } from "./composerAttachmentReferences";
@@ -501,6 +502,7 @@ const NO_PROVIDER_SKILLS: ServerProvider["skills"] = [];
 const NO_PROVIDER_SLASH_COMMANDS: ServerProvider["slashCommands"] = [];
 
 export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps) {
+  const ui = useUiText();
   const {
     composerDraftTarget,
     environmentId,
@@ -1258,10 +1260,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     environmentUnavailable !== null ||
     (!composerSendState.hasSendableContent && !showResumeAction);
   const collapsedComposerPrimaryActionLabel = showResumeAction
-    ? "Resume thread"
+    ? ui("Resume thread", "Продолжить чат")
     : props.resumeCompactionTokens !== null && !props.keepFullHistory
-      ? "Open composer to compact and send"
-      : "Send message";
+      ? ui("Open composer to compact and send", "Сжать и отправить")
+      : ui("Send message", "Отправить");
   const showMobilePendingAnswerActions =
     isMobileViewport && !isComposerCollapsedMobile && pendingPrimaryAction !== null;
 
@@ -3258,10 +3260,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   )}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={expandMobileComposerStable}
-                  aria-label="Expand composer"
+                  aria-label={ui("Expand composer", "Развернуть поле")}
                 >
                   {prompt.trim() ||
-                    (showProviderUnavailable ? "Enable a provider in Settings" : "Ask anything...")}
+                    (showProviderUnavailable
+                      ? ui("Enable a provider in Settings", "Включите агента в настройках")
+                      : ui("Ask anything...", "Сообщение…"))}
                 </button>
                 {collapsedComposerImagePreviews}
                 <button
@@ -3335,10 +3339,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 {composerSuggestionsVisible && composerMenuItems.length === 0
                   ? isComposerMenuLoading
                     ? composerTriggerKind === "pull-request"
-                      ? "Finding pull request..."
+                      ? ui("Finding pull request...", "Ищем PR…")
                       : composerTriggerKind === "skill" || composerTriggerKind === "slash-command"
-                        ? "Searching workspace skills..."
-                        : "Searching workspace files..."
+                        ? ui("Searching workspace skills...", "Ищем навыки…")
+                        : ui("Searching workspace files...", "Ищем файлы…")
                     : composerMenuEmptyState
                   : ""}
               </div>
@@ -3416,19 +3420,37 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     placeholder={
                       isComposerApprovalState
                         ? activePendingApproval?.supportsFeedback
-                          ? "Send feedback to decline this request"
-                          : "Send a message to decline and redirect the agent"
+                          ? ui("Send feedback to decline this request", "Причина отказа")
+                          : ui(
+                              "Send a message to decline and redirect the agent",
+                              "Другая задача для агента",
+                            )
                         : activePendingProgress
                           ? isChoiceOnlyPendingQuestion
-                            ? "Choose an option above"
-                            : "Type your own answer, or leave this blank to use the selected option"
+                            ? ui("Choose an option above", "Выберите вариант")
+                            : ui(
+                                "Type your own answer, or leave this blank to use the selected option",
+                                "Свой ответ или выбранный вариант",
+                              )
                           : showPlanFollowUpPrompt && activeProposedPlan
-                            ? "Add feedback to refine the plan, or leave this blank to implement it"
+                            ? ui(
+                                "Add feedback to refine the plan, or leave this blank to implement it",
+                                "Уточните план или сразу запустите работу",
+                              )
                             : projectSelectionRequired
-                              ? "Choose a project above to start a thread"
+                              ? ui(
+                                  "Choose a project above to start a thread",
+                                  "Выберите проект для чата",
+                                )
                               : showProviderUnavailable
-                                ? "Enable a provider in Settings to send a message"
-                                : DEFAULT_COMPOSER_PLACEHOLDER
+                                ? ui(
+                                    "Enable a provider in Settings to send a message",
+                                    "Включите агента в настройках",
+                                  )
+                                : ui(
+                                    DEFAULT_COMPOSER_PLACEHOLDER,
+                                    "Сообщение. @ файлы, $ навыки, / команды",
+                                  )
                     }
                     disabled={
                       projectSelectionRequired ||

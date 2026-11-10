@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useEffect, useId, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { create } from "zustand";
@@ -63,6 +64,7 @@ export function CustomSnoozeDialogHost() {
 }
 
 function CustomSnoozeDialog() {
+  const ui = useUiText();
   const id = useId();
   const navigate = useNavigate();
   const [initial] = useState(() => new Date(Date.now() + 3_600_000));
@@ -243,9 +245,9 @@ function CustomSnoozeDialog() {
               Edit snooze options
             </Button>
             <Button type="button" variant="outline" onClick={() => finish(null)}>
-              Cancel
+              {ui("Cancel", "Отмена")}
             </Button>
-            <Button type="submit">Snooze</Button>
+            <Button type="submit">{ui("Snooze", "Отложить")}</Button>
           </DialogFooter>
         </form>
       </DialogPopup>

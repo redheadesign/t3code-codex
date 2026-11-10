@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   isModifierPairShortcut,
   type DesktopCaptureConfigApplied,
@@ -35,6 +36,7 @@ export function CaptureShortcutConfig({
   onSaved?: () => Promise<unknown>;
   onComplete?: () => Promise<void>;
 }) {
+  const ui = useUiText();
   const bridge = getDesktopSnapShotBridge();
   const resolvedTheme = useRenderedAppearance();
   const { copyToClipboard, isCopied } = useCopyToClipboard();
@@ -142,7 +144,7 @@ export function CaptureShortcutConfig({
     <div className="space-y-4 text-sm">
       {!result ? (
         <div className="flex items-center justify-between gap-3">
-          <span>Shortcut</span>
+          <span>{ui("Shortcut", "Клавиши")}</span>
           {recorder.input}
         </div>
       ) : null}
@@ -202,16 +204,16 @@ export function CaptureShortcutConfig({
                 onClick={() => void apply()}
               >
                 {working === "writing"
-                  ? "Saving…"
+                  ? ui("Saving…", "Сохраняем…")
                   : changed
                     ? preview.operation === "install"
                       ? "Save shortcut"
                       : "Remove shortcut"
-                    : "Done"}
+                    : ui("Done", "Готово")}
               </Button>
             ) : null}
             <Button variant="ghost" disabled={actionBusy} onClick={() => setPreview(null)}>
-              Cancel
+              {ui("Cancel", "Отмена")}
             </Button>
           </div>
         </>
@@ -243,7 +245,7 @@ export function CaptureShortcutConfig({
         </p>
       ) : null}
       <details className="text-xs text-muted-foreground">
-        <summary className="cursor-pointer">Advanced</summary>
+        <summary className="cursor-pointer">{ui("Advanced", "Дополнительно")}</summary>
         <div className="mt-3 space-y-3">
           {error?.detail || result?.warning ? (
             <div className="space-y-1">
@@ -316,7 +318,7 @@ export function CaptureShortcutConfig({
               if (state.shortcutBinding) copyToClipboard(state.shortcutBinding);
             }}
           >
-            {isCopied ? "Copied" : "Copy shortcut"}
+            {isCopied ? ui("Copied", "Скопировано") : "Copy shortcut"}
           </Button>
           <p>
             Turn capture off in T3 Code to stop it. Remove the shortcut from {desktop} to free up

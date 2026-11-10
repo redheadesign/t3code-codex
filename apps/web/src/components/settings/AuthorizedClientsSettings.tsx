@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { AUTH_SCOPE_OPTIONS as PAIRING_SCOPE_OPTIONS } from "@t3tools/shared/authScopeOptions";
 import { PlusIcon, QrCodeIcon } from "lucide-react";
 import { type ReactNode, memo, useId, useState } from "react";
@@ -143,6 +144,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
   onRevoke,
   canRevoke,
 }: PairingLinkListRowProps) {
+  const ui = useUiText();
   const nowMs = useNowSecond();
   const expiresAtMs = new Date(pairingLink.expiresAt).getTime();
   const [isRevealDialogOpen, setIsRevealDialogOpen] = useState(false);
@@ -313,7 +315,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
               onClick={() => setIsQrPanelOpen((open) => !open)}
             >
               <QrCodeIcon aria-hidden />
-              Share
+              {ui("Share", "Доступ")}
             </Button>
           ) : null}
           <Dialog
@@ -331,7 +333,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
               )
             ) : (
               <DialogTrigger render={<Button size="xs" variant="outline" />}>
-                {shareablePairingUrl ? "Show link" : "Show code"}
+                {shareablePairingUrl ? "Show link" : ui("Show code", "Показать код")}
               </DialogTrigger>
             )}
             <DialogPopup className="max-w-md">
@@ -340,8 +342,8 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                   {isRevealValueUrl
                     ? isRevealValueHostedAppPairingUrl
                       ? "Hosted app pairing link"
-                      : "Pairing link"
-                    : "Pairing code"}
+                      : ui("Pairing link", "Ссылка для связи")
+                    : ui("Pairing code", "Код связи")}
                 </DialogTitle>
                 <DialogDescription>
                   {isRevealValueUrl
@@ -373,7 +375,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
               </DialogPanel>
               <DialogFooter variant="bare">
                 <Button variant="outline" onClick={() => setIsRevealDialogOpen(false)}>
-                  Done
+                  {ui("Done", "Готово")}
                 </Button>
                 {canCopyToClipboard ? (
                   <Button variant="outline" onClick={handleCopyCode}>
@@ -389,7 +391,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             disabled={!canRevoke || revokingPairingLinkId === pairingLink.id}
             onClick={() => void onRevoke(pairingLink.id)}
           >
-            {revokingPairingLinkId === pairingLink.id ? "Revoking…" : "Revoke"}
+            {revokingPairingLinkId === pairingLink.id ? "Revoking…" : ui("Revoke", "Отозвать")}
           </Button>
         </div>
       </div>
@@ -455,7 +457,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                 className="shrink-0"
                 onClick={() => copyPairingValue(qrPairingUrl, copyKindForUrl(qrPairingUrl))}
               >
-                Copy link
+                {ui("Copy link", "Копировать")}
               </Button>
             </div>
             <Button size="xs" variant="ghost" onClick={handleCopyCode}>
@@ -499,6 +501,7 @@ const ConnectedClientListRow = memo(function ConnectedClientListRow({
   onRevokeSession,
   canRevoke,
 }: ConnectedClientListRowProps) {
+  const ui = useUiText();
   const nowMs = useNowSecond();
   const isLive = clientSession.current || clientSession.connected;
   const lastConnectedAt = clientSession.lastConnectedAt;
@@ -557,7 +560,9 @@ const ConnectedClientListRow = memo(function ConnectedClientListRow({
               disabled={!canRevoke || revokingClientSessionId === clientSession.sessionId}
               onClick={() => void onRevokeSession(clientSession.sessionId)}
             >
-              {revokingClientSessionId === clientSession.sessionId ? "Revoking…" : "Revoke"}
+              {revokingClientSessionId === clientSession.sessionId
+                ? "Revoking…"
+                : ui("Revoke", "Отозвать")}
             </Button>
           ) : null}
         </div>
@@ -581,6 +586,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
   onRevokeOtherClients,
   delegatableScopes,
 }: AuthorizedClientsHeaderActionProps) {
+  const ui = useUiText();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const pairingDenial = managedCapabilityDenial(usePrimaryManagedPolicy(), "remoteClients");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -644,7 +650,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
         <ManagedControl reason={pairingDenial}>
           <Button size="xs" variant="default" disabled>
             <PlusIcon className="size-3" />
-            Create link
+            {ui("Create link", "Создать ссылку")}
           </Button>
         </ManagedControl>
       ) : null}
@@ -665,7 +671,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
             render={
               <Button size="xs" variant="default">
                 <PlusIcon className="size-3" />
-                Create link
+                {ui("Create link", "Создать ссылку")}
               </Button>
             }
           />
@@ -694,7 +700,9 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-medium text-foreground">Permissions</h3>
+                  <h3 className="text-xs font-medium text-foreground">
+                    {ui("Permissions", "Права")}
+                  </h3>
                   <p className="text-xs text-muted-foreground">
                     Limit what the paired client can do.
                   </p>
@@ -715,7 +723,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
                       )
                     }
                   >
-                    Read only
+                    {ui("Read only", "Чтение")}
                   </Button>
                   <Button
                     size="xs"
@@ -729,7 +737,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
                       )
                     }
                   >
-                    Standard
+                    {ui("Standard", "Обычный")}
                   </Button>
                 </div>
               </div>
@@ -771,13 +779,15 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
               disabled={isCreatingPairingLink}
               onClick={() => setDialogOpen(false)}
             >
-              Cancel
+              {ui("Cancel", "Отмена")}
             </Button>
             <Button
               disabled={isCreatingPairingLink || selectedScopes.length === 0}
               onClick={() => void handleCreatePairingLink()}
             >
-              {isCreatingPairingLink ? "Creating…" : "Create link"}
+              {isCreatingPairingLink
+                ? ui("Creating…", "Создаём…")
+                : ui("Create link", "Создать ссылку")}
             </Button>
           </DialogFooter>
         </DialogPopup>
@@ -870,6 +880,7 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
   onDisableTailscaleServe,
   isUpdatingTailscaleServe,
 }: AdvertisedEndpointListRowProps) {
+  const ui = useUiText();
   const isAvailable = endpoint.status === "available";
   const needsTailscaleSetup = isTailscaleHttpsEndpoint(endpoint) && endpoint.status !== "available";
   const canDisableTailscaleServe =
@@ -907,7 +918,7 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
         <div className="ml-auto flex min-h-7 shrink-0 items-center justify-end gap-2">
           {isDefault ? (
             <span className="inline-flex h-6 items-center rounded-md border border-primary/30 bg-primary/10 px-1.5 text-3xs text-primary">
-              Default
+              {ui("Default", "По умолчанию")}
             </span>
           ) : null}
           {needsTailscaleSetup ? (
@@ -929,7 +940,7 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
               onClick={() => onDisableTailscaleServe(endpoint)}
               disabled={isUpdatingTailscaleServe}
             >
-              {isUpdatingTailscaleServe ? "Restarting…" : "Disable"}
+              {isUpdatingTailscaleServe ? "Restarting…" : ui("Disable", "Выключить")}
             </Button>
           ) : null}
           {!needsTailscaleSetup && !isDefault ? (
@@ -956,6 +967,7 @@ export function NetworkAccessDescription({
   onToggleExpanded: () => void;
   fallback: ReactNode;
 }) {
+  const ui = useUiText();
   if (!endpoint) {
     return fallback;
   }
@@ -965,7 +977,7 @@ export function NetworkAccessDescription({
       <span className="min-w-0 truncate">{endpoint.httpBaseUrl}</span>
       {hiddenEndpointCount > 0 ? (
         <span className="shrink-0 text-xs font-medium">
-          {expanded ? "Hide" : `+${hiddenEndpointCount}`}
+          {expanded ? ui("Hide", "Скрыть") : `+${hiddenEndpointCount}`}
         </span>
       ) : null}
     </>

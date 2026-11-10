@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useComposerMenuState } from "../chat/useComposerMenuState";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
@@ -261,6 +262,7 @@ function ProjectDetail({
   allMembers: ReadonlyArray<SidebarProjectGroupMember>;
   hasOtherMembers: boolean;
 }) {
+  const ui = useUiText();
   const navigate = useNavigate({ from: "/settings" });
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { environments } = useEnvironments();
@@ -426,7 +428,7 @@ function ProjectDetail({
           onClick={() => void removeMembers([member])}
           aria-label={`Remove checkout ${member.workspaceRoot}`}
         >
-          Remove
+          {ui("Remove", "Убрать")}
         </Button>
       ) : null}
     </div>
@@ -512,7 +514,7 @@ function ProjectDetail({
             Can't find a setting? Keep this project picked above and hop to any other settings page.
           </AlertDescription>
         </Alert>
-        <SettingsSection id="project-overview" title="Project" hideTitle>
+        <SettingsSection id="project-overview" title={ui("Project", "Проект")} hideTitle>
           {!canEditGroup ? (
             <p className="px-3 py-2 text-sm text-muted-foreground sm:px-4">
               {group.memberProjects.length > 1
@@ -521,7 +523,7 @@ function ProjectDetail({
             </p>
           ) : null}
           <SettingsRow
-            title="Name"
+            title={ui("Name", "Имя")}
             description="The shared name for this project group in the sidebar and thread lists."
             resetAction={
               canResetScratchTitle ? (
@@ -626,7 +628,7 @@ function ProjectDetail({
                 }
               />
               <SettingsRow
-                title="Archive"
+                title={ui("Archive", "Архив")}
                 description={
                   group.archived
                     ? "Hidden from project pickers. Threads and files are kept."
@@ -646,7 +648,7 @@ function ProjectDetail({
                       )
                     }
                   >
-                    {group.archived ? "Unarchive" : "Archive"}
+                    {group.archived ? ui("Unarchive", "Вернуть") : ui("Archive", "Архив")}
                   </Button>
                 }
               />
@@ -663,7 +665,7 @@ function ProjectDetail({
                 ? "Remove checkout"
                 : group.memberProjects.length > 1
                   ? "Remove this project everywhere"
-                  : "Remove project"
+                  : ui("Remove project", "Удалить проект")
             }
             description={
               hasOtherMembers
@@ -684,7 +686,7 @@ function ProjectDetail({
                   ? "Remove checkout"
                   : group.memberProjects.length > 1
                     ? "Remove all entries"
-                    : "Remove project"}
+                    : ui("Remove project", "Удалить проект")}
               </Button>
             }
           />

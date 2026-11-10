@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 
 import { DraftProjectName } from "./chat/DraftProjectName";
@@ -51,6 +52,7 @@ export function ProjectPicker<Item extends ProjectPickerItem>({
   onHighlightedKeyDown?: (event: KeyboardEvent<HTMLInputElement>, item: Item) => void;
   triggerRef?: Ref<HTMLButtonElement>;
 }) {
+  const ui = useUiText();
   const [query, setQuery] = useState("");
   const highlighted = useRef<Item | null>(null);
   const filter = useComboboxFilter();
@@ -105,8 +107,8 @@ export function ProjectPicker<Item extends ProjectPickerItem>({
       </Tooltip>
       <ComboboxPopup align={align} className="w-72 overflow-hidden">
         <ComboboxSearchInput
-          aria-label="Search projects"
-          placeholder="Search projects"
+          aria-label={ui("Search projects", "Поиск проектов")}
+          placeholder={ui("Search projects", "Поиск проектов")}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   AuthPreviewOperateScope,
   type PreviewAnnotationPayload,
@@ -31,6 +32,7 @@ export function PreviewPanel({
   visible,
   onSendAnnotation,
 }: Props) {
+  const ui = useUiText();
   const available = usePreviewAvailable(threadRef.environmentId);
   const canOperatePreview = useEnvironmentScope(threadRef.environmentId, AuthPreviewOperateScope);
   if (!canOperatePreview || !available) {
@@ -39,8 +41,14 @@ export function PreviewPanel({
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p className="max-w-sm text-sm text-muted-foreground">
             {canOperatePreview
-              ? "Preview is only available in the T3 Code desktop app."
-              : "Pair this client again with preview access to control browser previews."}
+              ? ui(
+                  "Preview is only available in the T3 Code desktop app.",
+                  "Превью доступно в приложении T3 Code.",
+                )
+              : ui(
+                  "Pair this client again with preview access to control browser previews.",
+                  "Подключитесь заново с правом на превью.",
+                )}
           </p>
         </div>
       </PreviewPanelShell>

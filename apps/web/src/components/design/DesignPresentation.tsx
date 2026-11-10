@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useState, useEffect, type CSSProperties } from "react";
 import { ArrowLeftIcon, RotateCcwIcon } from "lucide-react";
 import { useStableCallback } from "../../hooks/useStableCallback";
@@ -17,6 +18,7 @@ export function DesignPresentation({
   startId: string;
   onClose: () => void;
 }) {
+  const ui = useUiText();
   const [frames, setFrames] = useState<readonly string[]>([startId]);
   const [overlays, setOverlays] = useState<
     readonly { nodeId: string; interaction: DesignInteraction }[]
@@ -208,7 +210,7 @@ export function DesignPresentation({
             type="button"
             className="absolute inset-0"
             style={backdrop}
-            aria-label="Dismiss overlay"
+            aria-label={ui("Dismiss overlay", "Закрыть оверлей")}
             onClick={() => setOverlays((items) => items.slice(0, -1))}
           />
         ) : (
@@ -254,7 +256,7 @@ export function DesignPresentation({
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label="Previous frame"
+              aria-label={ui("Previous frame", "Прошлый фрейм")}
               disabled={frames.length < 2 && !overlays.length}
               onClick={back}
             >
@@ -264,7 +266,7 @@ export function DesignPresentation({
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label="Restart prototype"
+              aria-label={ui("Restart prototype", "Прототип с начала")}
               onClick={() => {
                 setFrames([startId]);
                 setOverlays([]);
@@ -274,7 +276,10 @@ export function DesignPresentation({
               <RotateCcwIcon />
             </Button>
             <span className="text-xs text-muted-foreground">
-              Click connected layers to navigate · ← Back
+              {ui(
+                "Click connected layers to navigate · ← Back",
+                "Клик по слою для перехода · ← Назад",
+              )}
             </span>
           </div>
           <DesignPrototypeStage width={viewportWidth} height={viewportHeight} settings={settings}>
@@ -315,7 +320,7 @@ export function DesignPresentation({
                   ) : null}
                 </div>
               ) : (
-                <p role="status">This frame is unavailable.</p>
+                <p role="status">{ui("This frame is unavailable.", "Фрейм недоступен.")}</p>
               )}
             </div>
             {overlays.map((entry) => renderOverlay(entry))}

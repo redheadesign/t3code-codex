@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   EnvironmentId,
   GUEST_MESSAGE_MAX_LENGTH,
@@ -672,6 +673,7 @@ function GuestComposer({
   readonly shareId: GuestShareView["shareId"];
   readonly model: GuestThreadModel;
 }) {
+  const ui = useUiText();
   const [text, setText] = useState("");
   const [files, setFiles] = useState<ReadonlyArray<StagedFile>>([]);
   const [sending, setSending] = useState(false);
@@ -802,7 +804,10 @@ function GuestComposer({
             event.target.value = "";
           }}
         />
-        <ComposerControl aria-label="Attach files" onClick={() => fileInputRef.current?.click()}>
+        <ComposerControl
+          aria-label={ui("Attach files", "Приложить файлы")}
+          onClick={() => fileInputRef.current?.click()}
+        >
           <ComposerControlIcon icon={PaperclipIcon} />
         </ComposerControl>
         <GuestModelLabel model={model} />
@@ -817,7 +822,7 @@ function GuestComposer({
         )}
         <button
           type="submit"
-          aria-label="Send"
+          aria-label={ui("Send", "Отправить")}
           disabled={sending || (text.trim() === "" && files.length === 0)}
           className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-black shadow-xs hover:bg-white focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:bg-white disabled:text-black"
         >

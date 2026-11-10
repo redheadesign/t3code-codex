@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import {
@@ -23,6 +24,7 @@ export function DesignReactPasteDialog({
   onImport: (document: DesignDocument) => void;
   onClose: () => void;
 }) {
+  const ui = useUiText();
   const [code, setCode] = useState("");
   const [width, setWidth] = useState(Math.min(8192, Math.max(16, viewport.width)));
   const [height, setHeight] = useState(Math.min(8192, Math.max(16, viewport.height)));
@@ -63,23 +65,26 @@ export function DesignReactPasteDialog({
     >
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>Paste as React</DialogTitle>
+          <DialogTitle>{ui("Paste as React", "Вставить React")}</DialogTitle>
           <DialogDescription>
-            Paste JSX or a default component. The rendered result becomes editable layers.
+            {ui(
+              "Paste JSX or a default component. The rendered result becomes editable layers.",
+              "Вставьте JSX или компонент с default export. Результат станет слоями.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <fieldset disabled={busy} className="min-w-0 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <DesignNumberField
-                label="Viewport width"
+                label={ui("Viewport width", "Ширина окна")}
                 value={width}
                 onChange={setWidth}
                 min={16}
                 max={8192}
               />
               <DesignNumberField
-                label="Viewport height"
+                label={ui("Viewport height", "Высота окна")}
                 value={height}
                 onChange={setHeight}
                 min={16}
@@ -87,10 +92,10 @@ export function DesignReactPasteDialog({
               />
             </div>
             <label className="grid gap-2 text-xs">
-              React code
+              {ui("React code", "Код React")}
               <textarea
                 autoFocus
-                aria-label="React code"
+                aria-label={ui("React code", "Код React")}
                 spellCheck={false}
                 autoCapitalize="off"
                 autoComplete="off"
@@ -110,16 +115,16 @@ export function DesignReactPasteDialog({
           ) : null}
           {busy ? (
             <p role="status" className="mt-3 text-xs text-muted-foreground">
-              Rendering React and collecting images…
+              {ui("Rendering React and collecting images…", "Собираем слои и изображения…")}
             </p>
           ) : null}
         </DialogPanel>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {ui("Cancel", "Отмена")}
           </Button>
           <Button disabled={busy || !code.trim()} onClick={() => void submit()}>
-            {busy ? "Importing…" : "Import to canvas"}
+            {busy ? ui("Importing…", "Импорт…") : ui("Import to canvas", "Импорт на холст")}
           </Button>
         </DialogFooter>
       </DialogPopup>

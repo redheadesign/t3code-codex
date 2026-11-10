@@ -64,7 +64,9 @@ export const layer = McpToolAccess.toLayer(TaskBoardToolkit, {
   t3_task_board: McpToolAccess.reads(
     Effect.fn("mcp.readTaskBoard")(function* (input) {
       const { context, projectId, service } = yield* target(input.projectId);
-      const board = yield* service.read(projectId).pipe(Effect.mapError(boardFailure));
+      const board = yield* service
+        .read(projectId, { taskId: input.taskId })
+        .pipe(Effect.mapError(boardFailure));
       const currentTask = board.tasks.find((task) => task.threadId === context.caller?.id);
       const selected =
         input.taskId === undefined
@@ -97,6 +99,13 @@ export const layer = McpToolAccess.toLayer(TaskBoardToolkit, {
                   .slice(-8)
                   .map((comment) => ({ ...comment, body: comment.body.slice(0, 1_000) })),
                 activity: selected.activity.slice(-8),
+                ...(selected.initialBrief === undefined
+                  ? {}
+                  : { initialBrief: selected.initialBrief.slice(0, 8_000) }),
+                ...(selected.links === undefined ? {} : { links: selected.links.slice(-16) }),
+                ...(selected.threadHistory === undefined
+                  ? {}
+                  : { threadHistory: selected.threadHistory.slice(-16) }),
               },
         currentTaskId: currentTask?.id ?? null,
         nextOffset: offset + PAGE_SIZE < tasks.length ? offset + PAGE_SIZE : null,

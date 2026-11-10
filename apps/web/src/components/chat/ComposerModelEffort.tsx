@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   buildTraitsTriggerDisplay,
   getDescriptorStringValue,
@@ -184,6 +185,7 @@ function ColumnRow(props: {
   disabled?: boolean;
   onPick: () => void;
 }) {
+  const ui = useUiText();
   const rowProps = {
     type: "button",
     role: "radio",
@@ -202,11 +204,13 @@ function ColumnRow(props: {
       <span className="min-w-0 flex-1 truncate">{props.label}</span>
       {props.selected ? (
         <>
-          {props.isDefault ? <span className="sr-only">Default</span> : null}
+          {props.isDefault ? (
+            <span className="sr-only">{ui("Default", "По умолчанию")}</span>
+          ) : null}
           <CheckIcon aria-hidden="true" className="size-3.5" />
         </>
       ) : props.isDefault ? (
-        <span className="text-muted-foreground/70 text-xs">Default</span>
+        <span className="text-muted-foreground/70 text-xs">{ui("Default", "По умолчанию")}</span>
       ) : null}
     </>
   );
@@ -297,6 +301,7 @@ function EffortLevels(props: { traits: TraitsSelectionInput }) {
 type TraitsSelection = ReturnType<typeof useTraitsSelection>;
 
 function EffortRows(props: { control: ColumnControl; traits: TraitsSelection; locked: boolean }) {
+  const ui = useUiText();
   const { control, traits } = props;
   const { descriptor } = control;
   if (control.kind === "boolean") {
@@ -305,7 +310,7 @@ function EffortRows(props: { control: ColumnControl; traits: TraitsSelection; lo
         {([true, false] as const).map((value) => (
           <ColumnRow
             key={String(value)}
-            label={value ? "On" : "Off"}
+            label={value ? ui("On", "Вкл.") : ui("Off", "Выкл.")}
             selected={(control.descriptor.currentValue === true) === value}
             tabStop={(control.descriptor.currentValue === true) === value}
             onPick={() => traits.changeBoolean(descriptor.id, value)}
@@ -364,6 +369,7 @@ function OptionMenuRow(props: {
   /** Holds the column's tab stop when the model has no levels. */
   tabStop: boolean;
 }) {
+  const ui = useUiText();
   const { descriptor, traits } = props;
   const [open, setOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -445,7 +451,9 @@ function OptionMenuRow(props: {
                   ) : null}
                 </span>
                 {choice.isDefault ? (
-                  <span className="text-muted-foreground/70 text-xs">Default</span>
+                  <span className="text-muted-foreground/70 text-xs">
+                    {ui("Default", "По умолчанию")}
+                  </span>
                 ) : null}
                 <MenuRadioItemIndicator />
               </span>
@@ -481,8 +489,11 @@ function OptionSwitchRow(props: {
 }
 
 function NoEffortRow() {
+  const ui = useUiText();
   return (
-    <div className="flex h-8 items-center px-2 text-muted-foreground text-sm">No effort levels</div>
+    <div className="flex h-8 items-center px-2 text-muted-foreground text-sm">
+      {ui("No effort levels", "Нет уровней анализа")}
+    </div>
   );
 }
 
@@ -491,6 +502,7 @@ function CompactEffortControls(props: {
   modelLabel: string;
   onChooseModel: () => void;
 }) {
+  const ui = useUiText();
   const traits = useTraitsSelection(props.traits);
   const { effort, others } = columnControls(
     props.traits.provider,
@@ -534,7 +546,11 @@ function CompactEffortControls(props: {
         <Button
           variant={fast ? "ghost" : "ghost-muted"}
           size="icon-sm"
-          aria-label={fast ? "Turn off fast mode" : "Turn on fast mode"}
+          aria-label={
+            fast
+              ? ui("Turn off fast mode", "Отключить быстрый режим")
+              : ui("Turn on fast mode", "Включить быстрый режим")
+          }
           aria-pressed={fast}
           disabled={!canToggleSpeed || traits.modelIsUnavailable}
           onClick={() => {
@@ -565,7 +581,7 @@ function CompactEffortControls(props: {
         <Button
           variant="ghost-muted"
           size="icon-sm"
-          aria-label="Reset reasoning level"
+          aria-label={ui("Reset reasoning level", "Сбросить глубину")}
           disabled={!defaultChoice || locked || defaultChoice.id === value}
           onClick={() => {
             if (descriptor && defaultChoice) traits.changeSelect(descriptor, defaultChoice.id);
@@ -618,7 +634,7 @@ function CompactEffortControls(props: {
         </div>
       ) : (
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          No adjustable reasoning levels
+          {ui("No adjustable reasoning levels", "Глубина фиксирована")}
         </p>
       )}
       {locked && traits.ultrathinkInBodyText ? (
@@ -737,6 +753,7 @@ function SpeedSegment(props: {
 }
 
 function SpeedControl(props: { traits: TraitsSelectionInput; compact?: boolean }) {
+  const ui = useUiText();
   const traits = useTraitsSelection(props.traits);
   const { speedSelect, fastToggle } = splitSpeed(
     props.traits.provider,
@@ -767,7 +784,7 @@ function SpeedControl(props: { traits: TraitsSelectionInput; compact?: boolean }
               <SpeedSegment
                 key={String(value)}
                 checked={(fastToggle.currentValue === true) === value}
-                label={value ? "Fast" : "Standard"}
+                label={value ? ui("Fast", "Быстро") : ui("Standard", "Обычный")}
                 onPick={() => traits.changeBoolean(fastToggle.id, value)}
               />
             ))

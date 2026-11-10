@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import type { ChatFileAttachment } from "../../types";
 import { BlocksIcon, DownloadIcon, SparklesIcon } from "lucide-react";
 
@@ -45,6 +46,7 @@ export function ResourceAttachmentCard({
   readonly onOpen: () => void;
   readonly onDownload: () => void;
 }) {
+  const ui = useUiText();
   const meta = RESOURCE_ATTACHMENT_META[kind];
   const label = file.source?._tag === "pasted-text" ? "Pasted text" : file.name;
   const isPending = file.downloadable === false;
@@ -78,13 +80,20 @@ export function ResourceAttachmentCard({
               {meta.label}
             </Badge>
             <span className="truncate">
-              {isPending ? "Sending…" : `${meta.description} · ${formatBytes(file.sizeBytes)}`}
+              {isPending
+                ? ui("Sending…", "Отправляем…")
+                : `${meta.description} · ${formatBytes(file.sizeBytes)}`}
             </span>
           </span>
         </span>
       </button>
       {isPending ? (
-        <Button size="icon-xs" variant="ghost-muted" disabled aria-label="Sending attachment">
+        <Button
+          size="icon-xs"
+          variant="ghost-muted"
+          disabled
+          aria-label={ui("Sending attachment", "Отправляем файл")}
+        >
           <DownloadIcon />
         </Button>
       ) : (

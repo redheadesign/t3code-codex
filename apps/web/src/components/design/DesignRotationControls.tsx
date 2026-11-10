@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { RotateCwIcon, FlipHorizontalIcon, FlipVerticalIcon } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 
@@ -10,8 +11,13 @@ export function DesignRotationControls({
   onFlip: (axis: "horizontal" | "vertical") => void;
   disabled?: boolean;
 }) {
+  const ui = useUiText();
   return (
-    <div className="flex h-7 rounded-md bg-input/25" role="group" aria-label="Transform layers">
+    <div
+      className="flex h-7 rounded-md bg-input/25"
+      role="group"
+      aria-label={ui("Transform layers", "Трансформация")}
+    >
       {(
         [
           ["Rotate 90° clockwise", RotateCwIcon, onRotate],

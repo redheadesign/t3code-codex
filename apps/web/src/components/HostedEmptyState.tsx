@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAuth } from "@clerk/react";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
@@ -64,6 +65,7 @@ export function HostedEmptyState() {
 }
 
 function T3ConnectSteps() {
+  const ui = useUiText();
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
   // Adding the first computer unmounts this screen. Wait for all health checks
@@ -83,7 +85,7 @@ function T3ConnectSteps() {
           </p>
         ) : (
           <Button size="sm" disabled={!isLoaded} onClick={openAuthPrompt}>
-            Sign in
+            {ui("Sign in", "Войти")}
           </Button>
         )}
       </SetupStep>

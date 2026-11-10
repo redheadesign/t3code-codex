@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { PlusIcon, SearchIcon } from "lucide-react";
 
@@ -68,6 +69,7 @@ export function PullRequestListEmptyState({
   onLoadMore: () => void;
   onRefresh: () => void;
 }) {
+  const ui = useUiText();
   if (!hasProjects) {
     return (
       <Empty>
@@ -81,7 +83,7 @@ export function PullRequestListEmptyState({
         <EmptyContent>
           <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
             <PlusIcon className="size-3.5" />
-            Add project
+            {ui("Add project", "Добавить проект")}
           </Button>
         </EmptyContent>
       </Empty>
@@ -112,11 +114,11 @@ export function PullRequestListEmptyState({
         <div className="flex flex-wrap justify-center gap-2">
           <Button size="sm" variant="outline" onClick={onClearQuery}>
             <SearchIcon className="size-3.5" />
-            Clear search
+            {ui("Clear search", "Сбросить поиск")}
           </Button>
           <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
             <RefreshIcon size="sm" refreshing={refreshing} />
-            {refreshing ? "Checking..." : "Check again"}
+            {refreshing ? ui("Checking...", "Проверяем…") : "Check again"}
           </Button>
         </div>
       </Empty>
@@ -137,12 +139,12 @@ export function PullRequestListEmptyState({
       <div className="flex flex-wrap justify-center gap-2">
         {canLoadMore ? (
           <Button size="sm" variant="outline" disabled={loadingMore} onClick={onLoadMore}>
-            {loadingMore ? "Loading..." : "Load more pull requests"}
+            {loadingMore ? ui("Loading...", "Загрузка…") : "Load more pull requests"}
           </Button>
         ) : null}
         <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
           <RefreshIcon size="sm" refreshing={refreshing} />
-          {refreshing ? "Checking..." : "Check again"}
+          {refreshing ? ui("Checking...", "Проверяем…") : "Check again"}
         </Button>
       </div>
     </Empty>

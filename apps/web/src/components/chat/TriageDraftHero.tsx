@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { TRIAGE_CLI_COMMAND } from "~/hooks/useStartTriage";
 
@@ -12,6 +13,7 @@ export function TriageDraftHero(props: {
   readonly machineLabel: string | null;
   readonly serverVersion: string | null;
 }) {
+  const ui = useUiText();
   const { copyToClipboard, isCopied } = useCopyToClipboard({ timeout: 1500, target: "command" });
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
@@ -48,7 +50,7 @@ export function TriageDraftHero(props: {
               />
             }
           >
-            {isCopied ? "Copied" : "or run"}
+            {isCopied ? ui("Copied", "Скопировано") : "or run"}
             {isCopied ? null : <code className="ml-1 font-mono text-xs">{TRIAGE_CLI_COMMAND}</code>}
           </TooltipTrigger>
           <TooltipPopup side="bottom">Copy command, for a terminal</TooltipPopup>

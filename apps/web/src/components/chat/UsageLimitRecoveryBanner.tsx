@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   type OrchestrationV2LimitRecovery,
   type OrchestrationV2LimitRecoveryUpdate,
@@ -39,6 +40,7 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
 }
 
 function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: RecoveryProps) {
+  const ui = useUiText();
   const [pending, setPending] = useState(false);
 
   const scheduled =
@@ -86,7 +88,11 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
   return (
     <>
       <Button size="xs" variant="ghost" disabled={pending} onClick={() => void toggle("resume")}>
-        {pending ? "Saving..." : scheduled ? "Cancel auto-resume" : "Resume at reset"}
+        {pending
+          ? ui("Saving...", "Сохраняем…")
+          : scheduled
+            ? "Cancel auto-resume"
+            : "Resume at reset"}
       </Button>
       <Button
         size="xs"
@@ -94,7 +100,7 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
         disabled={pending || (!snoozed && resetPassed)}
         onClick={() => void toggle("snooze")}
       >
-        {pending ? "Saving..." : snoozed ? "Wake now" : "Snooze until reset"}
+        {pending ? ui("Saving...", "Сохраняем…") : snoozed ? "Wake now" : "Snooze until reset"}
       </Button>
     </>
   );

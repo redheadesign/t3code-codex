@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { normalizePreviewUrl } from "@t3tools/shared/preview";
 import { useRef, useState } from "react";
 import { previewBridge } from "../preview/previewBridge";
@@ -26,6 +27,7 @@ export function DesignWebsiteImport({
   onImport: (document: DesignDocument) => Promise<void>;
   onClose: () => void;
 }) {
+  const ui = useUiText();
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,9 +96,12 @@ export function DesignWebsiteImport({
     >
       <DialogPopup showCloseButton={!busy}>
         <DialogHeader>
-          <DialogTitle>Import website</DialogTitle>
+          <DialogTitle>{ui("Import website", "Импорт сайта")}</DialogTitle>
           <DialogDescription>
-            Capture the page as editable layers in a new design file.
+            {ui(
+              "Capture the page as editable layers in a new design file.",
+              "Перенесите страницу слоями в новый макет.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -107,7 +112,7 @@ export function DesignWebsiteImport({
         >
           <DialogPanel>
             <label className="grid gap-2 text-sm">
-              Website address
+              {ui("Website address", "Адрес сайта")}
               <Input
                 autoFocus
                 value={url}
@@ -128,10 +133,12 @@ export function DesignWebsiteImport({
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>
-              Cancel
+              {ui("Cancel", "Отмена")}
             </Button>
             <Button type="submit" disabled={busy || !url.trim()}>
-              {busy ? "Importing website" : "Import website"}
+              {busy
+                ? ui("Importing website", "Импорт сайта…")
+                : ui("Import website", "Импорт сайта")}
             </Button>
           </DialogFooter>
         </form>

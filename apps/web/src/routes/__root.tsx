@@ -14,6 +14,7 @@ import { Check, Copy } from "lucide";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { APP_DISPLAY_NAME, APP_VERSION } from "../branding";
+import { UiTextContext, uiTextByLanguage, useUiText } from "../i18n";
 import { AppSidebarLayout } from "../components/AppSidebarLayout";
 import { CommandPalette } from "../components/CommandPalette";
 import { CustomSnoozeDialogHost } from "../components/CustomSnoozeDialog";
@@ -114,29 +115,41 @@ export const Route = createRootRoute({
 });
 
 function RootRouteNotFoundView() {
+  const text = useUiText();
   return (
     <main className="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6">
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
-        <h1 className="text-lg font-medium text-foreground">Page not found</h1>
+        <h1 className="text-lg font-medium text-foreground">
+          {text("Page not found", "Нет страницы")}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          This link doesn't point to a page in {APP_DISPLAY_NAME}. Go home to choose a project or
-          start a thread.
+          {text(
+            `This link doesn't point to a page in ${APP_DISPLAY_NAME}. Go home to choose a project or start a thread.`,
+            "Откройте главную, чтобы выбрать проект или начать чат.",
+          )}
         </p>
-        <Button render={<Link to="/" replace />}>Go home</Button>
+        <Button render={<Link to="/" replace />}>{text("Go home", "Главная")}</Button>
       </div>
     </main>
   );
 }
 
 function RootRouteView() {
+  const language = useClientSettings((settings) => settings.interfaceLanguage);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Screen readers use the document language.
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
   // Above every branch: app services raise toasts for the whole page, so the surface they write to
   // must not unmount when the root switches branches (for example /welcome to the app shell).
   return (
-    <ToastProvider>
-      <AnchoredToastProvider>
-        <RootRouteBranch />
-      </AnchoredToastProvider>
-    </ToastProvider>
+    <UiTextContext value={uiTextByLanguage[language]}>
+      <ToastProvider>
+        <AnchoredToastProvider>
+          <RootRouteBranch />
+        </AnchoredToastProvider>
+      </ToastProvider>
+    </UiTextContext>
   );
 }
 
@@ -225,6 +238,7 @@ function RootRouteBranch() {
 }
 
 function RootRouteErrorView({ error }: ErrorComponentProps) {
+  const ui = useUiText();
   const router = useRouter();
   const message = errorMessage(error);
   // Router pathname rather than window.location: desktop uses hash history, where the window path is always "/".
@@ -237,7 +251,7 @@ function RootRouteErrorView({ error }: ErrorComponentProps) {
 
       <div className="mt-5 flex flex-wrap gap-2">
         <Button size="sm" onClick={() => void router.invalidate()}>
-          Try again
+          {ui("Try again", "Повторить")}
         </Button>
         <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
           Reload app
@@ -256,12 +270,13 @@ function RootRouteErrorView({ error }: ErrorComponentProps) {
 }
 
 function CopyErrorButton({ report }: { report: string }) {
+  const ui = useUiText();
   const { copyToClipboard, isCopied } = useCopyToClipboard({ target: "error-report" });
 
   return (
     <Button size="sm" variant="outline" onClick={() => copyToClipboard(report)}>
       <MorphIcon className={cn(isCopied && "text-success")} icon={isCopied ? Check : Copy} />
-      {isCopied ? "Copied" : "Copy error"}
+      {isCopied ? ui("Copied", "Скопировано") : "Copy error"}
     </Button>
   );
 }

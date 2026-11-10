@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import {
@@ -165,9 +166,10 @@ function EmptyAutomationState({
 }
 
 function LoadingAutomationState() {
+  const ui = useUiText();
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
-      Loading automations…
+      {ui("Loading automations…", "Загрузка автозадач…")}
     </div>
   );
 }
@@ -268,6 +270,7 @@ function AutomationListRow({
   canOperate: boolean;
   busy: boolean;
 }) {
+  const ui = useUiText();
   return (
     <li>
       <div
@@ -316,7 +319,7 @@ function AutomationListRow({
           <MenuPopup align="end">
             <MenuItem disabled={busy || !canOperate} onClick={onEdit}>
               <PencilIcon />
-              Edit automation
+              {ui("Edit automation", "Править автозадачу")}
             </MenuItem>
             {task.schedule.type === "webhook" ? null : (
               <MenuItem
@@ -374,6 +377,7 @@ function AutomationSidebar({
   error: string | null;
   environmentState: "ready" | "connecting" | "unavailable";
 }) {
+  const ui = useUiText();
   const active = tasks.filter((task) => task.enabled);
   const paused = tasks.filter((task) => !task.enabled);
   const list = (title: string, entries: ReadonlyArray<ScheduledTask>) =>
@@ -413,7 +417,9 @@ function AutomationSidebar({
     >
       <div className="border-b border-sidebar-border/70 p-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="min-w-0 truncate text-base font-semibold tracking-tight">Automations</h2>
+          <h2 className="min-w-0 truncate text-base font-semibold tracking-tight">
+            {ui("Automations", "Автозадачи")}
+          </h2>
           <div className="flex shrink-0 items-center gap-0.5">
             <Button
               size="icon-sm"
@@ -476,7 +482,7 @@ function AutomationSidebar({
             className="px-3 py-6 text-center text-xs leading-5 text-muted-foreground"
             role="status"
           >
-            Loading automations…
+            {ui("Loading automations…", "Загрузка автозадач…")}
           </p>
         ) : error ? (
           <div
@@ -485,7 +491,7 @@ function AutomationSidebar({
           >
             <p>Unable to load automations.</p>
             <Button size="xs" variant="outline" onClick={onRefresh}>
-              Retry
+              {ui("Retry", "Повторить")}
             </Button>
           </div>
         ) : environmentId === undefined ? (
@@ -519,6 +525,7 @@ function AutomationPreview({
   task: ScheduledTask;
   environmentId: EnvironmentId;
 }) {
+  const ui = useUiText();
   return (
     <div className="scrollbar-gutter-both flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-8">
       <div className="mx-auto flex w-full max-w-(--chat-content-max-width) flex-1 flex-col justify-center gap-5">
@@ -559,7 +566,7 @@ function AutomationPreview({
             to="/$environmentId/$threadId"
             params={{ environmentId, threadId: task.threadId }}
           >
-            Open thread
+            {ui("Open thread", "Открыть чат")}
           </Link>
         ) : null}
       </div>
@@ -578,6 +585,7 @@ function AutomationMain({
 }
 
 export function AutomationsWorkspace({ target }: { target: AutomationsSearch }) {
+  const ui = useUiText();
   const navigate = useNavigate();
   const { environments } = useEnvironments();
   const connected = environments.filter(
@@ -769,7 +777,7 @@ export function AutomationsWorkspace({ target }: { target: AutomationsSearch }) 
       <main
         data-workspace-area="automations"
         data-workspace-order={1}
-        aria-label="Automations"
+        aria-label={ui("Automations", "Автозадачи")}
         tabIndex={-1}
         className={cn(
           "flex min-h-0 min-w-0 flex-1 flex-col",
@@ -838,11 +846,18 @@ export function AutomationsWorkspace({ target }: { target: AutomationsSearch }) 
                 size="xs"
                 variant="ghost-muted"
                 disabled={!canOperate || busyTaskId !== null}
-                title={!canOperate ? "You do not have permission to edit automations." : undefined}
+                title={
+                  !canOperate
+                    ? ui(
+                        "You do not have permission to edit automations.",
+                        "Нет прав на изменение автозадач.",
+                      )
+                    : undefined
+                }
                 onClick={() => openEditor(selectedTask)}
               >
                 <PencilIcon />
-                Edit
+                {ui("Edit", "Править")}
               </Button>
               {selectedTask.schedule.type === "webhook" ? null : (
                 <Button
@@ -891,7 +906,7 @@ export function AutomationsWorkspace({ target }: { target: AutomationsSearch }) 
           >
             <p>{tasksQuery.error}</p>
             <Button size="xs" variant="outline" onClick={refresh}>
-              Retry
+              {ui("Retry", "Повторить")}
             </Button>
           </div>
         ) : tasksQuery.data === null && tasksQuery.isPending ? (

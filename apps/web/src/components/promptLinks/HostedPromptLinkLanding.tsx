@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   type LinkedPrompt,
   parseNewThreadLink,
@@ -120,6 +121,7 @@ function HostedPromptLinkLanding({
   readonly openInAppRemembered: boolean;
   readonly onChoose: (choice: "app" | "browser", remember: boolean) => void;
 }) {
+  const ui = useUiText();
   const summary = summarize(appPath);
   const [remember, setRemember] = useState(false);
   const deepLink = promptLinkDeepLink(appPath);
@@ -136,7 +138,10 @@ function HostedPromptLinkLanding({
   if (!summary.ok) {
     return (
       <StandalonePage>
-        <StandalonePageHeader title="Could not open the link" description={summary.error} />
+        <StandalonePageHeader
+          title={ui("Could not open the link", "Ссылка не открылась")}
+          description={summary.error}
+        />
       </StandalonePage>
     );
   }

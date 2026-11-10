@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { memo, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
@@ -89,6 +90,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   onAfterClose,
   composer,
 }: ExpandedImageDialogProps) {
+  const ui = useUiText();
   const [imageOffset, setImageOffset] = useState(0);
   const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
   const [accessibilityDetailsSrc, setAccessibilityDetailsSrc] = useState<string | null>(null);
@@ -237,7 +239,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             size="icon"
             variant="media-navigation"
             className="left-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="Previous media"
+            aria-label={ui("Previous media", "Предыдущее")}
             onClick={() => navigateImage(-1)}
           >
             <ChevronLeftIcon className="size-5" />
@@ -262,8 +264,11 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
                 <ExpandedMediaFailure>
                   <p>
                     {openOriginalLink
-                      ? "This image could not be loaded."
-                      : "Image unavailable. The file may have been moved or deleted."}
+                      ? ui("This image could not be loaded.", "Не загрузилось")
+                      : ui(
+                          "Image unavailable. The file may have been moved or deleted.",
+                          "Изображение недоступно. Возможно, файл переместили или удалили.",
+                        )}
                   </p>
                   {openOriginalLink}
                 </ExpandedMediaFailure>
@@ -330,7 +335,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             size="icon"
             variant="media-navigation"
             className="right-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="Next media"
+            aria-label={ui("Next media", "Следующее")}
             onClick={() => navigateImage(1)}
           >
             <ChevronRightIcon className="size-5" />

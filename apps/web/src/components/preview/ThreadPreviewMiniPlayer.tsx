@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { FILL_PREVIEW_VIEWPORT, type ScopedThreadRef } from "@t3tools/contracts";
 import { previewPdfAssetUrl } from "@t3tools/shared/preview";
 import { useEnvironmentHttpBaseUrl } from "~/state/environments";
@@ -204,6 +205,7 @@ export function ThreadPreviewMiniPlayer({ threadRef, miniPlayer }: Props) {
 }
 
 function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly tabId: string }) {
+  const ui = useUiText();
   const httpBaseUrl = useEnvironmentHttpBaseUrl(threadRef.environmentId);
   const { serverEpoch, snapshot, desktopOverlay, serverTab, sourceSize } =
     useBrowserMiniPlayerSource(threadRef, tabId);
@@ -265,7 +267,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
       threadRef={threadRef}
       miniPlayer={miniPlayer}
       sourceSize={sourceSize}
-      label="Floating browser preview"
+      label={ui("Floating browser preview", "Плавающее превью")}
       recording={recording}
       openOnContentClick
       onOpenInPanel={openInPanel}
@@ -278,7 +280,9 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
                   variant={poppedOut ? "secondary" : "ghost"}
                   size="icon-xs"
                   aria-label={
-                    poppedOut ? "Close popped-out preview" : "Pop preview into separate window"
+                    poppedOut
+                      ? ui("Close popped-out preview", "Закрыть превью")
+                      : ui("Pop preview into separate window", "Превью в новом окне")
                   }
                   disabled={!serverTab && !desktopOverlay?.hasWebContents}
                   onPointerDown={(event) => event.stopPropagation()}
@@ -289,7 +293,9 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
               <PictureInPicture2 />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {poppedOut ? "Close separate window" : "Pop into separate window"}
+              {poppedOut
+                ? ui("Close separate window", "Закрыть окно")
+                : ui("Pop into separate window", "В новое окно")}
             </TooltipPopup>
           </Tooltip>
         ) : null
@@ -339,7 +345,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
             />
             {!desktopOverlay?.hasWebContents ? (
               <div className="pointer-events-none absolute inset-0 z-[49] flex items-center justify-center rounded-[inherit] bg-muted text-xs text-muted-foreground">
-                Reconnecting preview…
+                {ui("Reconnecting preview…", "Восстанавливаем превью…")}
               </div>
             ) : null}
           </>
@@ -354,6 +360,7 @@ function DeviceMiniPlayer({
   source,
   miniPlayer,
 }: Props & { readonly source: Extract<PreviewMiniPlayerSource, { kind: "device" }> }) {
+  const ui = useUiText();
   const { state: deviceState } = useDeviceState(threadRef.environmentId);
   const viewId = miniPlayerDeviceViewId(threadRef, source);
   const screen = useAtomValue(deviceStreamScreenAtom(viewId));
@@ -381,7 +388,7 @@ function DeviceMiniPlayer({
       threadRef={threadRef}
       miniPlayer={miniPlayer}
       sourceSize={sourceSize}
-      label="Floating device preview"
+      label={ui("Floating device preview", "Плавающее устройство")}
       onOpenInPanel={openInPanel}
       cornerRadius={cornerRadius}
     >
@@ -431,6 +438,7 @@ function MiniPlayerShell({
   readonly cornerRadius?: (frame: PreviewMiniPlayerSize) => number;
   readonly children: (frame: PreviewMiniPlayerFrame) => ReactNode;
 }) {
+  const ui = useUiText();
   const canvas = useChatCanvas();
   const gestureRef = useRef<PointerGesture | null>(null);
   const suppressNextFrameClickRef = useRef(false);
@@ -580,7 +588,7 @@ function MiniPlayerShell({
               {recording ? (
                 <span
                   role="status"
-                  aria-label="Recording preview"
+                  aria-label={ui("Recording preview", "Запись превью")}
                   className="flex size-6 shrink-0 items-center justify-center"
                 >
                   <span className="size-2 rounded-full bg-destructive motion-safe:animate-status-pulse" />
@@ -592,7 +600,7 @@ function MiniPlayerShell({
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      aria-label="Open preview in right panel"
+                      aria-label={ui("Open preview in right panel", "Превью справа")}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={onOpenInPanel}
                     />
@@ -600,7 +608,9 @@ function MiniPlayerShell({
                 >
                   <PanelRightIcon />
                 </TooltipTrigger>
-                <TooltipPopup side="top">Open in right panel</TooltipPopup>
+                <TooltipPopup side="top">
+                  {ui("Open in right panel", "Открыть справа")}
+                </TooltipPopup>
               </Tooltip>
               {pillActions}
               <Tooltip>
@@ -609,7 +619,7 @@ function MiniPlayerShell({
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      aria-label="Close floating preview"
+                      aria-label={ui("Close floating preview", "Закрыть превью")}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={close}
                     />
@@ -617,7 +627,9 @@ function MiniPlayerShell({
                 >
                   <XIcon />
                 </TooltipTrigger>
-                <TooltipPopup side="top">Close floating preview</TooltipPopup>
+                <TooltipPopup side="top">
+                  {ui("Close floating preview", "Закрыть превью")}
+                </TooltipPopup>
               </Tooltip>
             </div>
           </div>

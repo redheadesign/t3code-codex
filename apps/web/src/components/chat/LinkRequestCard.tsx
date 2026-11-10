@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { pipe } from "effect/Function";
 import { useAtomValue } from "@effect/atom-react";
 import {
@@ -83,6 +84,7 @@ function PendingLinkRequest(props: {
   readonly environmentId: EnvironmentId;
   readonly item: LinkRequestItem;
 }) {
+  const ui = useUiText();
   const { item } = props;
   const [open, setOpen] = useState(false);
   const [declining, setDeclining] = useState(false);
@@ -140,10 +142,12 @@ function PendingLinkRequest(props: {
             disabled={declining}
             onClick={() => void decline()}
           >
-            Decline
+            {ui("Decline", "Отклонить")}
           </Button>
           <Button type="button" size="xs" disabled={declining} onClick={() => setOpen(true)}>
-            {picksMachine(item) ? "Choose machine…" : "Review link…"}
+            {picksMachine(item)
+              ? ui("Choose machine…", "Выбрать компьютер")
+              : ui("Review link…", "Проверить ссылку")}
           </Button>
         </div>
       ) : (
@@ -205,6 +209,7 @@ function LinkRequestDialog(props: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
+  const ui = useUiText();
   const { item } = props;
   const formId = useId();
   const pickMachine = picksMachine(item);
@@ -330,7 +335,7 @@ function LinkRequestDialog(props: {
     >
       <WizardPopup>
         <WizardHeader
-          title={pickMachine ? "Link a machine" : `Link ${targetName}`}
+          title={pickMachine ? ui("Link a machine", "Связать компьютеры") : `Link ${targetName}`}
           description="Agents here can then launch, message and wait on threads there. Revoke it in that machine's Connections."
         >
           {steps.length > 1 && !useExisting ? (
@@ -373,7 +378,9 @@ function LinkRequestDialog(props: {
                 ) : null}
                 {asksAddress ? (
                   <label className="block space-y-1.5">
-                    <span className="block text-xs font-medium text-foreground">Address</span>
+                    <span className="block text-xs font-medium text-foreground">
+                      {ui("Address", "Адрес")}
+                    </span>
                     <Input
                       value={address}
                       onChange={(event) => setAddress(event.target.value)}
@@ -401,12 +408,12 @@ function LinkRequestDialog(props: {
                     {canMint ? null : (
                       <label className="block space-y-1.5">
                         <span className="block text-xs font-medium text-foreground">
-                          Pairing code
+                          {ui("Pairing code", "Код связи")}
                         </span>
                         <Input
                           value={pairingCode}
                           onChange={(event) => setPairingCode(event.target.value)}
-                          placeholder="Paste the code"
+                          placeholder={ui("Paste the code", "Код")}
                           disabled={busy}
                           autoComplete="one-time-code"
                           nativeInput
@@ -447,11 +454,11 @@ function LinkRequestDialog(props: {
                 setError(null);
               }}
             >
-              Back
+              {ui("Back", "Назад")}
             </Button>
           ) : (
             <Button variant="outline" type="button" disabled={busy} onClick={close}>
-              Cancel
+              {ui("Cancel", "Отмена")}
             </Button>
           )}
           <Button
@@ -459,7 +466,13 @@ function LinkRequestDialog(props: {
             type="submit"
             disabled={busy || (finishesHere ? !ready : !machineReady)}
           >
-            {busy ? "Linking…" : useExisting ? "Use this link" : finishesHere ? "Link" : "Continue"}
+            {busy
+              ? ui("Linking…", "Связываем…")
+              : useExisting
+                ? ui("Use this link", "По ссылке")
+                : finishesHere
+                  ? ui("Link", "Ссылка")
+                  : ui("Continue", "Далее")}
           </Button>
         </WizardFooter>
       </WizardPopup>
@@ -474,11 +487,12 @@ function MachinePicker(props: {
   readonly disabled: boolean;
   readonly onChange: (value: string) => void;
 }) {
+  const ui = useUiText();
   const labelId = useId();
   return (
     <div className="space-y-2">
       <span id={labelId} className="block text-xs font-medium">
-        Machine
+        {ui("Machine", "Компьютер")}
       </span>
       <RadioGroup
         aria-labelledby={labelId}
@@ -502,7 +516,9 @@ function MachinePicker(props: {
         ))}
         <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm">
           <Radio value={ANOTHER_ADDRESS} />
-          <span className="min-w-0 flex-1 font-medium">Another address…</span>
+          <span className="min-w-0 flex-1 font-medium">
+            {ui("Another address…", "Другой адрес…")}
+          </span>
         </label>
       </RadioGroup>
     </div>

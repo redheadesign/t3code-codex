@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { useNavigate } from "@tanstack/react-router";
@@ -62,6 +63,7 @@ export function ThreadAutomationsPanel(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
 }) {
+  const ui = useUiText();
   const canOperate = useAtomValue(
     serverEnvironment.runScheduledTaskNow.permissionAtom(props.environmentId),
   );
@@ -85,11 +87,11 @@ export function ThreadAutomationsPanel(props: {
     return (
       <ThreadDetailsSection
         headingId="thread-details-automations-heading"
-        title="Automations"
+        title={ui("Automations", "Автозадачи")}
         data-thread-automations-panel
       >
         <p className="px-2.5 py-1.5 text-2xs text-muted-foreground" role="status">
-          Loading automations…
+          {ui("Loading automations…", "Загрузка автозадач…")}
         </p>
       </ThreadDetailsSection>
     );
@@ -147,7 +149,7 @@ export function ThreadAutomationsPanel(props: {
   return (
     <ThreadDetailsSection
       headingId="thread-details-automations-heading"
-      title="Automations"
+      title={ui("Automations", "Автозадачи")}
       data-thread-automations-panel
       actions={
         <Tooltip>
@@ -157,7 +159,7 @@ export function ThreadAutomationsPanel(props: {
                 size="icon-xs"
                 variant="ghost"
                 part="icon"
-                aria-label="Manage automations"
+                aria-label={ui("Manage automations", "Автозадачи")}
                 onClick={() =>
                   void navigate({
                     to: "/automations",
@@ -172,7 +174,7 @@ export function ThreadAutomationsPanel(props: {
               </ThreadDetailsControl>
             }
           />
-          <TooltipPopup>Manage automations</TooltipPopup>
+          <TooltipPopup>{ui("Manage automations", "Автозадачи")}</TooltipPopup>
         </Tooltip>
       }
     >
@@ -235,10 +237,16 @@ export function ThreadAutomationsPanel(props: {
               />
               <TooltipPopup>
                 {!canOperate
-                  ? "You do not have permission to edit automations."
+                  ? ui(
+                      "You do not have permission to edit automations.",
+                      "Нет прав на изменение автозадач.",
+                    )
                   : busyTaskId !== null
-                    ? "Another automation action is in progress."
-                    : "Edit automation"}
+                    ? ui(
+                        "Another automation action is in progress.",
+                        "Другое действие ещё выполняется.",
+                      )
+                    : ui("Edit automation", "Править автозадачу")}
               </TooltipPopup>
             </Tooltip>
             {/* Webhook tasks need a request from their URL. */}
@@ -271,7 +279,10 @@ export function ThreadAutomationsPanel(props: {
                       : task.lastRunStatus === "running"
                         ? "This automation is already running."
                         : busyTaskId !== null
-                          ? "Another automation action is in progress."
+                          ? ui(
+                              "Another automation action is in progress.",
+                              "Другое действие ещё выполняется.",
+                            )
                           : "Run now"}
                 </TooltipPopup>
               </Tooltip>

@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { LinkIcon, UnlinkIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
@@ -12,6 +13,7 @@ export function DesignAspectRatioControl({
   allNodes: readonly DesignNode[];
   onChange: (locked: boolean) => void;
 }) {
+  const ui = useUiText();
   const byId = new Map(allNodes.map((node) => [node.nodeId, node]));
   const unavailable = nodes.some((node) => {
     const visited = new Set<string>();
@@ -34,7 +36,7 @@ export function DesignAspectRatioControl({
           <Button
             size="icon-xs"
             variant={locked ? "secondary" : "ghost-muted"}
-            aria-label="Lock aspect ratio"
+            aria-label={ui("Lock aspect ratio", "Фиксировать пропорции")}
             aria-pressed={mixed ? "mixed" : locked}
             onClick={() => onChange(!locked)}
           />
@@ -42,7 +44,11 @@ export function DesignAspectRatioControl({
       >
         <Icon className="rotate-90" />
       </TooltipTrigger>
-      <TooltipPopup>{locked ? "Unlock aspect ratio" : "Lock aspect ratio"}</TooltipPopup>
+      <TooltipPopup>
+        {locked
+          ? ui("Unlock aspect ratio", "Снять фиксацию")
+          : ui("Lock aspect ratio", "Фиксировать пропорции")}
+      </TooltipPopup>
     </Tooltip>
   );
 }

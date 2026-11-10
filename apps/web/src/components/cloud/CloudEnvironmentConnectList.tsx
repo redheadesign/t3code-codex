@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { findErrorTraceId } from "@t3tools/client-runtime/errors";
 import {
   type EnvironmentConnectionPresentation,
@@ -89,6 +90,7 @@ export function CloudEnvironmentConnectRows({
     readonly onChange: (environmentId: EnvironmentId, selected: boolean) => void;
   };
 }) {
+  const ui = useUiText();
   const environmentsState = useRelayEnvironmentDiscovery();
   const registerEnvironment = useAtomCommand(environmentCatalog.register, {
     reportFailure: false,
@@ -298,7 +300,7 @@ export function CloudEnvironmentConnectRows({
             className="mt-3"
             onClick={() => void refreshRelayEnvironments()}
           >
-            Try again
+            {ui("Try again", "Повторить")}
           </Button>
         </div>
       );
@@ -405,7 +407,7 @@ export function CloudEnvironmentConnectRows({
               )}
             >
               {connectingEnvironmentIds.has(environment.environmentId)
-                ? "Connecting…"
+                ? ui("Connecting…", "Подключаем…")
                 : (savedConnection?.buttonLabel ??
                   (availability === "online"
                     ? "Available"
@@ -473,7 +475,7 @@ export function CloudEnvironmentConnectRows({
             <Tooltip>
               <TooltipTrigger render={<span className="inline-flex" tabIndex={0} />}>
                 <Button size="sm" disabled>
-                  Add
+                  {ui("Add", "Добавить")}
                 </Button>
               </TooltipTrigger>
               <TooltipPopup>{unsupportedDetail ?? "Client not supported"}</TooltipPopup>
@@ -492,7 +494,7 @@ export function CloudEnvironmentConnectRows({
                 ? "Adding…"
                 : savedWithoutRelay.has(environment.environmentId)
                   ? "Add route"
-                  : "Add"}
+                  : ui("Add", "Добавить")}
             </Button>
           )}
         </div>

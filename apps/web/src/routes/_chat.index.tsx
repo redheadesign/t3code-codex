@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
@@ -99,6 +100,7 @@ function IndexDraftLanding() {
 }
 
 function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
+  const ui = useUiText();
   const contentArea = workspaceAreaProps("home", 1, "Home");
   return (
     <SidebarInset
@@ -109,14 +111,17 @@ function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
       {isElectron ? <WorkspacePageHeader electron /> : null}
       <Empty className="flex-1">
         <EmptyHeader className="max-w-md">
-          <EmptyTitle>Couldn’t start a new thread</EmptyTitle>
+          <EmptyTitle>{ui("Couldn’t start a new thread", "Не удалось начать чат")}</EmptyTitle>
           <EmptyDescription>
-            The project is still available. Try opening the draft again.
+            {ui(
+              "The project is still available. Try opening the draft again.",
+              "Проект доступен. Откройте черновик снова.",
+            )}
           </EmptyDescription>
           <div className="mt-5 flex justify-center">
             <Button size="sm" onClick={onRetry}>
               <RefreshIcon size="md" />
-              Try again
+              {ui("Try again", "Повторить")}
             </Button>
           </div>
         </EmptyHeader>

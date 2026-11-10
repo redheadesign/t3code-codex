@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import { useEffect, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { Button } from "../ui/button";
@@ -17,6 +18,7 @@ export function DesignAssetRow({
   onReplace: () => void;
   onRemove: () => void;
 }) {
+  const ui = useUiText();
   const [source, setSource] = useState<{ id: string; url: string } | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Each local blob preview owns and releases its object URL.
   useEffect(() => {
@@ -57,7 +59,9 @@ export function DesignAssetRow({
         <span className="min-w-0 flex-1">
           <span className="block truncate text-xs">{asset.name}</span>
           <span className="text-2xs text-muted-foreground">
-            {uses === 0 ? "Not placed" : `Used in ${uses} ${uses === 1 ? "layer" : "layers"}`}
+            {uses === 0
+              ? ui("Not placed", "Не размещено")
+              : `Used in ${uses} ${uses === 1 ? "layer" : "layers"}`}
           </span>
         </span>
       </button>
@@ -68,7 +72,7 @@ export function DesignAssetRow({
           onClick={onReplace}
           aria-label={`Replace ${asset.name}`}
         >
-          Replace
+          {ui("Replace", "Заменить")}
         </Button>
         <Button
           size="xs"
@@ -77,7 +81,7 @@ export function DesignAssetRow({
           onClick={onRemove}
           aria-label={`Remove ${asset.name} from library`}
         >
-          Remove
+          {ui("Remove", "Убрать")}
         </Button>
       </div>
     </div>

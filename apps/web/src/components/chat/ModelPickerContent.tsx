@@ -1,3 +1,4 @@
+import { useUiText } from "~/i18n";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
   type ProviderInstanceId,
@@ -206,6 +207,7 @@ function ModelPickerProviderNotices({
   onRequestClose: (() => void) | undefined;
   onOpenProviderSetup: ((instanceId: ProviderInstanceId) => void) | undefined;
 }) {
+  const ui = useUiText();
   const navigate = useNavigate();
   return (
     <>
@@ -223,7 +225,9 @@ function ModelPickerProviderNotices({
                   onOpenProviderSetup?.(entry.instanceId);
                 }}
               >
-                {setupEntries.length > 1 ? `Set up ${entry.displayName}` : "Open provider setup"}
+                {setupEntries.length > 1
+                  ? `Set up ${entry.displayName}`
+                  : ui("Open provider setup", "Настроить агента")}
               </InlineButton>
             </div>
           ))}
@@ -243,7 +247,7 @@ function ModelPickerProviderNotices({
               void navigate({ to: "/settings/providers" });
             }}
           >
-            Provider settings
+            {ui("Provider settings", "Агенты")}
           </InlineButton>
         </p>
       ))}
@@ -371,6 +375,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   listFooter?: ReactNode;
   simplified?: boolean;
 }) {
+  const ui = useUiText();
   const {
     searchInputRef,
     keybindings: providedKeybindings,
@@ -942,7 +947,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
             {!props.simplified ? (
               <ComboboxSearchInput
                 ref={searchInputRef}
-                placeholder="Search models..."
+                placeholder={ui("Search models...", "Поиск моделей")}
                 value={searchQuery}
                 onChange={(e) => {
                   if (!isSearching) setSearchHeight(pickerContentRef.current?.offsetHeight ?? 0);
@@ -1048,7 +1053,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                       className="group w-full cursor-pointer"
                     >
                       <span className="text-sm leading-snug text-muted-foreground group-hover:text-foreground group-data-highlighted:text-foreground">
-                        {legacySection.isExpanded ? "Show less" : "Show more"}
+                        {legacySection.isExpanded
+                          ? ui("Show less", "Свернуть")
+                          : ui("Show more", "Развернуть")}
                       </span>
                     </ComboboxItem>
                   );
