@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { assert, expect, it } from "@effect/vitest";
 import { ComposerContextId, EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { T3_CODE_PROJECT_TOOL_INSTRUCTIONS } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
 
 import {
@@ -325,9 +326,14 @@ it("rebuilds the template from this checkout and sends a child T3's task prompt"
   assert.include(reminders?.[1], "Current branch: fix/date-format");
   assert.notInclude(reminders?.join(), "Codebase and user instructions");
 
-  const prompt = buildMessages(makeSample(childCase, base)).at(-1)?.content.at(-1);
+  const [prompt, projectContext] =
+    buildMessages(makeSample(childCase, base)).at(-1)?.content.slice(-2) ?? [];
   assert.equal(prompt?.text, taskPrompt({ task: childCase.prompt, role: "implementation" }));
   assert.notEqual(prompt?.text, childCase.prompt);
+  assert.equal(
+    projectContext?.text,
+    `<system-reminder>\n${T3_CODE_PROJECT_TOOL_INSTRUCTIONS}\n</system-reminder>`,
+  );
 });
 
 it("lists link tools only while a case turns the beta on, and sends chips as T3 projects them", () => {
@@ -364,7 +370,7 @@ it("lists link tools only while a case turns the beta on, and sends chips as T3 
       ],
     },
   };
-  const prompt = buildMessages(makeSample(testCase, on)).at(-1)?.content.at(-1);
+  const prompt = buildMessages(makeSample(testCase, on)).at(-1)?.content.at(-2);
   assert.equal(
     prompt?.text,
     projectComposerContextForProvider({ text: testCase.prompt, ...testCase.promptContext! }),
