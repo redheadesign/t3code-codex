@@ -3808,7 +3808,7 @@ export default function ChatView(props: ChatViewProps) {
                         data-ascii-composer={isDraftHeroState && !embedded ? "" : undefined}
                         style={
                           isDraftHeroState && !embedded && homeArtwork.swatch
-                            ? homeAccentStyle(homeArtwork.swatch)
+                            ? homeAccentStyle(homeArtwork.swatch, homeArtwork.selection)
                             : undefined
                         }
                       >

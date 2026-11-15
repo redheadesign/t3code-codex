@@ -380,6 +380,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["ASCII animal wallpaper animated background животное животные анимация"],
   },
   {
+    id: "ascii-cell-size",
+    title: "ASCII cell size",
+    titleRu: "Размер ASCII-ячеек",
+    to: "/settings/appearance",
+    searchTerms: ["ASCII glyph size animals font cell масштаб животные символы"],
+  },
+  {
     // Prefixed because the slider control already owns the `appearance-contrast` id.
     id: "setting-appearance-contrast",
     title: "Contrast",

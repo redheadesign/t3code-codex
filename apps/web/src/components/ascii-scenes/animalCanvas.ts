@@ -7,6 +7,7 @@ import {
   type AnimalPose,
 } from "./animalArtwork";
 import { animalScenes, type AnimalSceneId } from "./animalScenes";
+import { beginSteeringFrame, steerAnimal, type AnimalSteering } from "./animalSteering";
 
 interface AnimalSceneFrame {
   readonly sceneId: AnimalSceneId;
@@ -14,6 +15,7 @@ interface AnimalSceneFrame {
   readonly height: number;
   readonly time: number;
   readonly appearance: "dark" | "light";
+  readonly cellScale?: number;
 }
 
 const tau = Math.PI * 2;
@@ -119,6 +121,7 @@ const maxMantaSpriteBuildsPerFrame = 4;
 let mantaSprites:
   | {
       readonly appearance: AnimalSceneFrame["appearance"];
+      readonly cellWidth: number;
       readonly scaleX: number;
       readonly scaleY: number;
       readonly phases: Array<HTMLCanvasElement | undefined>;
@@ -131,22 +134,18 @@ function buildMantaSprite(
   scaleX: number,
   scaleY: number,
   appearance: AnimalSceneFrame["appearance"],
+  cellWidth: number,
+  width: number,
+  height: number,
 ) {
   const sprite = document.createElement("canvas");
-  sprite.width = Math.ceil(mantaSpriteSize * scaleX);
-  sprite.height = Math.ceil(mantaSpriteSize * scaleY);
+  sprite.width = Math.ceil(width * scaleX);
+  sprite.height = Math.ceil(height * scaleY);
   const context = sprite.getContext("2d");
   if (!context) return undefined;
   context.setTransform(scaleX, 0, 0, scaleY, 0, 0);
-  const pen = createAnimalPen(
-    context,
-    mantaSpriteSize,
-    mantaSpriteSize,
-    mantaCellWidth,
-    appearance,
-  );
-  const center = mantaSpriteSize / 2;
-  const pose = { id: 0, x: center, y: center, span: mantaSpriteSpan, heading, light: 1.06 };
+  const pen = createAnimalPen(context, width, height, cellWidth, appearance);
+  const pose = { id: 0, x: width / 2, y: height / 2, span: mantaSpriteSpan, heading, light: 1.06 };
   animalArtworks.manta.draw(pen, pose, (phase * tau) / mantaSpritePhases);
   return sprite;
 }
@@ -154,19 +153,24 @@ function buildMantaSprite(
 function createMantaSpritePainter(
   context: CanvasRenderingContext2D,
   appearance: AnimalSceneFrame["appearance"],
+  pen: AnimalPen,
 ) {
   const { a: scaleX, d: scaleY } = context.getTransform();
+  const { cellWidth, cellHeight } = pen;
+  const spriteWidth = Math.ceil(mantaSpriteSize / cellWidth) * cellWidth;
+  const spriteHeight = Math.ceil(mantaSpriteSize / cellHeight) * cellHeight;
   if (
     mantaSprites?.appearance !== appearance ||
+    mantaSprites.cellWidth !== cellWidth ||
     mantaSprites.scaleX !== scaleX ||
     mantaSprites.scaleY !== scaleY
   ) {
-    mantaSprites = { appearance, scaleX, scaleY, phases: [] };
+    mantaSprites = { appearance, cellWidth, scaleX, scaleY, phases: [] };
   }
   const { phases } = mantaSprites;
   let buildsRemaining = maxMantaSpriteBuildsPerFrame;
 
-  return (pose: AnimalPose, phase: number) => {
+  return (pose: AnimalPose, phase: number, turn: number) => {
     const heading = pose.id % mantaSpriteHeadings.length;
     const offset = heading * mantaSpritePhases;
     const index = Math.floor((wrap(phase, tau) * mantaSpritePhases) / tau);
@@ -174,7 +178,16 @@ function createMantaSpritePainter(
     let sprite = phases[key];
     if (!sprite && buildsRemaining > 0) {
       buildsRemaining--;
-      sprite = buildMantaSprite(index, mantaSpriteHeadings[heading]!, scaleX, scaleY, appearance);
+      sprite = buildMantaSprite(
+        index,
+        mantaSpriteHeadings[heading]!,
+        scaleX,
+        scaleY,
+        appearance,
+        cellWidth,
+        spriteWidth,
+        spriteHeight,
+      );
       phases[key] = sprite;
     }
     if (!sprite) {
@@ -188,16 +201,31 @@ function createMantaSpritePainter(
     if (!sprite) return false;
 
     // Align the cached pixels to the backing canvas so the ASCII characters stay sharp.
-    const x = Math.round((pose.x - mantaSpriteSize / 2) * scaleX) / scaleX;
-    const y = Math.round((pose.y - mantaSpriteSize / 2) * scaleY) / scaleY;
+    const x = Math.round((pose.x - spriteWidth / 2) * scaleX) / scaleX;
+    const y = Math.round((pose.y - spriteHeight / 2) * scaleY) / scaleY;
     context.globalAlpha = 1;
-    context.drawImage(sprite, x, y, sprite.width / scaleX, sprite.height / scaleY);
+    const width = sprite.width / scaleX;
+    const height = sprite.height / scaleY;
+    if (turn === 0) {
+      context.drawImage(sprite, x, y, width, height);
+    } else {
+      context.save();
+      context.translate(x + width / 2, y + height / 2);
+      context.rotate(turn);
+      context.imageSmoothingEnabled = false;
+      context.drawImage(sprite, -width / 2, -height / 2, width, height);
+      context.restore();
+    }
     return true;
   };
 }
 
-export function paintAnimalScene(context: CanvasRenderingContext2D, frame: AnimalSceneFrame) {
-  const { sceneId, width, height, time, appearance } = frame;
+export function paintAnimalScene(
+  context: CanvasRenderingContext2D,
+  frame: AnimalSceneFrame,
+  steering?: AnimalSteering,
+) {
+  const { sceneId, width, height, time, appearance, cellScale = 1 } = frame;
   if (width <= 0 || height <= 0) return;
   context.clearRect(0, 0, width, height);
   context.save();
@@ -226,19 +254,21 @@ export function paintAnimalScene(context: CanvasRenderingContext2D, frame: Anima
     isManta ? compactSpanLimit : spanLimit,
   );
   // Coarser cells keep the sampling work bounded as more animals fit on screen.
-  const cellScale = Math.max(
+  const cellDensityScale = Math.max(
     1,
     (baseSpan / compactSpanLimit) * Math.sqrt(count / compactPopulation),
   );
-  const cellWidth = isManta
+  const adaptiveCellWidth = isManta
     ? clamp(Math.round(width / 185), 5, mantaCellWidth)
-    : Math.ceil(clamp(Math.round(width / 185), 5, 9) * cellScale);
+    : Math.ceil(clamp(Math.round(width / 185), 5, 9) * cellDensityScale);
+  const cellWidth = Math.round(adaptiveCellWidth * clamp(cellScale, 0.75, 1.5));
   const pen = createAnimalPen(context, width, height, cellWidth, appearance);
   const paintManta =
-    isManta && isExpanded ? createMantaSpritePainter(context, appearance) : undefined;
+    isManta && isExpanded ? createMantaSpritePainter(context, appearance, pen) : undefined;
   const margin = baseSpan * 0.95;
   const flightWidth = width + 2 * margin;
   const flightHeight = height + 2 * margin;
+  const motion = steering ? beginSteeringFrame(steering, time) : undefined;
   for (let id = 0; id < count; id++) {
     const span = baseSpan * (0.72 + 0.37 * animalNoise(id, 78, 12));
     const column = id % columns;
@@ -247,14 +277,20 @@ export function paintAnimalScene(context: CanvasRenderingContext2D, frame: Anima
     const startX = (width * (column + 0.2 + 0.6 * animalNoise(id, 6, 26))) / rowColumns;
     const startY = (height * (row + 0.18 + 0.64 * animalNoise(id, 3, 60))) / rows;
     const course = -0.57 + 0.35 * animalNoise(id, 45, 12);
-    const distance = time * artwork.speed * (0.36 + 0.16 * animalNoise(id, 3, 78));
+    const pace = 0.36 + 0.16 * animalNoise(id, 3, 78);
+    const distance = time * artwork.speed * pace;
     const sway = 0.16 * Math.sin(time * 0.7 + id * 2.2);
-    const x = wrap(margin + startX + Math.cos(course) * distance, flightWidth) - margin;
+    const offset = motion?.turns.get(id);
+    const x =
+      wrap(margin + startX + Math.cos(course) * distance + (offset?.x ?? 0), flightWidth) - margin;
     const y =
-      wrap(margin + startY + Math.sin(course) * distance + sway * span * 0.25, flightHeight) -
-      margin;
+      wrap(
+        margin + startY + Math.sin(course) * distance + sway * span * 0.25 + (offset?.y ?? 0),
+        flightHeight,
+      ) - margin;
+    const turn = motion ? steerAnimal(motion, id, x, y, course, artwork.speed * pace) : 0;
     if (x < -span || x > width + span || y < -span || y > height + span) continue;
-    const heading = course + sway;
+    const heading = course + sway + turn;
     const pose: AnimalPose = { id, x, y, span, heading, light: 1.06 };
     const phase =
       (artwork.strideLength
@@ -276,7 +312,7 @@ export function paintAnimalScene(context: CanvasRenderingContext2D, frame: Anima
       );
     }
 
-    if (!paintManta?.(pose, phase)) artwork.draw(pen, pose, phase);
+    if (!paintManta?.(pose, phase, turn)) artwork.draw(pen, pose, phase);
   }
   context.restore();
 }

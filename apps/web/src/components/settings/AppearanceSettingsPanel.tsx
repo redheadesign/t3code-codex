@@ -5,7 +5,12 @@ import {
   russianAnimalSceneLabels,
   type AnimalSceneId,
 } from "~/components/ascii-scenes/animalScenes";
-import { useHomeArtwork } from "~/components/ascii-scenes/HomeArtwork";
+import {
+  asciiCellSizes,
+  defaultAsciiCellSize,
+  useAsciiCellSize,
+  useHomeArtwork,
+} from "~/components/ascii-scenes/HomeArtwork";
 import type { CSSProperties } from "react";
 import { useState } from "react";
 import {
@@ -211,6 +216,55 @@ function HomeArtworkSetting() {
   );
 }
 
+function AsciiCellSizeSetting() {
+  const ui = useUiText();
+  const [cellSize, setCellSize] = useAsciiCellSize();
+  const setting = searchableSetting("ascii-cell-size");
+  const title = settingsRowTitle(setting.id, setting.title, ui);
+  const format = new Intl.NumberFormat(ui("en", "ru"), { style: "percent" });
+  const options = asciiCellSizes.map((value) => ({ value, label: format.format(value / 100) }));
+
+  return (
+    <SettingsRow
+      {...setting}
+      description={ui(
+        "Change the size of the characters in the animal scenes.",
+        "Меняет размер символов в анимации животных.",
+      )}
+      resetAction={
+        cellSize === defaultAsciiCellSize ? null : (
+          <SettingResetButton
+            label={ui("ASCII cell size", "размер ASCII-ячеек")}
+            onClick={() => setCellSize(defaultAsciiCellSize)}
+          />
+        )
+      }
+      control={
+        <div className="w-full sm:w-48">
+          <Select<number>
+            items={options}
+            value={cellSize}
+            onValueChange={(value) => {
+              if (value !== null) setCellSize(value);
+            }}
+          >
+            <SelectTrigger size="sm" width="fluid" aria-label={title}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              {options.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </div>
+      }
+    />
+  );
+}
+
 export function AppearanceSettingsPanel() {
   const ui = useUiText();
   const {
@@ -298,6 +352,7 @@ export function AppearanceSettingsPanel() {
       <SettingsSection id="appearance-interface" title={ui("Interface", "Интерфейс")}>
         {window.desktopBridge?.setWindowZoomFactor ? <InterfaceScaleSetting /> : null}
         <HomeArtworkSetting />
+        <AsciiCellSizeSetting />
         <SettingsRow
           {...searchableSetting("setting-appearance-contrast")}
           description={ui(

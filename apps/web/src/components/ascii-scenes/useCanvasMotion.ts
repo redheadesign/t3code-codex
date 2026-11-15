@@ -15,8 +15,11 @@ export function useCanvasMotion(
   paint: (context: CanvasRenderingContext2D, frame: CanvasFrame) => void,
   appearance: CanvasFrame["appearance"],
   framesPerSecond = 30,
+  redrawKey?: number,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const redrawRef = useRef<(() => void) | undefined>(undefined);
+  const lastRedrawKeyRef = useRef(redrawKey);
   const paintFrame = useEffectEvent(paint);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- owns the canvas buffer, frame loop, and activity and resize subscriptions
@@ -92,10 +95,11 @@ export function useCanvasMotion(
       needsFrame = true;
       update();
     };
-    const onMotionChange = () => {
+    const redraw = () => {
       needsFrame = true;
       update();
     };
+    redrawRef.current = redraw;
     const unsubscribeActivity = subscribeDocumentActivity(update);
     const unobserveResize = observeResize([canvas], resize);
     const intersectionObserver = new IntersectionObserver(([entry]) => {
@@ -103,15 +107,23 @@ export function useCanvasMotion(
       update();
     });
     intersectionObserver.observe(canvas);
-    motion.addEventListener("change", onMotionChange);
+    motion.addEventListener("change", redraw);
     return () => {
       stop();
       unsubscribeActivity();
       unobserveResize();
       intersectionObserver.disconnect();
-      motion.removeEventListener("change", onMotionChange);
+      motion.removeEventListener("change", redraw);
+      redrawRef.current = undefined;
     };
   }, [appearance, framesPerSecond]);
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- repaints the canvas when its visual props change while motion is paused
+  useEffect(() => {
+    if (redrawKey === lastRedrawKeyRef.current) return;
+    lastRedrawKeyRef.current = redrawKey;
+    redrawRef.current?.();
+  }, [redrawKey]);
 
   return canvasRef;
 }
