@@ -239,7 +239,6 @@ it("chooses a model in two steps and only offers the two subscriptions in the co
               instanceId: selection.instanceId,
               models: entries.find((entry) => entry.instanceId === selection.instanceId)!.models,
               model: selection.model,
-              planModeEnabled: false,
               onModelOptionsChange: () => {},
             }}
           />

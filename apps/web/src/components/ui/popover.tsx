@@ -78,7 +78,9 @@ function PopoverPopup({
         collisionAvoidance={collisionAvoidance}
         collisionPadding={variant === "panel" ? 0 : undefined}
         className={cn(
-          "h-(--positioner-height) max-h-(--available-height) w-(--positioner-width) max-w-(--available-width) transition-transform data-instant:transition-none",
+          "h-(--positioner-height) max-h-(--available-height) w-(--positioner-width) max-w-(--available-width)",
+          // Kept-mounted positioners first paint at the window origin, so a transform transition slides them in from there.
+          !keepMounted && "transition-transform data-instant:transition-none",
           variant === "panel"
             ? "z-(--z-sheet) w-[min(calc(var(--thread-details-panel-width)+--spacing(4)),calc(var(--anchor-width)---spacing(2)))] transition-[top] duration-150 ease-out data-instant:transition-[top] motion-reduce:transition-none motion-reduce:data-instant:transition-none"
             : "z-[130]",
@@ -93,6 +95,13 @@ function PopoverPopup({
             "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) overflow-hidden rounded-(--floating-radius) text-popover-foreground outline-none transition-[width,height,scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
             variant !== "panel" && "dropdown-glass",
             tooltipStyle && "w-fit text-balance rounded-(--floating-radius-sm) text-xs",
+            // Electron drag hit-testing ignores z-index; popups over a drag region would swallow hover.
+            "[-webkit-app-region:no-drag]",
+            tooltipStyle &&
+              "w-fit text-balance rounded-md text-xs shadow-md/5 before:rounded-[calc(var(--radius-md)-1px)]",
+            !tooltipStyle &&
+              variant !== "panel" &&
+              "shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]",
             width !== "auto" && ["max-w-[calc(100vw-2rem)]", popoverPopupWidthClassName[width]],
             variant === "panel" &&
               "w-full overflow-visible rounded-none border-0 bg-transparent shadow-none [backdrop-filter:none] [-webkit-backdrop-filter:none]",

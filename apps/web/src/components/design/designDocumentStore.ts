@@ -67,6 +67,7 @@ export function designProjectConnection(
   return { ...project, relativePath: `.t3/design/${documentId}.json` };
 }
 
+// @effect-diagnostics-next-line extendsNativeError:off
 export class DesignStorageConflictError extends Error {
   constructor() {
     super(

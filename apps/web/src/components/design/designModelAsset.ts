@@ -16,6 +16,7 @@ const KTX2_IDENTIFIER = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0
 const MODEL_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/ktx2"]);
 const MODEL_BUFFER_MIMES = new Set(["application/octet-stream", "application/gltf-buffer"]);
 
+// @effect-diagnostics-next-line extendsNativeError:off
 export class DesignModelAssetError extends Error {
   constructor(readonly reason: "too-large" | "external-resource" | "invalid-model") {
     super(reason);

@@ -1,7 +1,12 @@
 import * as NodeBuffer from "node:buffer";
 
-import type { TaskWorkspaceAttachment, TaskWorkspaceIssue, TaskWorkspaceSprint } from "@t3tools/contracts";
+import type {
+  TaskWorkspaceAttachment,
+  TaskWorkspaceIssue,
+  TaskWorkspaceSprint,
+} from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
+import * as Schema from "effect/Schema";
 
 export interface JiraClientConnection {
   readonly baseUrl: string;
@@ -9,28 +14,21 @@ export interface JiraClientConnection {
   readonly username?: string | null;
 }
 
-export class JiraClientError extends Error {
-  readonly category: "configuration" | "response" | "pagination" | "conflict" | "network";
-  readonly status: number | null;
-
-  constructor(
-    category: "configuration" | "response" | "pagination" | "conflict" | "network",
-    status: number | null = null,
-  ) {
-    super(
-      category === "conflict"
-        ? "The Jira issue changed. Synchronize it before publishing the local draft."
-        : category === "configuration"
-          ? "Check the Jira address and server credential."
-          : category === "pagination"
-            ? "Jira returned an incomplete page. The previous task list has been preserved."
-            : category === "network"
-              ? "Jira did not answer. Retry synchronization."
-              : `Jira rejected the request${status === null ? "." : ` (${status}).`}`,
-    );
-    this.name = "JiraClientError";
-    this.category = category;
-    this.status = status;
+export class JiraClientError extends Schema.TaggedError<JiraClientError>()("JiraClientError", {
+  category: Schema.Literals(["configuration", "response", "pagination", "conflict", "network"]),
+  status: Schema.NullOr(Schema.Number),
+}) {
+  override get message(): string {
+    const { category, status } = this;
+    return category === "conflict"
+      ? "The Jira issue changed. Synchronize it before publishing the local draft."
+      : category === "configuration"
+        ? "Check the Jira address and server credential."
+        : category === "pagination"
+          ? "Jira returned an incomplete page. The previous task list has been preserved."
+          : category === "network"
+            ? "Jira did not answer. Retry synchronization."
+            : `Jira rejected the request${status === null ? "." : ` (${status}).`}`;
   }
 }
 
@@ -126,24 +124,27 @@ function normalizeIssue(raw: unknown, base: URL, sprintField: string | null): Ta
   const updated = string(fields.updated);
   const updatedAt = date(updated);
   const summary = string(fields.summary);
-  if (!key || !summary || !updatedAt) throw new JiraClientError("response");
+  if (!key || !summary || !updatedAt)
+    throw new JiraClientError({ category: "response", status: null });
   const assignee = object(fields.assignee);
   const status = object(fields.status);
   const category = object(status.statusCategory);
-  const attachments: TaskWorkspaceAttachment[] = list(fields.attachment).flatMap((rawAttachment) => {
-    const attachment = object(rawAttachment);
-    const id = string(attachment.id) || string(attachment.filename);
-    const name = string(attachment.filename) || id;
-    if (!id || !name) return [];
-    return [
-      {
-        id,
-        name,
-        url: string(attachment.content) || null,
-        mimeType: string(attachment.mimeType) || null,
-      },
-    ];
-  });
+  const attachments: TaskWorkspaceAttachment[] = list(fields.attachment).flatMap(
+    (rawAttachment) => {
+      const attachment = object(rawAttachment);
+      const id = string(attachment.id) || string(attachment.filename);
+      const name = string(attachment.filename) || id;
+      if (!id || !name) return [];
+      return [
+        {
+          id,
+          name,
+          url: string(attachment.content) || null,
+          mimeType: string(attachment.mimeType) || null,
+        },
+      ];
+    },
+  );
   return {
     key,
     summary,
@@ -187,7 +188,7 @@ export function createJiraClient(
   try {
     base = new URL(connection.baseUrl.replace(/\/?$/, "/"));
   } catch {
-    throw new JiraClientError("configuration");
+    throw new JiraClientError({ category: "configuration", status: null });
   }
   if (
     !["https:", "http:"].includes(base.protocol) ||
@@ -197,7 +198,7 @@ export function createJiraClient(
     base.hash ||
     !connection.token.trim()
   )
-    throw new JiraClientError("configuration");
+    throw new JiraClientError({ category: "configuration", status: null });
   const fetcher = options.fetch ?? fetch;
   const authorization = connection.username
     ? `Basic ${NodeBuffer.Buffer.from(`${connection.username}:${connection.token}`).toString("base64")}`
@@ -219,14 +220,14 @@ export function createJiraClient(
         },
       });
     } catch {
-      throw new JiraClientError("network");
+      throw new JiraClientError({ category: "network", status: null });
     }
-    if (!response.ok) throw new JiraClientError("response", response.status);
+    if (!response.ok) throw new JiraClientError({ category: "response", status: response.status });
     if (response.status === 204) return null;
     try {
       return await response.json();
     } catch {
-      throw new JiraClientError("response", response.status);
+      throw new JiraClientError({ category: "response", status: response.status });
     }
   }
 
@@ -241,13 +242,13 @@ export function createJiraClient(
         Number(data.total) < 0 ||
         !Array.isArray(data.comments)
       ) {
-        throw new JiraClientError("response");
+        throw new JiraClientError({ category: "response", status: null });
       }
       comments.push(...batch);
       if (comments.length >= Number(data.total)) return comments;
-      if (batch.length === 0) throw new JiraClientError("pagination");
+      if (batch.length === 0) throw new JiraClientError({ category: "pagination", status: null });
     }
-    throw new JiraClientError("pagination");
+    throw new JiraClientError({ category: "pagination", status: null });
   }
 
   async function completeComments(raw: unknown): Promise<unknown> {
@@ -327,7 +328,7 @@ export function createJiraClient(
         Number(data.total) < 0 ||
         !Array.isArray(data.issues)
       ) {
-        throw new JiraClientError("response");
+        throw new JiraClientError({ category: "response", status: null });
       }
       let newCount = 0;
       for (const raw of batch) {
@@ -349,9 +350,9 @@ export function createJiraClient(
         ];
         return { issues, sprints };
       }
-      if (!newCount) throw new JiraClientError("pagination");
+      if (!newCount) throw new JiraClientError({ category: "pagination", status: null });
     }
-    throw new JiraClientError("pagination");
+    throw new JiraClientError({ category: "pagination", status: null });
   }
 
   async function getIssue(key: string): Promise<TaskWorkspaceIssue> {
@@ -369,7 +370,8 @@ export function createJiraClient(
     expectedRevision: string,
   ) {
     const current = await getIssue(key);
-    if (current.sourceRevision !== expectedRevision) throw new JiraClientError("conflict");
+    if (current.sourceRevision !== expectedRevision)
+      throw new JiraClientError({ category: "conflict", status: null });
     await request(`issue/${encodeURIComponent(key)}`, {
       method: "PUT",
       body: JSON.stringify({ fields }),
@@ -378,7 +380,8 @@ export function createJiraClient(
   }
 
   async function ensureComment(key: string, body: string, marker: string) {
-    if (!marker || marker.includes("\n")) throw new JiraClientError("configuration");
+    if (!marker || marker.includes("\n"))
+      throw new JiraClientError({ category: "configuration", status: null });
     const existing = (await allComments(key)).find((raw) =>
       documentText(object(raw).body).split("\n").includes(marker),
     );
@@ -390,7 +393,7 @@ export function createJiraClient(
       }),
     );
     const id = string(created.id);
-    if (!id) throw new JiraClientError("response");
+    if (!id) throw new JiraClientError({ category: "response", status: null });
     return { id, created: true };
   }
 

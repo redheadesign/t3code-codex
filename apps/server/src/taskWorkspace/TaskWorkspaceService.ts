@@ -1,8 +1,10 @@
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
@@ -39,7 +41,16 @@ const AUTO_SYNC_WATCHERS = new Set<string>();
 type WorkspaceFileSystemService = WorkspaceFileSystem.WorkspaceFileSystem["Service"];
 type JiraClient = ReturnType<typeof createJiraClient>;
 const decodeSnapshot = Schema.decodeUnknownSync(TaskWorkspaceSnapshot);
+const encodeSnapshot = Schema.encodeEffect(
+  Schema.fromJsonString(TaskWorkspaceSnapshot, { space: 2 }),
+);
+const jiraTokenConfigured = Config.Redacted("T3_JIRA_TOKEN").pipe(
+  Config.map((token) => Boolean(Redacted.value(token).trim())),
+  Effect.orElseSucceed(() => false),
+);
+const jiraEnvironmentUrl = Config.String("T3_JIRA_URL").pipe(Effect.orElseSucceed(() => null));
 const isTaskWorkspaceError = Schema.is(TaskWorkspaceError);
+const isJiraClientError = Schema.is(JiraClientError);
 const isBoardCommand = Schema.is(TaskWorkspaceBoardCommand);
 
 /** Optional host integrations. The default service remains useful in local-only mode. */
@@ -571,7 +582,7 @@ function defaultJiraClient(connection: TaskWorkspaceConnection): JiraClient | nu
 }
 
 function jiraFailure(cause: unknown): TaskWorkspaceError {
-  if (cause instanceof JiraClientError) return taskError("sync", cause.message, cause);
+  if (isJiraClientError(cause)) return taskError("sync", cause.message, cause);
   return taskError(
     "sync",
     "Jira synchronization failed. Previous local tasks were preserved.",
@@ -675,8 +686,7 @@ export function makeTaskWorkspaceService(
     snapshot: TaskWorkspaceSnapshot,
   ) {
     return yield* Effect.gen(function* () {
-      // @effect-diagnostics-next-line preferSchemaOverJson:off - snapshot is already schema-decoded and persisted as human-readable local state.
-      const contents = JSON.stringify(snapshot, null, 2);
+      const contents = yield* encodeSnapshot(snapshot);
       if (snapshot.connection.url !== null)
         yield* workspaceFileSystem.writeFile({
           cwd: input.workspaceRoot,
@@ -724,7 +734,7 @@ export function makeTaskWorkspaceService(
       (stored.lastSyncedAt === null ||
         !Number.isFinite(lastSyncedAtMs) ||
         DateTime.toEpochMillis(DateTime.nowUnsafe()) - lastSyncedAtMs >= AUTO_SYNC_INTERVAL_MS) &&
-      (Boolean(process.env.T3_JIRA_TOKEN?.trim()) || stored.connection.secretConfigured);
+      (stored.connection.secretConfigured || (yield* jiraTokenConfigured));
     const snapshot = shouldInitialSync
       ? yield* sync(input, stored).pipe(
           Effect.flatMap((synced) => {
@@ -789,7 +799,7 @@ export function makeTaskWorkspaceService(
       connection: {
         ...snapshot.connection,
         configured: true,
-        url: snapshot.connection.url ?? process.env.T3_JIRA_URL ?? null,
+        url: snapshot.connection.url ?? (yield* jiraEnvironmentUrl),
         secretConfigured: true,
       },
       sprints: result.sprints.slice(),
@@ -1006,8 +1016,7 @@ export function makeTaskWorkspaceService(
             configured: true,
             url: normalizedUrl,
             username: command.username,
-            secretConfigured:
-              command.secretRef !== null || Boolean(process.env.T3_JIRA_TOKEN?.trim()),
+            secretConfigured: command.secretRef !== null || (yield* jiraTokenConfigured),
             secretRef: command.secretRef,
             projectKeys: command.projectKeys ?? [],
           },

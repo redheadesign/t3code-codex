@@ -7,7 +7,7 @@ import {
   LockIcon,
   PenLineIcon,
   ShieldOffIcon,
-  WandSparklesIcon,
+  ShieldCheckIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,8 +27,8 @@ export const runtimeModeConfig: Record<
   },
   auto: {
     label: "Auto",
-    description: "Approve routine actions automatically and ask before higher-risk actions.",
-    icon: WandSparklesIcon,
+    description: "Supported providers approve routine actions; others still ask.",
+    icon: ShieldCheckIcon,
   },
   "full-access": {
     label: "Full access",

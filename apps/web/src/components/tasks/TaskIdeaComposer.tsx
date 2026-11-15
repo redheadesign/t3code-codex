@@ -96,7 +96,6 @@ export function TaskIdeaComposer({
         model: selection.model,
         models: activeEntry.models,
         modelOptions: selection.options,
-        planModeEnabled: false,
         promptUltrathink: readPromptUltrathink(draft.value),
         onPromptEdit: (edit) => {
           setDraft((previous) => {
@@ -133,7 +132,6 @@ export function TaskIdeaComposer({
       model: selection.model,
       models: activeEntry.models,
       modelOptions: selection.options,
-      planModeEnabled: false,
     });
     const modelSelection = createModelSelection(
       selection.instanceId,

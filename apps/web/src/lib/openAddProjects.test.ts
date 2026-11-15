@@ -1,7 +1,7 @@
 import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/models";
 import * as Cause from "effect/Cause";
-import * as Data from "effect/Data";
+import * as Schema from "effect/Schema";
 import { AsyncResult } from "effect/reactivity";
 import { expect, it, vi } from "vite-plus/test";
 
@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
 }));
 
-class MissingFolder extends Data.TaggedError("MissingFolder")<{ readonly message: string }> {}
+class MissingFolder extends Schema.TaggedError<MissingFolder>()("MissingFolder", {
+  message: Schema.String,
+}) {}
 
 vi.mock("../state/entities", () => ({ readProjects: mocks.readProjects }));
 vi.mock("../state/environments", () => ({

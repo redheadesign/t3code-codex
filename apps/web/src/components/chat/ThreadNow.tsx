@@ -37,7 +37,7 @@ function ThreadNowLine({
   return (
     <div
       role={announce ? "alert" : undefined}
-      className={lineClassName}
+      className={cn(lineClassName, "items-baseline")}
       data-thread-now-line="true"
     >
       <WorkLogLine

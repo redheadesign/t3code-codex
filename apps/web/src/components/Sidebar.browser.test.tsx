@@ -6,16 +6,28 @@ import type { ReactNode } from "react";
 
 import { render } from "../../test/render";
 import { openCommandPalette } from "../commandPaletteBus";
+import { makeThreadFixture } from "../test-fixtures";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { __setClientSettingsForTests, getClientSettings } from "../hooks/useSettings";
 import { useProjects, useQuietThreadShells, useServerConfigs } from "../state/entities";
-import { makeThreadFixture } from "../test-fixtures";
 import type { Project } from "../types";
 import Sidebar from "./Sidebar";
 import { SidebarProvider } from "./ui/sidebar";
 
 vi.mock("../state/entities", { spy: true });
 vi.mock("../hooks/useHandleNewThread", { spy: true });
+vi.mock("../hooks/useThreadRouteTarget", { spy: true });
+vi.mock("./sidebar/SidebarThreadRow", { spy: true });
+vi.mock(import("../state/server"), async (original) => {
+  const { Atom } = await import("effect/reactivity");
+  const { compileResolvedKeybindingsConfig } = await import("@t3tools/shared/keybindings");
+  // The desktop defaults: holding Mod alone already matches a thread jump.
+  const keybindings = compileResolvedKeybindingsConfig([
+    { key: "mod+1", command: "thread.jump.1" },
+    { key: "mod+2", command: "thread.jump.2" },
+  ]);
+  return { ...(await original()), primaryServerKeybindingsAtom: Atom.make(keybindings) };
+});
 vi.mock("../commandPaletteBus", () => ({
   openCommandPalette: vi.fn(),
   isCommandPaletteOpen: () => false,
@@ -46,7 +58,6 @@ describe("sidebar header new thread", () => {
     { mode: "boring", count: 2, shift: false, picker: false },
     { mode: "boring", count: 2, shift: true, picker: true },
     { mode: "boring", count: 1, shift: false, picker: false },
-    { mode: "legacy", count: 2, shift: false, picker: false },
   ] as const)("$mode sidebar, $count projects, shift=$shift: picker=$picker", async (scenario) => {
     using stack = new DisposableStack();
     const previousSettings = getClientSettings();
@@ -54,7 +65,6 @@ describe("sidebar header new thread", () => {
     __setClientSettingsForTests({
       ...DEFAULT_CLIENT_SETTINGS,
       boringSidebarEnabled: scenario.mode === "boring",
-      legacySidebarEnabled: scenario.mode === "legacy",
     });
     const projects = [project("active"), project("idle")].slice(0, scenario.count);
     const currentProjectRef = {
@@ -67,6 +77,7 @@ describe("sidebar header new thread", () => {
       activeDraftThread: null,
       activeThread: null,
       defaultProjectRef: currentProjectRef,
+      defaultProjectFallbackReady: true,
       handleNewThread: startThread,
       routeDraftId: null,
       routeThreadRef: null,

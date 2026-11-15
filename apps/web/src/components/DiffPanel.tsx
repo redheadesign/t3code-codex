@@ -18,8 +18,10 @@ import {
   PilcrowIcon,
   Rows3Icon,
   TextWrapIcon,
+  ChevronRightIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
 } from "lucide-react";
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide";
 import * as Schema from "effect/Schema";
 import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { useCodeViewFileReveal } from "./diffs/useCodeViewFileReveal";
@@ -71,7 +73,6 @@ import { DiffFileTree } from "./diffs/DiffFileTree";
 import { FileExplorerPane } from "./files/FileExplorerPane";
 import { diffFileTreeEntries } from "./diffs/diffFileTree.logic";
 import { Button } from "./ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
 import { ToggleGroup, Toggle } from "./ui/toggle-group";
 import { Switch } from "./ui/switch";
 import {
@@ -103,6 +104,7 @@ import { vcsEnvironment } from "../state/vcs";
 import { buildBaseRefChoices, filterBaseRefChoices } from "../lib/baseRefChoices";
 import { createGitDiffFileContentsLoader } from "../lib/diffFileContents";
 
+import { observeIntersection } from "~/lib/observeIntersection";
 import { useReviewFilePatches } from "./diffs/useReviewFilePatches";
 import { DiffFileLoadingBoundary } from "./diffs/DiffFileLoadingBoundary";
 import { DiffFileStatus } from "./diffs/DiffFileStatus";
@@ -136,13 +138,13 @@ function DiffFileCollapseToggle({
   filePath,
   fileKey,
   collapsed,
-  unavailable,
   onToggle,
+  load,
 }: {
   filePath: string;
   fileKey: string;
   collapsed: boolean;
-  unavailable: boolean;
+  load?: () => void;
   onToggle: (fileKey: string) => void;
 }) {
   const ui = useUiText();
@@ -156,7 +158,16 @@ function DiffFileCollapseToggle({
             className="-ms-0.5"
             aria-label={collapsed ? `Expand ${filePath}` : `Collapse ${filePath}`}
             aria-expanded={!collapsed}
-            disabled={unavailable}
+            ref={(node) => {
+              if (!node || !load) return;
+              return observeIntersection(
+                node,
+                (entry) => {
+                  if (entry.isIntersecting) load();
+                },
+                { rootMargin: "600px" },
+              );
+            }}
             onClick={(event) => {
               event.stopPropagation();
               onToggle(fileKey);
@@ -164,10 +175,11 @@ function DiffFileCollapseToggle({
           />
         }
       >
-        <MorphIcon
-          className="size-4 text-muted-foreground/80"
-          icon={collapsed ? ChevronRight : ChevronDown}
-        />
+        {collapsed ? (
+          <ChevronRightIcon className="size-4 text-muted-foreground/80" />
+        ) : (
+          <ChevronDownIcon className="size-4 text-muted-foreground/80" />
+        )}
       </TooltipTrigger>
       <TooltipPopup side="top">
         {collapsed
@@ -369,6 +381,15 @@ export default function DiffPanel({
           ...(selectedBaseRef ? { baseRef: selectedBaseRef } : {}),
           ...(selectedCommitSha !== null ? { commitSha: selectedCommitSha } : {}),
           ignoreWhitespace: diffIgnoreWhitespace,
+          metadataOnly: true,
+          ...(selectedCommitSha === null
+            ? {
+                sourceKind:
+                  selectedGitScope === "unstaged"
+                    ? ("working-tree" as const)
+                    : ("branch-range" as const),
+              }
+            : {}),
         }
       : undefined;
   const canRefreshGitDiff =
@@ -472,16 +493,25 @@ export default function DiffPanel({
     : selectedTurn
       ? activeCheckpointDiff
       : branchDiffPreview;
-  const isLoadingSelectedPatch = selectedPatchQuery.isPending && selectedPatchQuery.data === null;
+  const isLoadingSelectedPatch =
+    selectedPatchQuery.isPending &&
+    (selectedPatchQuery.data === null ||
+      (isGitSelection && preview?.incomplete === true && selectedGitSource?.files?.length === 0));
   const selectedPatchError = toolCallSelection
     ? toolCallDetail.error
     : selectedTurn
       ? activeCheckpointDiff.error
       : branchDiffPreview.error;
   const hasResolvedPatch = typeof selectedPatch === "string";
-  const hasNoNetChanges = hasResolvedPatch && selectedPatch.trim().length === 0;
+  const hasNoNetChanges =
+    hasResolvedPatch &&
+    selectedPatch.trim().length === 0 &&
+    !preview?.incomplete &&
+    (!selectedGitSource?.patchesDeferred || selectedGitSource.files?.length === 0);
   const lazySource =
-    isGitSelection && selectedGitSource?.truncated && selectedGitSource.files
+    isGitSelection &&
+    (selectedGitSource?.truncated || selectedGitSource?.patchesDeferred) &&
+    selectedGitSource.files?.length
       ? selectedGitSource
       : null;
   const renderablePatch = getRenderablePatch(
@@ -502,7 +532,7 @@ export default function DiffPanel({
       : 0;
   const fileStats = new Map(lazySource?.files?.map((file) => [file.path, file]));
   const sourceLineStat =
-    isGitSelection && selectedGitSource?.files
+    isGitSelection && selectedGitSource?.files && !preview?.incomplete
       ? selectedGitSource.files.reduce(
           (total, file) => ({
             additions: total.additions + file.additions,
@@ -573,14 +603,12 @@ export default function DiffPanel({
     ...matchingBaseRefChoices.map(valueForBaseRefChoice),
   ];
   const {
-    scope: filePatchScope,
     isPending: areFilePatchesPending,
     fileStates,
     retry,
     requestFile,
-    readyFilePaths,
     renderableFiles,
-    settledFileCount,
+    remainingFileCount,
     loadNextFiles,
   } = useReviewFilePatches({
     environmentId: activeThread?.environmentId,
@@ -616,7 +644,16 @@ export default function DiffPanel({
   );
 
   const isRefreshingDiff = branchDiffPreview.isPending || areFilePatchesPending;
-  const renderableFileEntries = renderableFiles.map(getCachedFileEntry);
+  const pathOccurrences = new Map<string, number>();
+  const renderableFileEntries = renderableFiles.map((fileDiff) => {
+    const entry = getCachedFileEntry(fileDiff);
+    if (!isGitSelection) return entry;
+    // Metadata has no change type; keep each path's identity when its patch arrives.
+    const pathKey = JSON.stringify([fileDiff.prevName ?? fileDiff.name, fileDiff.name]);
+    const occurrence = pathOccurrences.get(pathKey) ?? 0;
+    pathOccurrences.set(pathKey, occurrence + 1);
+    return { ...entry, fileKey: `${pathKey}:${occurrence}` };
+  });
   const diffFileKeys = renderableFileEntries.map((file) => file.fileKey);
   const testFileCount = renderableFiles.filter((file) =>
     isTestChangedFile(resolveFileDiffPath(file)),
@@ -644,25 +681,17 @@ export default function DiffPanel({
       .updateCollapsedFileKeys(collapseScopeKey, defaultCollapsedDiffFileKeys, update);
   };
   const renderLoadingBoundary = () =>
-    settledFileCount < renderableFiles.length ? (
-      <DiffFileLoadingBoundary
-        load={loadNextFiles}
-        count={renderableFiles.length - settledFileCount}
-      />
+    remainingFileCount > 0 ? (
+      <DiffFileLoadingBoundary load={loadNextFiles} count={remainingFileCount} />
     ) : null;
-  const codeViewFiles = shownFileEntries
-    .filter(
-      ({ fileDiff }) =>
-        !lazySource || !readyFilePaths || readyFilePaths.has(resolveFileDiffPath(fileDiff)),
-    )
-    .map(({ fileDiff, fileKey, fileVersion }) => ({
-      fileDiff,
-      filePath: resolveFileDiffPath(fileDiff),
-      fileKey,
-      fileVersion,
-      collapsed:
-        collapsedDiffFileKeys.has(fileKey) || fileDiff.cacheKey?.endsWith(":pending") === true,
-    }));
+  const codeViewFiles = shownFileEntries.map(({ fileDiff, fileKey, fileVersion }) => ({
+    fileDiff,
+    filePath: resolveFileDiffPath(fileDiff),
+    fileKey,
+    fileVersion,
+    collapsed:
+      collapsedDiffFileKeys.has(fileKey) || fileDiff.cacheKey?.endsWith(":pending") === true,
+  }));
   const pendingFiles = renderableFiles.filter(
     (file) => file.cacheKey?.endsWith(":pending") && isFileShown(file),
   );
@@ -681,9 +710,7 @@ export default function DiffPanel({
       next.delete(file.fileKey);
       return next;
     });
-    if (lazySource && index >= settledFileCount) {
-      requestFile(index);
-    }
+    if (lazySource) requestFile(filePath);
     codeViewReveal.request(file.fileKey);
     return true;
   };
@@ -730,9 +757,12 @@ export default function DiffPanel({
     });
   };
   const toggleDiffFileCollapsed = useStableCallback((fileKey: string) => {
+    const file = renderableFileEntries.find((file) => file.fileKey === fileKey);
+    if (lazySource && file) requestFile(resolveFileDiffPath(file.fileDiff));
+    const pending = file?.fileDiff.cacheKey?.endsWith(":pending") === true;
     updateCollapsedDiffFiles((current) => {
       const next = new Set(current);
-      if (next.has(fileKey)) {
+      if (pending || next.has(fileKey)) {
         next.delete(fileKey);
       } else {
         next.add(fileKey);
@@ -1154,10 +1184,11 @@ export default function DiffPanel({
                 />
               }
             >
-              <MorphIcon
-                className="size-3.5"
-                icon={allDiffFilesCollapsed ? ChevronsUpDown : ChevronsDownUp}
-              />
+              {allDiffFilesCollapsed ? (
+                <ChevronsUpDownIcon className="size-3.5" />
+              ) : (
+                <ChevronsDownUpIcon className="size-3.5" />
+              )}
             </TooltipTrigger>
             <TooltipPopup side="top">
               {allDiffFilesCollapsed
@@ -1317,6 +1348,13 @@ export default function DiffPanel({
       ) : (
         <>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+            {preview?.incomplete && (
+              <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-2xs text-muted-foreground">
+                {selectedPatchError
+                  ? "Showing tracked changes. Untracked changes could not be loaded. Refresh to retry."
+                  : "Showing tracked changes. Checking untracked files..."}
+              </p>
+            )}
             {isSelectedPatchTruncated && !lazySource && (
               <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-2xs text-muted-foreground">
                 This preview exceeds the size limit. Changes shown are incomplete.
@@ -1440,8 +1478,10 @@ export default function DiffPanel({
                 >
                   <AnnotatableCodeView
                     key={collapseScopeKey ?? reviewSectionId}
+                    environmentId={activeThread?.environmentId}
+                    projectId={activeThread?.projectId}
                     viewerRef={codeViewReveal.attach}
-                    codeViewKey={`${codeViewMountKey}:${lazySource ? filePatchScope : "preview"}`}
+                    codeViewKey={codeViewMountKey}
                     className="h-full min-h-0 overflow-auto"
                     files={codeViewFiles}
                     pendingFiles={pendingFiles}
@@ -1478,15 +1518,19 @@ export default function DiffPanel({
                         }
                       : {})}
                     onRevealSearchMatch={unfoldDiffFile}
-                    renderHeaderPrefix={(fileDiff, fileKey) => {
-                      const unavailable = fileDiff.cacheKey?.endsWith(":pending") === true;
+                    renderHeaderPrefix={(fileDiff, fileKey, collapsed) => {
                       return (
                         <DiffFileCollapseToggle
                           filePath={resolveFileDiffPath(fileDiff)}
                           fileKey={fileKey}
-                          collapsed={unavailable || collapsedDiffFileKeys.has(fileKey)}
-                          unavailable={unavailable}
+                          collapsed={collapsed}
                           onToggle={toggleDiffFileCollapsed}
+                          {...(fileDiff.cacheKey?.endsWith(":pending") &&
+                          !collapsedDiffFileKeys.has(fileKey)
+                            ? {
+                                load: () => requestFile(resolveFileDiffPath(fileDiff)),
+                              }
+                            : {})}
                         />
                       );
                     }}

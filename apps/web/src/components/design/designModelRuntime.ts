@@ -57,6 +57,7 @@ type SceneCamera = PerspectiveCamera | OrthographicCamera;
 type SceneMesh = Mesh | Line | Points;
 type ColoredMaterial = Material & { color: Color };
 
+// @effect-diagnostics-next-line extendsNativeError:off
 export class DesignModelGraphicsError extends Error {}
 
 function isRenderable(object: Object3D): object is SceneMesh {

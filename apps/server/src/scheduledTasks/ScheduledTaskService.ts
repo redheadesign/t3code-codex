@@ -30,8 +30,9 @@ import {
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
+import * as Digest from "effect/crypto/Digest";
+import * as Mac from "effect/crypto/Mac";
 import * as SecureRandom from "effect/crypto/SecureRandom";
-import * as Data from "effect/Data";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
@@ -122,9 +123,10 @@ export class ScheduledTaskWebhookOrigin extends Context.Reference<Effect.Effect<
   },
 ) {}
 
-class WebhookDeliverySkipped extends Data.TaggedError("WebhookDeliverySkipped")<{
-  readonly reason: string;
-}> {}
+class WebhookDeliverySkipped extends Schema.TaggedError<WebhookDeliverySkipped>()(
+  "WebhookDeliverySkipped",
+  { reason: Schema.String },
+) {}
 
 interface RateWindow {
   readonly accepted: ReadonlyArray<{ readonly at: number }>;
@@ -453,6 +455,8 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const random = yield* SecureRandom.SecureRandom;
+    const digest = yield* Digest.Digest;
+    const mac = yield* Mac.Mac;
     const threadLaunch = yield* ThreadLaunchService.ThreadLaunchService;
     const threadManagement = yield* ThreadManagementService.ThreadManagementService;
     const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
@@ -1249,6 +1253,30 @@ export const layer = Layer.effect(
         }),
       );
 
+    const requireDestinationThread = Effect.fn("ScheduledTaskService.requireDestinationThread")(
+      function* (threadId: ThreadId, projectId: ProjectId, taskId: ScheduledTaskId) {
+        const thread = yield* threadManagement
+          .getThreadShell(threadId)
+          .pipe(
+            Effect.mapError((cause) =>
+              taskError("Could not read the destination thread.", { taskId, cause }),
+            ),
+          );
+        if (thread === null || thread.deletedAt !== null) {
+          return yield* taskError("That thread no longer exists.", { taskId });
+        }
+        if (thread.archivedAt !== null) {
+          return yield* taskError(
+            "That thread is archived. Unarchive it or pick another destination.",
+            { taskId },
+          );
+        }
+        if (thread.projectId !== projectId) {
+          return yield* taskError("That thread belongs to a different project.", { taskId });
+        }
+      },
+    );
+
     const upsert: ScheduledTaskService["Service"]["upsert"] = Effect.fn(
       "ScheduledTaskService.upsert",
     )(function* (input) {
@@ -1287,6 +1315,10 @@ export const layer = Layer.effect(
         existingTask.projectId !== input.projectId &&
         keptThreadId === existingTask.threadId;
       const threadId = threadMode === "new_thread" || movedOffThread ? null : keptThreadId;
+      // An unchanged destination is not rechecked, so a task on an archived thread stays editable.
+      if (threadId !== null && threadId !== existingTask?.threadId) {
+        yield* requireDestinationThread(threadId, input.projectId, id);
+      }
       // Refused on save rather than at run time; a disabled task can still be saved, so one
       // stored above the ceiling can be turned off before its mode is lowered. A task bound to a
       // thread runs in that thread's mode, which the orchestrator checks instead. Checked before
@@ -1989,7 +2021,9 @@ export const layer = Layer.effect(
       if (
         row === undefined ||
         row.webhook_token === null ||
-        !constantTimeEquals(request.token, row.webhook_token)
+        !(yield* constantTimeEquals(request.token, row.webhook_token).pipe(
+          Effect.provideService(Digest.Digest, digest),
+        ))
       ) {
         return yield* notFound;
       }
@@ -2104,12 +2138,12 @@ export const layer = Layer.effect(
           if (signature !== null) {
             const verified =
               row.webhook_secret !== null &&
-              verifyWebhookSignature({
+              (yield* verifyWebhookSignature({
                 signature,
                 secret: row.webhook_secret,
                 headers: request.headers,
                 body: request.body,
-              });
+              }).pipe(Effect.provideService(Mac.Mac, mac)));
             if (!verified) {
               yield* log("rejected_signature");
               yield* observe("rejected_signature");

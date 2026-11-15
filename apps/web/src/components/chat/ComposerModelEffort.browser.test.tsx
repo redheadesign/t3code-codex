@@ -71,7 +71,6 @@ function traitsInput(
     models,
     model: "fusion",
     modelOptions,
-    planModeEnabled: false,
     onModelOptionsChange,
   };
 }
@@ -157,7 +156,6 @@ it("persists compact reasoning changes and resets to the model's default", async
             models: [model],
             model: model.slug,
             modelOptions: options,
-            planModeEnabled: false,
             onModelOptionsChange: (next) => setOptions(next ?? []),
           }}
         />

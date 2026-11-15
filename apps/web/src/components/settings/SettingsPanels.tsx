@@ -23,6 +23,8 @@ import {
   type ResponseStreamingMode,
   type QuitConfirmationMode,
   SidebarProjectSortOrder,
+  ScreenReaderAnnouncements,
+  ToolCallVisibility,
 } from "@t3tools/contracts/settings";
 import { desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
 import { createModelSelection } from "@t3tools/shared/model";
@@ -69,10 +71,14 @@ import {
   resolveAppModelSelectionState,
   selectsPlanAgent,
 } from "../../modelSelection";
-import { providerInstanceEntriesFor } from "../../providerInstances";
+import { useTextGenerationTargets } from "../../textGenerators";
 import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { isMacPlatform } from "../../lib/utils";
-import { useEnvironmentProviders, useEnvironments } from "../../state/environments";
+import {
+  useEnvironmentProviders,
+  useEnvironments,
+  usePrimaryEnvironmentId,
+} from "../../state/environments";
 import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
 import { Button } from "../ui/button";
 import { DraftInput } from "../ui/draft-input";
@@ -106,6 +112,7 @@ import { StorageCleanupSections } from "./StorageSettings";
 import { UpdateTrackSwitchDialog } from "./UpdateTrackSwitchDialog";
 import { environmentIdsKey } from "~/state/environmentAtomList";
 import { environmentSessionStatesAtom } from "~/state/session";
+import { useCheckProviderUpdates } from "../ProviderUpdatesAction";
 import { canUpdateServer } from "../ServerUpdateAction";
 import { useUpdateEverythingRun } from "../sidebar/updateEverythingRun";
 import { awaitsTrackSwitch, channelSwitchLabel } from "../sidebar/updateEverything.logic";
@@ -174,6 +181,7 @@ function AboutVersionSection() {
   );
   // A second run would replace the first run's progress and local download.
   const updateRun = useUpdateEverythingRun();
+  const checkProviderUpdates = useCheckProviderUpdates();
 
   const hasDesktopBridge = typeof window !== "undefined" && Boolean(window.desktopBridge);
   const selectedUpdateChannel = updateState?.channel ?? "latest";
@@ -264,6 +272,7 @@ function AboutVersionSection() {
     }
 
     if (typeof bridge.checkForUpdate !== "function") return;
+    void checkProviderUpdates();
     void bridge
       .checkForUpdate()
       .then((result) => {
@@ -555,8 +564,11 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior
       ? ["Follow-up behavior"]
       : []),
-    ...(settings.contextWindowMeterEnabled !== DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled
-      ? ["Context window indicator"]
+    ...(settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility
+      ? ["Tool calls in chat"]
+      : []),
+    ...(settings.screenReaderAnnouncements !== DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements
+      ? ["Screen reader announcements"]
       : []),
     ...(settings.responseStreamingMode !== DEFAULT_UNIFIED_SETTINGS.responseStreamingMode
       ? ["Response streaming"]
@@ -578,6 +590,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(settings.addProjectBaseDirectory !== DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory
       ? ["Add project base directory"]
+      : []),
+    ...(settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout
+      ? ["Clone into host folders"]
       : []),
     ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
       ? ["Unpin confirmation"]
@@ -669,7 +684,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       composerRichTextEnabled: DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled,
       sendShortcut: DEFAULT_UNIFIED_SETTINGS.sendShortcut,
       followUpBehavior: DEFAULT_UNIFIED_SETTINGS.followUpBehavior,
-      contextWindowMeterEnabled: DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled,
+      toolCallVisibility: DEFAULT_UNIFIED_SETTINGS.toolCallVisibility,
+      screenReaderAnnouncements: DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements,
       environmentIdentificationMode: DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode,
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       panelAnimationDurationMs: DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs,
@@ -692,6 +708,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
       newWorktreesStartFromOrigin: DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
       addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
+      ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout,
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       confirmThreadUnpin: DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin,
@@ -728,7 +745,7 @@ export function useSettingsRestore(onRestored?: () => void) {
   };
 }
 
-const AUTO_SETTLE_DEFAULT_DAYS = DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays ?? 3;
+const AUTO_SETTLE_DEFAULT_DAYS = DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays ?? 7;
 
 function AutoSettleDaysInput({
   value,
@@ -777,22 +794,6 @@ export function LegacyFeaturesSection() {
 
   return (
     <SettingsSection id="legacy-features" title={ui("Legacy", "Прежний режим")}>
-      <SettingsRow
-        {...searchableSetting("legacy-plan-mode")}
-        description={ui(
-          "Restore Build/Plan, /plan, /default, and Shift+Tab. Off uses build mode.",
-          "Возвращает режим плана, /plan, /default и Shift+Tab.",
-        )}
-        control={
-          <Switch
-            checked={settings.planModeEnabled}
-            onCheckedChange={(checked) => {
-              updateSettings({ planModeEnabled: Boolean(checked) });
-            }}
-            aria-label={ui("Plan mode (legacy)", "Режим плана")}
-          />
-        }
-      />
       <SettingsRow
         {...searchableSetting("legacy-context-window-indicator")}
         description={ui(
@@ -1366,7 +1367,120 @@ export function ChatSettingsPanel() {
           }
         />
       </SettingsSection>
+
+      <SettingsSection id="activity" title="Activity">
+        <ToolCallVisibilityRow />
+        <ScreenReaderAnnouncementsRow />
+      </SettingsSection>
     </SettingsPageContainer>
+  );
+}
+
+const TOOL_CALL_VISIBILITY_LABELS: Record<ToolCallVisibility, string> = {
+  showAll: "Show all",
+  hideSuccessful: "Hide successful",
+  hideAll: "Hide all",
+  zen: "Zen",
+};
+
+const isToolCallVisibility = Schema.is(ToolCallVisibility);
+
+function ToolCallVisibilityRow() {
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  return (
+    <SettingsRow
+      {...searchableSetting("tool-call-visibility")}
+      description="Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show."
+      resetAction={
+        settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility ? (
+          <SettingResetButton
+            label="tool calls in chat"
+            onClick={() =>
+              updateSettings({ toolCallVisibility: DEFAULT_UNIFIED_SETTINGS.toolCallVisibility })
+            }
+          />
+        ) : null
+      }
+      control={
+        <Select
+          value={settings.toolCallVisibility}
+          onValueChange={(value) => {
+            if (isToolCallVisibility(value)) updateSettings({ toolCallVisibility: value });
+          }}
+        >
+          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Tool calls in chat">
+            <SelectValue>{TOOL_CALL_VISIBILITY_LABELS[settings.toolCallVisibility]}</SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {ToolCallVisibility.literals.map((value) => (
+              <SelectItem key={value} value={value}>
+                {TOOL_CALL_VISIBILITY_LABELS[value]}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      }
+    />
+  );
+}
+
+const SCREEN_READER_ANNOUNCEMENTS_LABELS: Record<ScreenReaderAnnouncements, string> = {
+  status: "Status only",
+  messages: "Status and messages",
+  everything: "Everything",
+};
+
+const isScreenReaderAnnouncements = Schema.is(ScreenReaderAnnouncements);
+
+function ScreenReaderAnnouncementsRow() {
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  return (
+    <SettingsRow
+      {...searchableSetting("screen-reader-announcements")}
+      description="What a screen reader hears from the open thread: a turn starting, needing you, and ending. Status and messages adds what the agent writes before its last message. Everything adds each step."
+      resetAction={
+        settings.screenReaderAnnouncements !==
+        DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements ? (
+          <SettingResetButton
+            label="screen reader announcements"
+            onClick={() =>
+              updateSettings({
+                screenReaderAnnouncements: DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements,
+              })
+            }
+          />
+        ) : null
+      }
+      control={
+        <Select
+          value={settings.screenReaderAnnouncements}
+          onValueChange={(value) => {
+            if (isScreenReaderAnnouncements(value)) {
+              updateSettings({ screenReaderAnnouncements: value });
+            }
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-48"
+            aria-label="Screen reader announcements"
+          >
+            <SelectValue>
+              {SCREEN_READER_ANNOUNCEMENTS_LABELS[settings.screenReaderAnnouncements]}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {ScreenReaderAnnouncements.literals.map((value) => (
+              <SelectItem key={value} value={value}>
+                {SCREEN_READER_ANNOUNCEMENTS_LABELS[value]}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      }
+    />
   );
 }
 
@@ -1695,9 +1809,14 @@ export function ThreadsSettingsPanel() {
     (target) => target.serverConfig?.environment.capabilities.threadAutoSettlementScope === true,
   );
 
-  const textGenerationProviders = serverProviders.filter(
-    (provider) => provider.supportsTextGeneration !== false,
-  );
+  const textGenerationTargets = useTextGenerationTargets({
+    environmentId,
+    settings,
+    providers: serverProviders.filter((provider) => provider.supportsTextGeneration !== false),
+    projectId: target?.projectId ?? null,
+    selections: [settings.textGenerationModelSelection],
+  });
+  const textGenerationProviders = textGenerationTargets.providers;
   const textGenerationModelSelection = resolveAppModelSelectionState(
     settings,
     textGenerationProviders,
@@ -1705,11 +1824,7 @@ export function ThreadsSettingsPanel() {
   const textGenInstanceId = textGenerationModelSelection.instanceId;
   const textGenModel = textGenerationModelSelection.model;
   const textGenModelOptions = textGenerationModelSelection.options;
-  const textGenerationModelInstanceEntries = providerInstanceEntriesFor(
-    textGenerationProviders,
-    settings,
-    target?.projectId ?? null,
-  );
+  const textGenerationModelInstanceEntries = textGenerationTargets.entries;
   const hasTextGenerationProvider = textGenerationModelInstanceEntries.some(
     (entry) => entry.enabled && entry.isAvailable,
   );
@@ -1769,6 +1884,30 @@ export function ThreadsSettingsPanel() {
               placeholder={mixedAddProjectBaseDirectory ? ui("Mixed", "Разные значения") : "~/"}
               spellCheck={false}
               aria-label={ui("Add project base directory", "Папка проектов")}
+            />
+          }
+        />
+        <SettingsRow
+          serverScoped
+          settingKeys={["ghqCloneLayout"]}
+          {...searchableSetting("ghq-clone-layout")}
+          description="Clones go to github.com/owner/repo under the folder above, like ghq."
+          resetAction={
+            settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout ? (
+              <SettingResetButton
+                label="clone into host folders"
+                onClick={() =>
+                  updateSettings({ ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout })
+                }
+              />
+            ) : null
+          }
+          control={
+            <ScopedSwitch
+              settingKeys={["ghqCloneLayout"]}
+              checked={settings.ghqCloneLayout}
+              onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
+              aria-label="Clone into host folders"
             />
           }
         />
@@ -2018,9 +2157,7 @@ export function ThreadsSettingsPanel() {
                     model={textGenModel}
                     modelOptions={textGenModelOptions}
                     allowPromptInjectedEffort={false}
-                    planModeEnabled={
-                      settings.planModeEnabled || selectsPlanAgent(textGenModelOptions)
-                    }
+                    includePlanAgent={selectsPlanAgent(textGenModelOptions)}
                     triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
                     onModelOptionsChange={(nextOptions) => {
                       updateSettings({
@@ -2237,6 +2374,8 @@ export function MaintenanceSettingsPanel() {
 export function AboutSettingsPanel() {
   const ui = useUiText();
   const primaryPolicy = usePrimaryManagedPolicy();
+  // The Welcome page sets up this computer, so it needs one.
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
   const telemetryOff = managedTelemetryOffMessage(primaryPolicy);
   return (
     <SettingsPageContainer>
@@ -2272,6 +2411,17 @@ export function AboutSettingsPanel() {
           </>
         )}
         <MobileAppSettingsRow />
+        {primaryEnvironmentId === null ? null : (
+          <SettingsRow
+            {...searchableSetting("welcome-page")}
+            description="See your agents, import projects, and set up your phone."
+            control={
+              <Button size="sm" variant="outline" render={<Link to="/welcome" />}>
+                Open
+              </Button>
+            }
+          />
+        )}
       </SettingsSection>
 
       <SettingsSection id="legal" title={ui("Legal", "Правовая информация")}>

@@ -451,7 +451,7 @@ function registerAppShellCommands(router: AnyRouter, shellElement: Element): () 
   };
 }
 
-function SidebarControl() {
+function SidebarControl({ showSidebar }: { readonly showSidebar: boolean }) {
   const router = useRouter();
   const usagePageOpen = useLocation({ select: (location) => location.pathname === "/usage" });
   const automationsPage = useLocation({
@@ -468,6 +468,8 @@ function SidebarControl() {
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- window keydown listener that toggles the sidebar on its shortcut
   useEffect(() => {
+    // A hidden sidebar would still save the toggle, so the shortcut does nothing without one.
+    if (!showSidebar) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (automationsPage || designPage || tasksPage) return;
       if (event.defaultPrevented) return;
@@ -506,7 +508,15 @@ function SidebarControl() {
       window.removeEventListener("keydown", onKeyDown, true);
       unsubscribe?.();
     };
-  }, [automationsPage, designPage, tasksPage, keybindings, toggleSidebar, usagePageOpen]);
+  }, [
+    automationsPage,
+    designPage,
+    tasksPage,
+    keybindings,
+    showSidebar,
+    toggleSidebar,
+    usagePageOpen,
+  ]);
 
   // The control lives as long as the shell, so it carries the shell's commands. Created
   // once so re-renders never re-register them.
@@ -518,7 +528,13 @@ function SidebarControl() {
   return <div ref={appShellCommandsRef} className="hidden" data-sidebar-control="" />;
 }
 
-export function AppSidebarLayout({ children }: { children: ReactNode }) {
+export function AppSidebarLayout({
+  children,
+  showSidebar = true,
+}: {
+  children: ReactNode;
+  showSidebar?: boolean;
+}) {
   const ui = useUiText();
   const [sidebarRouteReveal] = useState<SidebarRouteReveal>(() => ({
     observedKey: null,
@@ -587,10 +603,11 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
             className="relative h-full! min-h-0! overflow-hidden"
             data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
             defaultOpen
+            storageKey="chat_thread_sidebar_open"
             style={sidebarProviderStyle}
           >
             <SidebarBrandWidthProbe isElectron={isElectron} onWidthChange={setBrandWidth} />
-            {automationsPage || designPage || tasksPage ? null : (
+            {!showSidebar || automationsPage || designPage || tasksPage ? null : (
               <Sidebar
                 side="left"
                 collapsible="offcanvas"
@@ -623,7 +640,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
             )}
             {children}
             <BackgroundThreadAnnouncer />
-            <SidebarControl />
+            <SidebarControl showSidebar={showSidebar} />
             {isElectron ? <HistorySwipeNavigation /> : null}
             <WorkspaceGlobalChrome />
           </SidebarProvider>

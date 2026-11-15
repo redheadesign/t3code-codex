@@ -174,7 +174,9 @@ export const trustCodexProjectFolders = Effect.fn("desktop.projectTrust.codex")(
 ): Effect.fn.Return<TrustProjectFoldersResult["codex"]> {
   const cwd = yield* HostProcess.HomeDirectory;
   const command = yield* resolveSpawnCommand("codex", ["app-server"], { bypassNpmShim: true });
-  return yield* Effect.tryPromise((signal) => writeCodexTrust(command, cwd, paths, signal)).pipe(
+  return yield* Effect.promise((signal) =>
+    writeCodexTrust(command, cwd, paths, signal).catch(() => "failed" as const),
+  ).pipe(
     Effect.timeout("15 seconds"),
     Effect.orElseSucceed(() => "failed" as const),
   );

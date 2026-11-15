@@ -1,13 +1,30 @@
 import { useUiText } from "~/i18n";
 import { Button } from "../ui/button";
-import { type ContextWindowSnapshot, formatContextWindowTokens } from "~/lib/contextWindow";
+import type { ContextWindowSnapshot } from "@t3tools/client-runtime/state/context-window";
+import { formatContextWindowTokens } from "~/lib/contextWindow";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
-import {
-  formatContextWindowCompactionMessage,
-  formatContextWindowCost,
-} from "./ContextWindowMeter.logic";
 import { Minimize2Icon } from "lucide-react";
 import { composerFloatingLayerProps } from "./composerEventScope";
+
+function formatContextWindowCompactionMessage(
+  modelDisplayName: string | null | undefined,
+  autoCompactThreshold?: number | null,
+): string {
+  if (typeof autoCompactThreshold === "number" && autoCompactThreshold > 0) {
+    return `Compacts automatically at about ${autoCompactThreshold.toLocaleString("en-US")} tokens.`;
+  }
+  return modelDisplayName
+    ? `Context for ${modelDisplayName} compacts automatically when needed.`
+    : "Context compacts automatically when needed.";
+}
+
+function formatContextWindowCost(cost: {
+  readonly amount: number;
+  readonly currency: string;
+}): string {
+  const fractionDigits = Math.abs(cost.amount) > 0 && Math.abs(cost.amount) < 0.01 ? 4 : 2;
+  return `${cost.currency} ${cost.amount.toFixed(fractionDigits)}`;
+}
 
 function formatPercentage(value: number | null): string | null {
   if (value === null || !Number.isFinite(value)) {
@@ -176,8 +193,4 @@ export function ContextWindowMeter(props: {
       </PopoverPopup>
     </Popover>
   );
-}
-
-export function ContextWindowMeterPlaceholder() {
-  return <span aria-hidden="true" className="size-7 shrink-0" />;
 }
