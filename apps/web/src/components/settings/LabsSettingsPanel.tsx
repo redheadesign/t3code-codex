@@ -8,6 +8,7 @@ import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
+import { LegacyFeaturesSection } from "./SettingsPanels";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
@@ -18,6 +19,7 @@ import { firstManagedDenial, usePrimaryManagedPolicy } from "~/state/managedPoli
 export function LabsSettingsPanel() {
   return (
     <SettingsPageContainer>
+      <LegacyFeaturesSection />
       <SettingsSection id="beta" title="Beta">
         <BoringSidebarRow />
         {/* Clerk is only mounted when this build has T3 Connect. */}
