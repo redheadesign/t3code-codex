@@ -22,17 +22,17 @@ export function ComposerSubmitButton({
       type={type}
       data-composer-submit="true"
       className={cn(
-        "relative isolate flex h-9 w-9 items-center justify-center overflow-hidden rounded-full shadow-xs outline-none transition-colors duration-150 enabled:cursor-pointer enabled:inset-shadow-control-highlight focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:inset-shadow-control-pressed active:shadow-none disabled:pointer-events-none disabled:shadow-none sm:h-8 sm:w-8 [&_svg]:pointer-events-none",
+        "group/submit relative isolate flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-black shadow-xs outline-none transition-colors duration-150 enabled:cursor-pointer enabled:inset-shadow-control-highlight focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:inset-shadow-control-pressed active:shadow-none disabled:pointer-events-none disabled:bg-white disabled:shadow-none sm:h-8 sm:w-8 [&_svg]:pointer-events-none",
         stageBackdropVariant
-          ? "bg-white text-black enabled:shadow-black/24 enabled:hover:brightness-110 disabled:bg-white disabled:text-black"
-          : "bg-white text-black enabled:shadow-black/12 hover:bg-white disabled:bg-white disabled:text-black",
+          ? "enabled:shadow-black/24 enabled:hover:brightness-110"
+          : "bg-white/70 enabled:shadow-black/12 enabled:hover:bg-white/70",
       )}
       {...props}
     >
       {stageBackdropVariant ? (
         <span
           data-composer-submit-decoration
-          className="pointer-events-none absolute inset-0 -z-10"
+          className="pointer-events-none absolute inset-0 -z-10 group-enabled/submit:opacity-70"
           aria-hidden="true"
         >
           <StageBackdropButtonArt variant={stageBackdropVariant} />

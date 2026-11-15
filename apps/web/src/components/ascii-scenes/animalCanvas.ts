@@ -40,9 +40,9 @@ function createAnimalPen(
   context: CanvasRenderingContext2D,
   width: number,
   height: number,
+  cellWidth: number,
   appearance: AnimalSceneFrame["appearance"],
 ): AnimalPen {
-  const cellWidth = clamp(Math.round(width / 185), 5, 9);
   const cellHeight = Math.round(cellWidth * 1.43);
   const lightMode = appearance === "light";
   const columns = Math.ceil(width / cellWidth);
@@ -114,13 +114,32 @@ export function paintAnimalScene(context: CanvasRenderingContext2D, frame: Anima
   if (width <= 0 || height <= 0) return;
   context.clearRect(0, 0, width, height);
   context.save();
-  const pen = createAnimalPen(context, width, height, appearance);
   const artwork = animalArtworks[sceneId];
   const swatch = animalScenes.find(({ id }) => id === sceneId)!.swatch;
-  const count = clamp(Math.round((width * height) / 104_000), width < 560 ? 4 : 5, 12);
-  const columns = width < 560 ? 2 : width < 940 ? 3 : 4;
+  const areaPerAnimal = 104_000;
+  const compactPopulation = 12;
+  const compactSpanLimit = 214;
+  const area = width * height;
+  const count = clamp(Math.round(area / areaPerAnimal), width < 560 ? 4 : 5, 24);
+  const isExpanded = count > compactPopulation;
+  const columns = isExpanded
+    ? clamp(Math.round(Math.sqrt((count * width) / height)), 1, count)
+    : width < 560
+      ? 2
+      : width < 940
+        ? 3
+        : 4;
   const rows = Math.ceil(count / columns);
-  const baseSpan = clamp(Math.min(width, height) * 0.2 * artwork.scale, 60, 214);
+  const linearScale = Math.sqrt(area / (areaPerAnimal * compactPopulation));
+  const spanLimit = compactSpanLimit * clamp(1 + (linearScale - 1) * 0.35, 1, 1.45);
+  const baseSpan = clamp(Math.min(width, height) * 0.2 * artwork.scale, 60, spanLimit);
+  // Coarser cells keep the sampling work bounded as more animals fit on screen.
+  const cellScale = Math.max(
+    1,
+    (baseSpan / compactSpanLimit) * Math.sqrt(count / compactPopulation),
+  );
+  const cellWidth = Math.ceil(clamp(Math.round(width / 185), 5, 9) * cellScale);
+  const pen = createAnimalPen(context, width, height, cellWidth, appearance);
   const margin = baseSpan * 0.95;
   const flightWidth = width + 2 * margin;
   const flightHeight = height + 2 * margin;
@@ -128,7 +147,8 @@ export function paintAnimalScene(context: CanvasRenderingContext2D, frame: Anima
     const span = baseSpan * (0.72 + 0.37 * animalNoise(id, 78, 12));
     const column = id % columns;
     const row = Math.floor(id / columns);
-    const startX = (width * (column + 0.2 + 0.6 * animalNoise(id, 6, 26))) / columns;
+    const rowColumns = isExpanded ? Math.min(columns, count - row * columns) : columns;
+    const startX = (width * (column + 0.2 + 0.6 * animalNoise(id, 6, 26))) / rowColumns;
     const startY = (height * (row + 0.18 + 0.64 * animalNoise(id, 3, 60))) / rows;
     const course = -0.57 + 0.35 * animalNoise(id, 45, 12);
     const distance = time * artwork.speed * (0.36 + 0.16 * animalNoise(id, 3, 78));

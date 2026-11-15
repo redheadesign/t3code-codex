@@ -3591,7 +3591,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     "hidden sm:flex",
                 )}
               >
-                <div className="me-2 flex shrink-0 items-center gap-0.5">
+                <div className="me-2 flex shrink-0 items-center gap-2">
                   {composerAttachButton}
                   {permissionsButton}
                 </div>

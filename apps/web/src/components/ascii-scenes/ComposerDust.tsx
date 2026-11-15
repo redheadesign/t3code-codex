@@ -19,7 +19,7 @@ export function ComposerDust({ appearance }: { readonly appearance: "dark" | "li
       context.globalAlpha = 1;
     },
     appearance,
-    20,
+    15,
   );
   return <canvas ref={canvasRef} data-ascii-composer-dust aria-hidden="true" />;
 }

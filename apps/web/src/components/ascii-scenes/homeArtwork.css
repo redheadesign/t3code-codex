@@ -32,7 +32,8 @@
 }
 
 [data-ascii-composer] [data-composer-submit]:enabled {
-  background: var(--home-scene-accent, var(--primary));
+  --composer-send-color: var(--home-scene-accent, var(--primary));
+  background: color-mix(in srgb, var(--composer-send-color) 70%, transparent);
   color: var(--home-scene-foreground, var(--primary-foreground));
   box-shadow:
     inset 0 1px rgb(255 255 255 / 0.45),
@@ -41,23 +42,56 @@
 
 @media (hover: hover) {
   [data-ascii-composer] [data-composer-submit]:enabled:hover {
-    background: color-mix(in srgb, var(--home-scene-accent, var(--primary)), white 14%);
+    --composer-send-color: color-mix(in srgb, var(--home-scene-accent, var(--primary)), white 14%);
   }
 }
 
-[data-ascii-composer] [data-composer-submit]:enabled::after {
+:is([data-ascii-composer] [data-composer-submit], [data-composer-model-sheen]) {
+  --composer-sheen: linear-gradient(105deg, transparent 22%, white 50%, transparent 78%);
+}
+
+[data-ascii-composer] [data-composer-submit]:enabled::after,
+[data-composer-model-sheen] {
   position: absolute;
   inset: 0;
   padding: 1px;
   border-radius: inherit;
-  background: linear-gradient(105deg, transparent 22%, white 50%, transparent 78%) 0 0 / 240% 100%;
   mask:
     linear-gradient(#000 0 0) content-box exclude,
     linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+[data-ascii-composer] [data-composer-submit]:enabled::after {
+  background: var(--composer-sheen) 0 0 / 240% 100%;
   opacity: 0;
   content: "";
-  pointer-events: none;
   animation: ascii-send-sheen 1s ease-out 2;
+}
+
+[data-composer-model-sheen] {
+  overflow: hidden;
+}
+
+[data-composer-model-sheen]::before {
+  position: absolute;
+  inset: 0;
+  background: var(--composer-sheen);
+  opacity: 0.42;
+  content: "";
+  animation: composer-model-sheen 5s linear infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
+}
+
+@keyframes composer-model-sheen {
+  0% {
+    transform: translateX(-80%);
+  }
+  70%,
+  100% {
+    transform: translateX(80%);
+  }
 }
 
 @keyframes ascii-send-sheen {
@@ -71,7 +105,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-ascii-composer] [data-composer-submit]:enabled::after {
+  [data-ascii-composer] [data-composer-submit]:enabled::after,
+  [data-composer-model-sheen]::before {
     animation: none;
   }
 }

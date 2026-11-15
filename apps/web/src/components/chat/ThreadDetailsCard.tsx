@@ -115,7 +115,7 @@ export function ThreadDetailsCard({
   const card = (
     <div
       className={cn(
-        "isolate contain-paint grid max-h-full grid-rows-[minmax(0,1fr)] overflow-hidden rounded-(--floating-radius) border frosted-glass-fill frosted-glass-rim [--frosted-glass-fill:var(--popover)] [--frosted-glass-opacity:calc((var(--glass-frost-opacity)+var(--glass-opacity))/2)] [--frosted-glass-shadow:var(--glass-elevation)]",
+        "isolate contain-paint grid max-h-full grid-rows-[minmax(0,1fr)] overflow-hidden rounded-(--floating-radius) border frosted-floating-glass",
         mode === "popover" &&
           "max-h-[min(calc(100dvh-6.5rem),calc(var(--available-height,100dvh)-1rem))]",
       )}

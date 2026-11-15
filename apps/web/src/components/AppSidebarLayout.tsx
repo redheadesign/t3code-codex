@@ -114,7 +114,10 @@ function WorkspaceGlobalChrome() {
 
   return (
     <header
-      className="fixed top-0 right-0 left-0 z-30 flex h-(--workspace-chrome-height) items-center gap-2 pe-5 ps-5 md:left-(--workspace-rail-width)"
+      className={cn(
+        "fixed top-0 right-0 left-0 z-30 flex h-(--workspace-chrome-height) items-center gap-2 pe-5 ps-5 md:left-(--workspace-rail-width)",
+        isElectron && "drag-region select-none",
+      )}
       style={{
         paddingInlineStart:
           "max(1.25rem, calc(var(--workspace-controls-left) - var(--workspace-rail-width)))",
@@ -606,6 +609,8 @@ export function AppSidebarLayout({
             storageKey="chat_thread_sidebar_open"
             style={sidebarProviderStyle}
           >
+            {/* Electron applies the fixed controls' no-drag regions after the titlebar. */}
+            <WorkspaceGlobalChrome />
             <SidebarBrandWidthProbe isElectron={isElectron} onWidthChange={setBrandWidth} />
             {!showSidebar || automationsPage || designPage || tasksPage ? null : (
               <Sidebar
@@ -635,14 +640,13 @@ export function AppSidebarLayout({
                   <ThreadSidebar routeReveal={sidebarRouteReveal} />
                 )}
                 <SidebarRail onDoubleClick={resetSidebarWidth} />
-                <SidebarRail titlebar />
+                <SidebarRail titlebar className="[-webkit-app-region:no-drag]" />
               </Sidebar>
             )}
             {children}
             <BackgroundThreadAnnouncer />
             <SidebarControl showSidebar={showSidebar} />
             {isElectron ? <HistorySwipeNavigation /> : null}
-            <WorkspaceGlobalChrome />
           </SidebarProvider>
         </div>
       </div>

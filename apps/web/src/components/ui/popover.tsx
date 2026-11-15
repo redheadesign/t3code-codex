@@ -47,7 +47,7 @@ function PopoverPopup({
   ...props
 }: PopoverPrimitive.Popup.Props & {
   padding?: keyof typeof popoverViewportPaddingClassName;
-  variant?: "default" | "panel";
+  variant?: "default" | "frosted" | "panel";
   side?: PopoverPrimitive.Positioner.Props["side"];
   align?: PopoverPrimitive.Positioner.Props["align"];
   sideOffset?: PopoverPrimitive.Positioner.Props["sideOffset"];
@@ -93,14 +93,15 @@ function PopoverPopup({
         <PopoverPrimitive.Popup
           className={cn(
             "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) overflow-hidden rounded-(--floating-radius) text-popover-foreground outline-none transition-[width,height,scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
-            variant !== "panel" && "dropdown-glass",
+            variant === "default" && "dropdown-glass",
+            variant === "frosted" && "border border-solid frosted-floating-glass",
             tooltipStyle && "w-fit text-balance rounded-(--floating-radius-sm) text-xs",
             // Electron drag hit-testing ignores z-index; popups over a drag region would swallow hover.
             "[-webkit-app-region:no-drag]",
             tooltipStyle &&
               "w-fit text-balance rounded-md text-xs shadow-md/5 before:rounded-[calc(var(--radius-md)-1px)]",
             !tooltipStyle &&
-              variant !== "panel" &&
+              variant === "default" &&
               "shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]",
             width !== "auto" && ["max-w-[calc(100vw-2rem)]", popoverPopupWidthClassName[width]],
             variant === "panel" &&
