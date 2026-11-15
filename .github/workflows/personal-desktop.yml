@@ -19,6 +19,10 @@ on:
         description: Publish the complete desktop release from main
         type: boolean
         default: false
+      reuse_run:
+        description: Completed main build run ID to publish without rebuilding
+        type: string
+        required: false
 permissions:
   contents: read
 jobs:
@@ -34,11 +38,15 @@ jobs:
           VERSION: ${{ inputs.version }}
           PLATFORM: ${{ inputs.platform }}
           PUBLISH: ${{ inputs.publish }}
+          REUSE_RUN: ${{ inputs.reuse_run }}
         run: |
           node --input-type=module <<'JS'
           import { appendFileSync } from 'node:fs';
 
-          const { VERSION, PLATFORM, PUBLISH, GITHUB_REF, GITHUB_OUTPUT } = process.env;
+          const { VERSION, PLATFORM, PUBLISH, REUSE_RUN, GITHUB_REF, GITHUB_OUTPUT } = process.env;
+          if (REUSE_RUN && PUBLISH !== 'true') {
+            throw new Error('Reusing a build requires publishing.');
+          }
           if (PUBLISH === 'true' && (PLATFORM !== 'all' || GITHUB_REF !== 'refs/heads/main')) {
             throw new Error('Publishing requires all platforms and the main branch.');
           }
@@ -65,6 +73,7 @@ jobs:
 
   build:
     name: ${{ matrix.label }}
+    if: inputs.reuse_run == ''
     needs: plan
     strategy:
       fail-fast: false
@@ -193,13 +202,17 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    if: inputs.publish && github.ref == 'refs/heads/main'
+    if: >-
+      !cancelled() && inputs.publish && github.ref == 'refs/heads/main' &&
+      needs.plan.result == 'success' &&
+      (needs.build.result == 'success' || (inputs.reuse_run != '' && needs.build.result == 'skipped'))
     needs: [plan, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     concurrency: desktop-release-publish
     permissions:
       contents: write
+      actions: read
     env:
       VERSION: ${{ needs.plan.outputs.version }}
     steps:
@@ -212,10 +225,38 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           install-args: --filter @t3tools/scripts...
+      - name: Resolve build provenance
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REUSE_RUN: ${{ inputs.reuse_run }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$REUSE_RUN" ]]; then
+            printf 'run_id=%s\ncommit=%s\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          [[ "$REUSE_RUN" =~ ^[1-9][0-9]*$ ]]
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REUSE_RUN")
+          jq -e '
+            .path == ".github/workflows/personal-desktop.yml" and
+            .head_branch == "main" and .event == "workflow_dispatch" and .status == "completed"
+          ' <<< "$run" > /dev/null
+          jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REUSE_RUN/jobs?per_page=100")
+          jq -e '
+            ([.jobs[] | select(.conclusion == "success") | .name] | sort) as $passed |
+            (["Linux ARM64", "Linux x64", "Windows ARM64", "Windows x64", "macOS Apple Silicon", "macOS Intel"] - $passed) == []
+          ' <<< "$jobs" > /dev/null
+          printf 'run_id=%s\ncommit=%s\n' "$REUSE_RUN" "$(jq -r .head_sha <<< "$run")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v8
         with:
           pattern: installers-*
           path: installers
+          run-id: ${{ steps.source.outputs.run_id }}
+          github-token: ${{ inputs.reuse_run != '' && github.token || '' }}
       - name: Assemble and verify release assets
         shell: bash
         run: |
@@ -272,6 +313,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          BUILD_RUN: ${{ steps.source.outputs.run_id }}
+          BUILD_SHA: ${{ steps.source.outputs.commit }}
         run: |
           set -euo pipefail
           downloads="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/v$VERSION"
@@ -289,11 +332,11 @@ jobs:
 
           macOS uses manual installation and updates. These installers are distributed without Apple Developer ID notarization.
 
-          [SHA-256 checksums]($downloads/SHA256SUMS) · [Build and launch checks]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)
+          [SHA-256 checksums]($downloads/SHA256SUMS) · [Build and launch checks]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN)
           EOF
 
           gh release create "v$VERSION" release/* \
-            --target "$GITHUB_SHA" \
+            --target "$BUILD_SHA" \
             --title "T3 Code by redheadesign $VERSION" \
             --notes-file "$RUNNER_TEMP/release-notes.md" \
             --latest
