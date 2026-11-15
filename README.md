@@ -2,7 +2,7 @@
 
 A desktop fork of T3 Code by redheadesign for working with Codex, Claude Code, and other coding agents. It adds a glass interface, interactive ASCII animals, and a Codex-style project sidebar with task boards and a design canvas.
 
-**[Download for Windows x64](https://github.com/redheadesign/t3code-codex/releases/latest)** · [Browse releases](https://github.com/redheadesign/t3code-codex/releases)
+**[Download for macOS, Windows, or Linux](https://github.com/redheadesign/t3code-codex/releases/latest)** · [Browse releases](https://github.com/redheadesign/t3code-codex/releases)
 
 ![A new chat with ASCII foxes, a glass composer, and the project sidebar](docs/images/fork/workspace.png)
 
@@ -27,10 +27,11 @@ The screenshots show a demo workspace.
 
 ## Install and sign in
 
-1. Download and run the Windows x64 `.exe` from the latest release. The installer can also update an existing T3 Code (Beta) installation from this fork. [Latest release](https://github.com/redheadesign/t3code-codex/releases/latest)
+1. Pick the installer for your operating system and processor from the latest release. [Latest release](https://github.com/redheadesign/t3code-codex/releases/latest)
+   - **macOS:** Open the Apple Silicon or Intel `.dmg` and drag the app to **Applications**. Install updates manually from Releases.
+   - **Windows:** Run the x64 or ARM64 `.exe`.
+   - **Linux:** Use the x64 or ARM64 AppImage or install the matching `.deb` on Debian-based distributions.
 2. Sign in to at least one coding agent with your provider account. [Codex setup](docs/user/providers-codex.md) · [Claude Code setup](docs/user/providers-claude.md)
-
-For macOS on Apple Silicon, download the `.dmg` if it is listed in the release you choose, then drag the app to **Applications**. [Release history](https://github.com/redheadesign/t3code-codex/releases)
 
 ## Documentation
 
@@ -56,7 +57,7 @@ Open the pairing URL printed by the dev runner. [Development guide](docs/operati
 
 ### Build desktop installers
 
-Run the desktop release workflow with a version and target platform. GitHub Actions smoke-tests the packaged app in an isolated profile and uploads the installers and checksums as build artifacts. Published installers are available through Releases. [Desktop release workflow](https://github.com/redheadesign/t3code-codex/actions/workflows/personal-desktop.yml) · [Releases](https://github.com/redheadesign/t3code-codex/releases)
+Run the desktop release workflow with a version and platform. GitHub Actions launches the packaged apps against an isolated profile and uploads the installers and checksums. Select **All** and enable **Publish** on `main` to publish the verified builds as a GitHub Release. [Desktop release workflow](https://github.com/redheadesign/t3code-codex/actions/workflows/personal-desktop.yml) · [Releases](https://github.com/redheadesign/t3code-codex/releases)
 
 ## Credits and license
 
