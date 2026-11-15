@@ -134,6 +134,7 @@ const WINDOWS_PAYLOAD_FIXTURE_VERSION = "1.2.3";
 
 const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(function* (input: {
   readonly copyUnpackedNatives: boolean;
+  readonly extraNativeFiles?: readonly string[];
   readonly serverEntrySource?: string;
   readonly wslRuntime?: "valid" | "loose-server-tree" | "missing-pty" | "bad-digest";
   readonly targetArch?: "x64" | "arm64";
@@ -151,6 +152,11 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
   yield* fs.makeDirectory(path.dirname(nativePath), { recursive: true });
   yield* fs.writeFileString(serverEntryPath, input.serverEntrySource ?? "console.log('server');\n");
   yield* fs.writeFileString(nativePath, "MZ native-binary");
+  for (const nativeFile of input.extraNativeFiles ?? []) {
+    const file = path.join(sourceDir, nativeFile);
+    yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+    yield* fs.writeFileString(file, "MZ native-binary");
+  }
 
   const generatedAsarPath = path.join(tempDir, WINDOWS_SERVER_ASAR_RESOURCE);
   yield* packWindowsServerAsar({ sourceDir, asarPath: generatedAsarPath, arch: "x64" });
@@ -1321,6 +1327,48 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         ]);
       }),
     ),
+  );
+
+  it.effect("budgets the declared Windows transcription DLLs for the target architecture", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const speechPackage = "node_modules/@transcribe-cpp/win32-x64-cpu-vulkan";
+        const fixture = yield* makeWindowsPayloadFixture({
+          copyUnpackedNatives: true,
+          extraNativeFiles: Array.from(
+            { length: 14 },
+            (_, index) => `${speechPackage}/runtime-${index}.dll`,
+          ),
+        });
+        const input = {
+          stageDistDir: fixture.stageDistDir,
+          appExecutableName: fixture.appExecutableName,
+          targetArch: "x64",
+          appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
+        } as const;
+        const { fileCount } = yield* validateWindowsPackagedPayload(input);
+        const budget = WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT + 13;
+        for (let count = fileCount; count < budget; count++) {
+          yield* fs.writeFileString(path.join(fixture.packagedAppDir, String(count)), "resource");
+        }
+        assert.equal((yield* validateWindowsPackagedPayload(input)).fileCount, budget);
+
+        const wrongArchitecture = yield* validateWindowsPackagedPayload({
+          ...input,
+          targetArch: "arm64",
+        }).pipe(Effect.flip);
+        assert.instanceOf(wrongArchitecture, WindowsPackagedPayloadValidationError);
+        assert.equal(wrongArchitecture.fileLimit, WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT);
+
+        yield* fs.writeFileString(path.join(fixture.packagedAppDir, "extra-resource"), "resource");
+        const excess = yield* validateWindowsPackagedPayload(input).pipe(Effect.flip);
+        assert.instanceOf(excess, WindowsPackagedPayloadValidationError);
+        assert.equal(excess.reason, "file-limit-exceeded");
+        assert.equal(excess.fileLimit, budget);
+      }),
+    ).pipe(Effect.provideService(HostProcess.Platform, "linux")),
   );
 
   it.effect("rejects a Windows payload that regresses above the file-count budget", () =>

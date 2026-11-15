@@ -1062,6 +1062,8 @@ export function resolveWindowsServerAsarIgnoreGlobs(arch: typeof BuildArch.Type)
 }
 
 export const WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT = 80;
+// The transcription runtime loads CPU-specific and Vulkan DLLs from disk.
+const WINDOWS_TRANSCRIPTION_PAYLOAD_DLL_LIMIT = 13;
 export const WINDOWS_SERVER_RESOURCE_SOURCE_DIR = "apps/desktop/prod-resources/windows-server";
 export const WINDOWS_SERVER_EXTRA_RESOURCES = [
   {
@@ -3328,7 +3330,6 @@ export const validateWindowsPackagedPayload = Effect.fn(
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const fileLimit = input.fileLimit ?? WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT;
   const isFile = (filePath: string) =>
     fs.stat(filePath).pipe(
       Effect.map((stat) => stat.type === "File"),
@@ -3515,6 +3516,14 @@ export const validateWindowsPackagedPayload = Effect.fn(
     }
   }
 
+  const transcriptionPackage = `node_modules/@transcribe-cpp/win32-${input.targetArch}-cpu-vulkan/`;
+  const transcriptionDllCount = unpackedFiles.filter(
+    (file) => file.startsWith(transcriptionPackage) && file.endsWith(".dll"),
+  ).length;
+  const fileLimit =
+    input.fileLimit ??
+    WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT +
+      Math.min(transcriptionDllCount, WINDOWS_TRANSCRIPTION_PAYLOAD_DLL_LIMIT);
   const fileCount = yield* countPayloadFiles(packagedAppDir);
   if (fileCount > fileLimit) {
     return yield* new WindowsPackagedPayloadValidationError({
