@@ -356,6 +356,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "appearance",
   },
   {
+    id: "home-artwork",
+    title: "Home screen artwork",
+    titleRu: "Фон главного экрана",
+    to: "/settings/appearance",
+    searchTerms: ["ASCII animal wallpaper animated background животное животные анимация"],
+  },
+  {
     // Prefixed because the slider control already owns the `appearance-contrast` id.
     id: "setting-appearance-contrast",
     title: "Contrast",

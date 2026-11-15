@@ -100,9 +100,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
    * Compact UI geometry. Keep these values semantic so sidebar, palette,
    * tooltip, and toolbar controls cannot quietly drift apart.
    */
-  --control-radius: 0.5rem;
+  --control-radius: 0.625rem;
   /* Elevated surfaces share one softer silhouette; controls remain compact. */
-  --floating-radius: 1rem;
+  --floating-radius: 1.25rem;
   --floating-radius-sm: 0.75rem;
   --dialog-radius: 1.5rem;
   --floating-inner-radius: calc(var(--floating-radius) - 1px);
@@ -125,9 +125,14 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
      docked sheets, then the floating preview player (47–49, see
      previewMiniPlayerLayout.ts), then dialogs and popovers (50 and up). */
   --z-sheet: 46;
-  --glass-blur: 12px;
+  --glass-blur: 14px;
   --glass-opacity: 80%;
-  --glass-saturation: 1.14;
+  --glass-panel-opacity: 87%;
+  --glass-saturation: 1.5;
+  --glass-edge: color-mix(in srgb, var(--contrast-foreground) 14%, transparent);
+  --glass-sheen: linear-gradient(165deg, rgb(255 255 255 / 58%), transparent 52%);
+  --glass-rim-shadow: inset 0 1px rgb(255 255 255 / 90%);
+  --glass-elevation: 0 14px 38px -14px rgb(38 47 71 / 30%);
   --desktop-window-right-resize-inset: 0px;
   --workspace-topbar-height: 44px;
   /* The window row above the shell card. Its controls center on it, as do the macOS traffic
@@ -165,7 +170,11 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --app-scrollbar-thumb: rgb(255 255 255 / 8%);
     --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
     --glass-blur: 16px;
-    --glass-saturation: 1.08;
+    --glass-opacity: 76%;
+    --glass-edge: rgb(236 241 255 / 15%);
+    --glass-sheen: linear-gradient(165deg, rgb(228 235 255 / 8%), transparent 48%);
+    --glass-rim-shadow: inset 0 1px rgb(233 240 255 / 12%);
+    --glass-elevation: 0 18px 42px -14px rgb(0 0 0 / 72%);
   }
 }
 
@@ -391,25 +400,42 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 @utility surface-glass {
-  background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--glass-fill, var(--card)) var(--glass-opacity),
+    transparent
+  );
+  background-image: var(--glass-sheen);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-rim-shadow);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 
   @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-    background: var(--background) !important;
+    background-color: var(--glass-fill, var(--card));
   }
+}
+
+@utility glass-panel {
+  background-color: color-mix(
+    in srgb,
+    var(--glass-panel-fill, var(--card)) var(--glass-panel-opacity),
+    transparent
+  );
+  background-image: var(--glass-sheen);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-rim-shadow);
 }
 
 @utility alert-glass {
   --alert-glass-tint: transparent;
+  @apply surface-glass;
   background:
     linear-gradient(
       color-mix(in srgb, var(--alert-glass-tint) 4%, transparent),
       color-mix(in srgb, var(--alert-glass-tint) 4%, transparent)
     ),
-    color-mix(in srgb, var(--background) var(--glass-opacity), transparent) !important;
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+    var(--glass-sheen), color-mix(in srgb, var(--card) var(--glass-opacity), transparent) !important;
 
   &[data-variant="error"] {
     --alert-glass-tint: var(--destructive);
@@ -428,7 +454,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 
   @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-    background: var(--background) !important;
+    background-color: var(--card) !important;
   }
 }
 
@@ -452,22 +478,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 @utility dialog-glass {
-  background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  border-color: color-mix(in srgb, var(--contrast-foreground) 10%, transparent);
-  box-shadow: 0 24px 64px -24px rgb(0 0 0 / 65%);
-
-  @variant dark {
-    border-color: color-mix(in srgb, var(--contrast-foreground) 8%, transparent);
-    box-shadow:
-      inset 0 1px rgb(255 255 255 / 4%),
-      0 24px 72px -20px rgb(0 0 0 / 90%);
-  }
-
-  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-    background: var(--popover) !important;
-  }
+  --glass-fill: var(--popover);
+  @apply surface-glass;
+  box-shadow: var(--glass-rim-shadow), var(--glass-elevation);
 }
 
 @utility dialog-backdrop {
@@ -481,29 +494,17 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 @utility dropdown-glass {
-  background: color-mix(
+  @apply dialog-glass;
+  background-color: color-mix(
     in srgb,
-    var(--popover) 18%,
+    var(--popover) 44%,
     color-mix(in srgb, var(--popover) var(--glass-opacity), transparent)
   );
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  border: 1px solid color-mix(in srgb, var(--contrast-foreground) 14%, transparent);
-  box-shadow:
-    inset 0 1px rgb(255 255 255 / 7%),
-    0 1px 3px rgb(0 0 0 / 10%),
-    0 10px 28px -8px rgb(0 0 0 / 24%);
+  border-style: solid;
+  border-width: 1px;
 
   @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-    background: var(--popover) !important;
-  }
-
-  @variant dark {
-    border-color: color-mix(in srgb, var(--contrast-foreground) 11%, transparent);
-    box-shadow:
-      inset 0 1px rgb(255 255 255 / 8%),
-      0 1px 3px rgb(0 0 0 / 45%),
-      0 14px 36px -10px rgb(0 0 0 / 72%);
+    background-color: var(--popover);
   }
 }
 
@@ -515,7 +516,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --glass-opacity: 100% !important;
+    --glass-panel-opacity: 100% !important;
     --glass-blur: 0px !important;
+    --glass-saturation: 1 !important;
   }
 }
 
@@ -1232,38 +1235,37 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
 :root {
   color-scheme: light;
-  --radius: 0.5rem;
-  --background: var(--color-zinc-25);
-  --app-chrome-background: var(--background);
+  --radius: var(--control-radius);
+  --background: #f6f3ec;
+  --app-chrome-background: #efede8;
   --toolbar-background: var(--app-chrome-background);
   --toolbar-foreground: var(--foreground);
   --toolbar-border: var(--border);
   --toolbar-control: var(--popover);
   --toolbar-control-foreground: var(--foreground);
   --toolbar-control-hover: var(--accent);
-  --surface-raised: color-mix(in srgb, var(--card) 20%, transparent);
-  --foreground: var(--color-zinc-900);
-  --card: var(--color-white);
-  --card-foreground: var(--color-zinc-900);
-  --popover: var(--color-white);
-  --popover-foreground: var(--color-zinc-900);
-  --primary: oklch(0.488 0.217 264);
-  --primary-foreground: var(--color-white);
-  --secondary: var(--color-zinc-50);
-  --secondary-foreground: var(--color-zinc-800);
-  --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-500);
+  --surface-raised: #fdfaf4;
+  --foreground: #1b1f30;
+  --card: #fffdf8;
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: #2a5fe6;
+  --primary-foreground: #fffdf8;
+  --secondary: #eeece7;
+  --secondary-foreground: var(--foreground);
+  --muted: var(--secondary);
+  --muted-foreground: #5b6172;
   --placeholder: var(--muted-foreground);
   --secondary-label: var(--muted-foreground);
   --icon-muted: var(--muted-foreground);
-  /* One step past the accent, so a user turn stands off the near-white canvas. */
-  --message-surface: color-mix(in srgb, var(--color-zinc-200) 55%, var(--color-zinc-100));
+  --message-surface: #e8eaf2;
   --message-foreground: var(--foreground);
   --message-action: var(--primary);
   --message-action-foreground: var(--primary-foreground);
   --message-action-hover: color-mix(in srgb, var(--primary) 90%, var(--background));
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
+  --accent: #e3e6ef;
+  --accent-foreground: var(--foreground);
   /* Action rows get their own contrast step; base accent still owns surfaces and controls. */
   --interactive-row-hover: var(--accent);
   --interactive-row-active: var(--accent);
@@ -1272,8 +1274,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --tool-error-icon: var(--error);
   --error-surface: color-mix(in srgb, var(--error) 8%, transparent);
   --destructive: var(--error);
-  --border: var(--color-zinc-200);
-  --input: var(--color-zinc-300);
+  --border: #d9d9df;
+  --input: #c9ced9;
   --ring: var(--primary);
   --destructive-foreground: var(--error-foreground);
   --info: var(--color-blue-500);
@@ -1291,13 +1293,13 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --update-foreground: var(--primary);
   /* Keep every sidebar primitive on the same light surface hierarchy, including
      portaled mobile sheets and settings navigation outside the app sidebar. */
-  --sidebar: var(--color-zinc-50);
+  --sidebar: #f2f0ed;
   --sidebar-foreground: var(--foreground);
   --sidebar-muted-foreground: var(--muted-foreground);
-  --sidebar-control-surface: var(--color-zinc-100);
-  --sidebar-row-hover: var(--color-zinc-25);
-  --sidebar-row-active: var(--color-white);
-  --sidebar-row-selected: var(--color-white);
+  --sidebar-control-surface: var(--accent);
+  --sidebar-row-hover: var(--surface-raised);
+  --sidebar-row-active: var(--card);
+  --sidebar-row-selected: var(--card);
   --sidebar-border: var(--border);
   --sidebar-stage-fade: var(--sidebar);
   --code-background: color-mix(in srgb, var(--card) 90%, var(--background));
@@ -1309,96 +1311,40 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
   @variant dark {
     color-scheme: dark;
-    /* The canvas is true black, matching the sidebar. Raised surfaces keep the tone they had
-       over neutral-950, so cards, popovers, and the composer still lift. Borders and hover
-       states provide separation without milky gray fills. */
-    --background: #000;
-    --surface-raised: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
-    --foreground: var(--color-neutral-100);
-    --card: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
-    --card-foreground: var(--color-neutral-100);
-    --popover: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
-    --popover-foreground: var(--color-neutral-100);
-    --primary: oklch(0.571 0.21 264);
-    --secondary: --alpha(var(--color-white) / 3%);
-    --secondary-foreground: var(--color-neutral-100);
-    --muted: --alpha(var(--color-white) / 3%);
-    --muted-foreground: var(--color-neutral-400);
-    --accent: --alpha(var(--color-white) / 4%);
-    --accent-foreground: var(--color-neutral-100);
+    --background: #06070c;
+    --app-chrome-background: #0b0e17;
+    --surface-raised: #141929;
+    --foreground: #e8ebf7;
+    --card: #101421;
+    --popover: #141927;
+    --primary: #7aa2ff;
+    --primary-foreground: #0b1020;
+    --secondary: #141824;
+    --muted-foreground: #9ca4bc;
+    --accent: #1a2134;
     --interactive-row-hover: color-mix(in srgb, var(--color-white) 6%, transparent);
     --interactive-row-active: color-mix(in srgb, var(--color-white) 11%, transparent);
-    /* A user turn sits above the composer tone, level with the selected sidebar row. */
-    --message-surface: color-mix(in srgb, var(--color-neutral-950) 92%, var(--color-white));
+    --message-surface: #191f31;
+    --message-action-hover: color-mix(in srgb, var(--primary) 86%, white);
     --error: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
     --error-foreground: var(--color-red-400);
     --tool-error-icon: #fca5a5;
     --error-surface: color-mix(in srgb, var(--error) 16%, transparent);
-    --border: --alpha(var(--color-white) / 8%);
-    --input: --alpha(var(--color-white) / 11%);
+    --border: rgb(211 223 255 / 13%);
+    --input: rgb(211 223 255 / 18%);
     --info-foreground: var(--color-blue-400);
     --guest-foreground: var(--color-fuchsia-300);
     --success-foreground: var(--color-emerald-400);
     --warning-foreground: var(--color-amber-400);
     --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
     --update-foreground: var(--color-blue-400);
-    --sidebar: var(--card);
+    --sidebar: #0b0e17;
     --sidebar-control-surface: var(--muted);
     --sidebar-row-hover: var(--accent);
     --sidebar-row-active: var(--accent);
-    --sidebar-row-selected: var(--muted);
-    --sidebar-stage-fade: var(--card);
+    --sidebar-row-selected: var(--message-surface);
     --terminal-cursor: rgb(180 203 255);
     --terminal-selection-background: rgb(180 203 255 / 25%);
-  }
-}
-
-/* Keep both sidebar implementations (default and legacy) on the same quiet
-   zinc hierarchy: zinc-50 navigation, zinc-25 hover, and white selected/raised
-   surfaces. */
-[data-app-sidebar] {
-  --background: var(--color-zinc-25);
-  --foreground: var(--color-zinc-900);
-  --card: var(--color-white);
-  --card-foreground: var(--color-zinc-900);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
-  --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-500);
-  --border: var(--color-zinc-200);
-  --input: var(--color-zinc-300);
-  --sidebar: var(--color-zinc-50);
-  --sidebar-foreground: var(--color-zinc-900);
-  --sidebar-muted-foreground: var(--color-zinc-500);
-  --sidebar-control-surface: var(--color-zinc-100);
-  --sidebar-row-hover: var(--color-zinc-25);
-  --sidebar-row-active: var(--color-white);
-  --sidebar-row-selected: var(--color-white);
-  --sidebar-border: var(--color-zinc-200);
-  --sidebar-stage-fade: var(--sidebar);
-
-  @variant dark {
-    --background: #000;
-    --foreground: #f1f3f7;
-    --card: #000;
-    --card-foreground: var(--foreground);
-    --accent: #191a1d;
-    --accent-foreground: #f7f9ff;
-    --muted: #0a0a0a;
-    --muted-foreground: #a3a3a3;
-    --border: rgb(255 255 255 / 8%);
-    --input: rgb(255 255 255 / 18%);
-    --sidebar: var(--card);
-    --sidebar-foreground: var(--foreground);
-    --sidebar-muted-foreground: var(--muted-foreground);
-    --sidebar-control-surface: var(--muted);
-    --sidebar-row-hover: color-mix(in srgb, var(--contrast-foreground) 8%, transparent);
-    --sidebar-row-active: color-mix(in srgb, var(--contrast-foreground) 8%, transparent);
-    --sidebar-row-selected: color-mix(in srgb, var(--contrast-foreground) 7%, transparent);
-    --sidebar-border: var(--border);
-    --sidebar-stage-fade: var(--card);
-    /* Row metadata sits a step below read titles (75% white). */
-    --secondary-label: #8f8f8f;
   }
 }
 

@@ -6,28 +6,28 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0b0e17" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       (() => {
-        const LIGHT_BACKGROUND = "#ffffff";
-        const DARK_BACKGROUND = "#000000";
+        const LIGHT_BACKGROUND = "#efede8";
+        const DARK_BACKGROUND = "#0b0e17";
         const CUSTOM_THEMES_STORAGE_KEY = "t3code:themes:v1";
         const THEME_FOLLOW_SYSTEM_STORAGE_KEY = "t3code:theme-follow-system";
         const THEME_APPEARANCE_MODE_STORAGE_KEY = "t3code:theme-appearance-mode";
         const THEME_HALVES_STORAGE_KEY = "t3code:theme-halves:v1";
         const SPLASH_COLORS = {
           light: {
-            background: "#ffffff",
-            foreground: "#262626",
-            accent: "#4f46e5",
+            background: "#f6f3ec",
+            foreground: "#1b1f30",
+            accent: "#2a5fe6",
           },
           dark: {
-            background: "#000000",
-            foreground: "#f5f5f5",
-            accent: "#818cf8",
+            background: "#06070c",
+            foreground: "#e8ebf7",
+            accent: "#7aa2ff",
           },
         };
         // These are the runtime defaults used to complete a custom palette
@@ -396,15 +396,15 @@
       }
 
       body {
-        background: #ffffff;
-        color: #262626;
+        background: #f6f3ec;
+        color: #1b1f30;
         font-family:
           -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
       }
 
       html.dark body {
-        background: #000000;
-        color: #f5f5f5;
+        background: #06070c;
+        color: #e8ebf7;
       }
 
       #boot-shell {
@@ -447,8 +447,8 @@
       }
 
       #boot-error {
-        --boot-error-fg: #262626;
-        --boot-error-bg: #ffffff;
+        --boot-error-fg: #1b1f30;
+        --boot-error-bg: #f6f3ec;
         --boot-error-line: color-mix(in srgb, currentColor 12%, transparent);
         display: flex;
         flex-direction: column;
@@ -461,8 +461,8 @@
       }
 
       html.dark #boot-error {
-        --boot-error-fg: #f5f5f5;
-        --boot-error-bg: #000000;
+        --boot-error-fg: #e8ebf7;
+        --boot-error-bg: #06070c;
       }
 
       html[data-theme-selected="true"] #boot-error {

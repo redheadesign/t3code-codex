@@ -632,10 +632,6 @@ describe("context chip colors", () => {
   });
 
   it("reads at 5:1 on the standard surfaces as index.css paints them", () => {
-    const painted = {
-      light: ["#fcfcfc", "#ffffff", "#ebebed"],
-      dark: ["#000000", "#0a0a0a", "#111111", "#141414", "#1e1e1e"],
-    } as const;
     const properties = new Map<string, string>();
     vi.stubGlobal("window", { localStorage: { getItem: () => null } });
     vi.stubGlobal("document", {
@@ -651,10 +647,16 @@ describe("context chip colors", () => {
     try {
       for (const appearance of ["light", "dark"] as const) {
         applyThemePalette("system", appearance);
+        const colors = getStandardThemeColors(appearance);
         for (const kind of Object.keys(CONTEXT_CHIP_ACCENTS) as Array<
           keyof typeof CONTEXT_CHIP_ACCENTS
         >) {
-          for (const surface of painted[appearance]) {
+          for (const surface of [
+            colors.canvas,
+            colors.surface,
+            colors.surfaceRaised,
+            colors.messageSurface,
+          ]) {
             expect(
               contrastRatio(properties.get(contextChipColorVariable(kind))!, surface),
             ).toBeGreaterThanOrEqual(5);

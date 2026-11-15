@@ -1,4 +1,10 @@
 import { useUiText } from "~/i18n";
+import {
+  animalScenes,
+  russianAnimalSceneLabels,
+  type AnimalSceneId,
+} from "~/components/ascii-scenes/animalScenes";
+import { useHomeArtwork } from "~/components/ascii-scenes/HomeArtwork";
 import type { CSSProperties } from "react";
 import { useState } from "react";
 import {
@@ -32,7 +38,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { searchableSetting, settingsRowTitle } from "./settingsSearch";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 import { TypographySection } from "./TypographySettings";
@@ -84,6 +90,52 @@ const EFFORT_DISPLAY_LABELS: Record<EffortDisplay, string> = {
   label: "Word",
   bars: "Bars",
 };
+
+function HomeArtworkSetting() {
+  const ui = useUiText();
+  const { selection, setScene } = useHomeArtwork();
+  const setting = searchableSetting("home-artwork");
+  const title = settingsRowTitle(setting.id, setting.title, ui);
+  const options = [
+    ...animalScenes.map(({ id, label }) => ({
+      value: id,
+      label: ui(label, russianAnimalSceneLabels[id]),
+    })),
+    { value: "off" as const, label: ui("Off", "Выключено") },
+  ];
+
+  return (
+    <SettingsRow
+      {...setting}
+      description={ui(
+        "Show an ASCII animal on the home screen and in a new chat.",
+        "ASCII-животное на главном экране и в новом чате.",
+      )}
+      control={
+        <div className="w-full sm:w-48">
+          <Select<AnimalSceneId | "off">
+            items={options}
+            value={selection}
+            onValueChange={(value) => {
+              if (value !== null) setScene(value);
+            }}
+          >
+            <SelectTrigger size="sm" width="fluid" aria-label={title}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              {options.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </div>
+      }
+    />
+  );
+}
 
 export function AppearanceSettingsPanel() {
   const ui = useUiText();
@@ -170,6 +222,7 @@ export function AppearanceSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="appearance-interface" title={ui("Interface", "Интерфейс")}>
+        <HomeArtworkSetting />
         <SettingsRow
           {...searchableSetting("setting-appearance-contrast")}
           description={ui(

@@ -2,6 +2,7 @@ import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 
+import clerkTheme from "../clerk-theme.json";
 import { customThemeNames, renderUniwindThemesCSS } from "./generate-uniwind-themes.mts";
 
 describe("generate mobile Uniwind themes", () => {
@@ -23,17 +24,18 @@ describe("generate mobile Uniwind themes", () => {
     for (const [name, variables] of themes) {
       expect([...variables.keys()].sort(), name).toEqual([...lightVariables.keys()].sort());
       const isDark = name === "dark" || name.endsWith("-dark");
+      const clerkColors = isDark ? clerkTheme.darkColors : clerkTheme.colors;
       expect(
         Object.fromEntries(
           [...variables].filter(([variable]) => variable.startsWith("--color-clerk-")),
         ),
         name,
       ).toEqual({
-        "--color-clerk-page": isDark ? "#0a0a0a" : "#fcfcfc",
-        "--color-clerk-foreground": isDark ? "#f5f5f5" : "#27272a",
-        "--color-clerk-foreground-muted": isDark ? "#818181" : "#71717b",
-        "--color-clerk-border": isDark ? "#191919" : "#e4e4e7",
-        "--color-clerk-danger": isDark ? "#ff6467" : "#c10007",
+        "--color-clerk-page": clerkColors.background,
+        "--color-clerk-foreground": clerkColors.foreground,
+        "--color-clerk-foreground-muted": clerkColors.mutedForeground,
+        "--color-clerk-border": clerkColors.border,
+        "--color-clerk-danger": clerkColors.danger,
       });
     }
   });

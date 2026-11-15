@@ -259,6 +259,8 @@ import {
 import { useEnvironmentShellHasSnapshot } from "../state/shell";
 import { ChatComposer, type ChatComposerHandle, type ChatComposerProps } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
+import { HomeArtwork, homeAccentStyle, useHomeArtwork } from "./ascii-scenes/HomeArtwork";
+import { ComposerDust } from "./ascii-scenes/ComposerDust";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
 import {
   BranchRestoreConfirmHost,
@@ -579,6 +581,7 @@ export default function ChatView(props: ChatViewProps) {
   })() as AssistantCitationRequest | null;
   const citationHistory = useCitedHistory(citationRequest);
   const { resolvedTheme } = useTheme();
+  const homeArtwork = useHomeArtwork();
   const composerRuntimeMode = useComposerDraftStore(
     (store) => store.getComposerDraft(composerDraftTarget)?.runtimeMode ?? null,
   );
@@ -3767,6 +3770,9 @@ export default function ChatView(props: ChatViewProps) {
               )}
             </div>
 
+            {isDraftHeroState && !embedded ? (
+              <HomeArtwork selection={homeArtwork.selection} appearance={resolvedTheme} />
+            ) : null}
             <div
               {...composerArea}
               ref={(overlay: HTMLDivElement | null) => {
@@ -3817,11 +3823,22 @@ export default function ChatView(props: ChatViewProps) {
                     }
                   >
                     <ChildThreadApprovals threadRef={activeThreadRef} />
-                    <ComposerSurface.Shell contextRow={showComposerContextStrip}>
+                    <ComposerSurface.Shell
+                      contextRow={showComposerContextStrip}
+                      data-ascii-composer={isDraftHeroState && !embedded ? "" : undefined}
+                      style={
+                        isDraftHeroState && !embedded && homeArtwork.swatch
+                          ? homeAccentStyle(homeArtwork.swatch)
+                          : undefined
+                      }
+                    >
                       <ComposerSurface.Host
                         inert={queuedRunEdit.isSaving}
                         aria-busy={queuedRunEdit.isSaving}
                       >
+                        {isDraftHeroState && !embedded && homeArtwork.swatch ? (
+                          <ComposerDust key={homeArtwork.selection} appearance={resolvedTheme} />
+                        ) : null}
                         <div className="relative z-10">
                           {showProviderSubagentBar ? (
                             <ProviderSubagentBar

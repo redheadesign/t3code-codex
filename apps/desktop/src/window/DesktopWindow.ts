@@ -10,6 +10,10 @@ import * as Semaphore from "effect/Semaphore";
 import * as Electron from "electron";
 
 import { type DesktopSnapShotEvent, DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts";
+import {
+  T3_CODE_DARK_THEME_COLORS,
+  T3_CODE_LIGHT_THEME_COLORS,
+} from "@t3tools/shared/themePalettes";
 
 import * as DesktopAssets from "../app/DesktopAssets.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
@@ -133,7 +137,7 @@ function getIconOption(
 }
 
 function getInitialWindowBackgroundColor(shouldUseDarkColors: boolean): string {
-  return shouldUseDarkColors ? "#000000" : "#ffffff";
+  return (shouldUseDarkColors ? T3_CODE_DARK_THEME_COLORS : T3_CODE_LIGHT_THEME_COLORS).chrome;
 }
 
 type DisplayBounds = Pick<Electron.Rectangle, "x" | "y" | "width" | "height">;

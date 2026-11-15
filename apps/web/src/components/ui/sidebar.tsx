@@ -355,7 +355,7 @@ function Sidebar({
           <SheetPopup
             ref={setMobileSheetElement}
             className={cn(
-              "w-(--sidebar-width) max-w-none bg-sidebar surface-grain p-0 text-sidebar-foreground",
+              "w-(--sidebar-width) max-w-none p-0 text-sidebar-foreground [--glass-fill:var(--sidebar)]",
               className,
             )}
             data-mobile="true"
@@ -457,7 +457,7 @@ function Sidebar({
           {...props}
         >
           <div
-            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
+            className="flex h-full w-full flex-col glass-panel [--glass-panel-fill:var(--sidebar)] group-data-[variant=floating]:rounded-(--floating-radius) group-data-[variant=floating]:border"
             data-sidebar="sidebar"
             data-slot="sidebar-inner"
           >

@@ -570,10 +570,13 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
-      <div className="relative h-dvh min-h-0 overflow-hidden bg-background" data-workspace-stage="">
+      <div
+        className="relative h-dvh min-h-0 overflow-hidden bg-(--app-chrome-background) surface-grain"
+        data-workspace-stage=""
+      >
         <WorkspaceIconRail />
         <div
-          className="relative ms-(--workspace-shell-inset) me-(--workspace-shell-inset) overflow-hidden rounded-2xl border border-sidebar-border/70 md:ms-[calc(var(--workspace-rail-width)+var(--workspace-shell-inset))]"
+          className="relative ms-(--workspace-shell-inset) me-(--workspace-shell-inset) overflow-hidden rounded-(--floating-radius) border glass-panel md:ms-[calc(var(--workspace-rail-width)+var(--workspace-shell-inset))]"
           style={{
             marginTop: "var(--workspace-chrome-height)",
             height: "calc(100% - var(--workspace-chrome-height) - var(--workspace-shell-inset))",

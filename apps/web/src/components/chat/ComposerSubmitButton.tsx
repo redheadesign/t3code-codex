@@ -20,8 +20,9 @@ export function ComposerSubmitButton({
   return (
     <button
       type={type}
+      data-composer-submit="true"
       className={cn(
-        "relative isolate flex h-9 w-9 items-center justify-center overflow-hidden rounded-full shadow-xs transition-all duration-150 enabled:cursor-pointer enabled:inset-shadow-control-highlight hover:scale-105 active:inset-shadow-control-pressed active:shadow-none disabled:pointer-events-none disabled:shadow-none disabled:hover:scale-100 sm:h-8 sm:w-8 [&_svg]:pointer-events-none",
+        "relative isolate flex h-9 w-9 items-center justify-center overflow-hidden rounded-full shadow-xs outline-none transition-colors duration-150 enabled:cursor-pointer enabled:inset-shadow-control-highlight focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset active:inset-shadow-control-pressed active:shadow-none disabled:pointer-events-none disabled:shadow-none sm:h-8 sm:w-8 [&_svg]:pointer-events-none",
         stageBackdropVariant
           ? "bg-white text-black enabled:shadow-black/24 enabled:hover:brightness-110 disabled:bg-white disabled:text-black"
           : "bg-white text-black enabled:shadow-black/12 hover:bg-white disabled:bg-white disabled:text-black",
@@ -29,7 +30,11 @@ export function ComposerSubmitButton({
       {...props}
     >
       {stageBackdropVariant ? (
-        <span className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+        <span
+          data-composer-submit-decoration
+          className="pointer-events-none absolute inset-0 -z-10"
+          aria-hidden="true"
+        >
           <StageBackdropButtonArt variant={stageBackdropVariant} />
         </span>
       ) : null}

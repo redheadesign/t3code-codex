@@ -92,7 +92,7 @@ function SheetPopup({
       <SheetViewport side={side} variant={variant}>
         <SheetPrimitive.Popup
           className={cn(
-            "bg-popover relative flex max-h-full min-h-0 w-full min-w-0 flex-col overflow-hidden text-popover-foreground shadow-[0_24px_64px_-24px_rgb(0_0_0_/_65%)] transition-[opacity,translate] duration-200 ease-in-out will-change-transform data-ending-style:opacity-0 data-starting-style:opacity-0 dark:shadow-[inset_0_1px_rgb(255_255_255_/_4%),0_24px_72px_-20px_rgb(0_0_0_/_90%)]",
+            "dialog-glass relative flex max-h-full min-h-0 w-full min-w-0 flex-col overflow-hidden text-popover-foreground transition-[opacity,translate] duration-200 ease-in-out will-change-transform data-ending-style:opacity-0 data-starting-style:opacity-0",
             side === "bottom" &&
               "row-start-2 rounded-t-(--dialog-radius) border-t data-ending-style:translate-y-8 data-starting-style:translate-y-8",
             side === "top" &&
