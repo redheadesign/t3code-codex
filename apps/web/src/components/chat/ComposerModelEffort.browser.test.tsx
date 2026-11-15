@@ -124,7 +124,7 @@ it("draws an agent's reasoning as bars and keeps its mode out of the levels", as
   await expect.element(page.getByRole("menuitemradio")).not.toBeInTheDocument();
 });
 
-it("persists compact reasoning changes and resets to the model's default", async () => {
+it("persists composer reasoning changes and returns to the model's default", async () => {
   const model = {
     slug: "gpt-model",
     name: "GPT model",
@@ -166,16 +166,17 @@ it("persists compact reasoning changes and resets to the model's default", async
     );
   }
   await using screen = await render(<Compact />, { router: false }); // only local option persistence
-  const slider = screen.getByRole("slider", { name: "Reasoning" });
-  await expect.element(slider).toHaveAttribute("aria-valuetext", "Medium");
-  await slider.click();
-  await userEvent.keyboard("{End}");
-  await expect.element(slider).toHaveAttribute("aria-valuetext", "High");
+  const reasoning = screen.getByRole("radiogroup", { name: "Reasoning" });
+  const medium = reasoning.getByRole("radio", { name: /Medium/ });
+  const high = reasoning.getByRole("radio", { name: "High", exact: true });
+  await expect.element(medium).toHaveAttribute("aria-checked", "true");
+  await userEvent.click(high);
+  await expect.element(high).toHaveAttribute("aria-checked", "true");
   await expect
     .element(screen.getByRole("status", { name: "Saved reasoning" }))
     .toHaveTextContent("high");
-  await screen.getByRole("button", { name: "Reset reasoning level" }).click();
-  await expect.element(slider).toHaveAttribute("aria-valuetext", "Medium");
+  await userEvent.click(medium);
+  await expect.element(medium).toHaveAttribute("aria-checked", "true");
   await expect
     .element(screen.getByRole("status", { name: "Saved reasoning" }))
     .toHaveTextContent("medium");

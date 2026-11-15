@@ -261,7 +261,11 @@ it("chooses a model in two steps and only offers the two subscriptions in the co
   await page.getByRole("button", { name: "Claude", exact: true }).click();
   await expect.element(page.getByRole("option", { name: /codex model/ })).not.toBeInTheDocument();
   await page.getByRole("option", { name: /claudeAgent model/ }).click();
-  await expect.element(page.getByRole("slider", { name: "Reasoning" })).toHaveFocus();
+  await expect
+    .element(
+      page.getByRole("radiogroup", { name: "Reasoning" }).getByRole("radio", { checked: true }),
+    )
+    .toHaveFocus();
   await expect
     .element(page.getByRole("button", { name: "Choose model: claudeAgent model", exact: true }))
     .toBeVisible();
@@ -276,7 +280,11 @@ it("chooses a model in two steps and only offers the two subscriptions in the co
     .element(page.getByRole("button", { name: "Claude", exact: true }))
     .toHaveAttribute("aria-pressed", "true");
   await userEvent.keyboard("{Escape}");
-  await expect.element(page.getByRole("slider", { name: "Reasoning" })).toHaveFocus();
+  await expect
+    .element(
+      page.getByRole("radiogroup", { name: "Reasoning" }).getByRole("radio", { checked: true }),
+    )
+    .toHaveFocus();
   await userEvent.keyboard("{Escape}");
   await screen.rerender(<Picker locked />);
   await screen.getByRole("button", { name: "Model settings" }).click();

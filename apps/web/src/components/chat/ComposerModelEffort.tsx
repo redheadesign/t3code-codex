@@ -10,7 +10,9 @@ import { getProviderOptionCurrentLabel } from "@t3tools/shared/model";
 import { CheckIcon, ChevronRightIcon, ChevronUpIcon, WorkflowIcon } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, use, useRef, useState } from "react";
 
+import { useUiText } from "~/i18n";
 import { cn } from "~/lib/utils";
+import { Button } from "../ui/button";
 import {
   Menu,
   MenuPopup,
@@ -491,6 +493,7 @@ function NoEffortRow() {
 
 /** The model picker's effort column: the selected model's levels and its other options. */
 export function ComposerEffortColumn(props: { traits: TraitsSelectionInput | null }) {
+  const ui = useUiText();
   const picker = use(DockedPickerContext);
   const visibility = props.traits ? getTraitsSectionVisibility(props.traits) : null;
   const controls =
@@ -505,9 +508,27 @@ export function ComposerEffortColumn(props: { traits: TraitsSelectionInput | nul
           <span className="text-muted-foreground">
             {controls?.effort?.descriptor.label ?? (controls?.others.length ? "Options" : "Effort")}
           </span>
-          <span className="ms-auto min-w-0 truncate text-muted-foreground text-xs">
-            {picker.modelLabel}
-          </span>
+          {picker.onChooseModel ? (
+            <div className="ms-auto min-w-0">
+              <Button
+                size="compact"
+                variant="glass-pill"
+                data-choose-model
+                onClick={picker.onChooseModel}
+                aria-label={ui(
+                  `Choose model: ${picker.modelLabel}`,
+                  `Выбрать модель: ${picker.modelLabel}`,
+                )}
+              >
+                <span className="truncate">{picker.modelLabel}</span>
+                <ChevronRightIcon aria-hidden />
+              </Button>
+            </div>
+          ) : (
+            <span className="ms-auto min-w-0 truncate text-muted-foreground text-xs">
+              {picker.modelLabel}
+            </span>
+          )}
         </div>
       </div>
       {/* pt-2.5 puts the first level on the same line as the first model. */}
