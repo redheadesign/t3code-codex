@@ -20,7 +20,7 @@ on:
         type: boolean
         default: false
       reuse_run:
-        description: Completed main build run ID to publish without rebuilding
+        description: Completed main build run ID to publish with an existing version tag
         type: string
         required: false
 permissions:
@@ -250,7 +250,12 @@ jobs:
             ([.jobs[] | select(.conclusion == "success") | .name] | sort) as $passed |
             (["Linux ARM64", "Linux x64", "Windows ARM64", "Windows x64", "macOS Apple Silicon", "macOS Intel"] - $passed) == []
           ' <<< "$jobs" > /dev/null
-          printf 'run_id=%s\ncommit=%s\n' "$REUSE_RUN" "$(jq -r .head_sha <<< "$run")" >> "$GITHUB_OUTPUT"
+          commit=$(jq -r .head_sha <<< "$run")
+          if ! tag_commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/v$VERSION" --jq .sha) || [[ "$tag_commit" != "$commit" ]]; then
+            printf 'Tag v%s must point to build commit %s\n' "$VERSION" "$commit" >&2
+            exit 1
+          fi
+          printf 'run_id=%s\ncommit=%s\n' "$REUSE_RUN" "$commit" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v8
         with:
           pattern: installers-*
