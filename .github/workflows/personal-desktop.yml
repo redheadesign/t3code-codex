@@ -250,7 +250,7 @@ jobs:
             release/latest.yml
 
           for manifest in release/latest*.yml; do
-            grep -Fx "version: $VERSION" "$manifest"
+            grep -Fx -e "version: $VERSION" -e "version: '$VERSION'" "$manifest"
           done
           grep -F "T3-Code-$VERSION-x64.exe" release/latest.yml
           grep -F "T3-Code-$VERSION-arm64.exe" release/latest.yml
