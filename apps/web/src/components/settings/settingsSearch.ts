@@ -365,6 +365,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "appearance",
   },
   {
+    id: "interface-scale",
+    title: "Interface scale",
+    titleRu: "Масштаб интерфейса",
+    to: "/settings/appearance",
+    searchTerms: ["zoom dpi high resolution icons size увеличить иконки текст разрешение"],
+    desktopOnly: true,
+  },
+  {
     id: "home-artwork",
     title: "Home screen artwork",
     titleRu: "Фон главного экрана",

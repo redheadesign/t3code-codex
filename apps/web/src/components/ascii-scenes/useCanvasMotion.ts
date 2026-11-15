@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useRef } from "react";
+import { getDocumentActivity, subscribeDocumentActivity } from "~/lib/documentActivity";
 import { observeResize } from "~/lib/observeResize";
 
 interface CanvasFrame {
@@ -10,13 +11,13 @@ interface CanvasFrame {
 
 export function useCanvasMotion(
   paint: (context: CanvasRenderingContext2D, frame: CanvasFrame) => void,
-  duration: number,
   appearance: CanvasFrame["appearance"],
+  duration = Infinity,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const paintFrame = useEffectEvent(paint);
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- owns the canvas buffer, resize and visibility observers, and bounded paint timer
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- owns the canvas buffer, activity and resize subscriptions, and frame timer
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
@@ -29,6 +30,7 @@ export function useCanvasMotion(
     let visible = false;
     let width = 0;
     let height = 0;
+    let needsFrame = true;
 
     const stop = () => {
       window.clearInterval(timer);
@@ -40,10 +42,20 @@ export function useCanvasMotion(
       }
     };
     const update = () => {
-      stop();
-      if (document.hidden || !visible || !width || !height) return;
-      draw();
-      if (motion.matches || time >= duration) return;
+      const activity = getDocumentActivity();
+      if (!activity.visible || !visible || !width || !height) {
+        stop();
+        return;
+      }
+      if (needsFrame) {
+        draw();
+        needsFrame = false;
+      }
+      if (!activity.focused || motion.matches || time >= duration) {
+        stop();
+        return;
+      }
+      if (timer !== undefined) return;
       previousTime = performance.now();
       timer = window.setInterval(() => {
         const now = performance.now();
@@ -62,22 +74,27 @@ export function useCanvasMotion(
       if (canvas.width !== bufferWidth) canvas.width = bufferWidth;
       if (canvas.height !== bufferHeight) canvas.height = bufferHeight;
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      needsFrame = true;
       update();
     };
+    const onMotionChange = () => {
+      needsFrame = true;
+      update();
+    };
+    const unsubscribeActivity = subscribeDocumentActivity(update);
     const unobserveResize = observeResize([canvas], resize);
     const intersectionObserver = new IntersectionObserver(([entry]) => {
       visible = entry?.isIntersecting === true;
       update();
     });
     intersectionObserver.observe(canvas);
-    document.addEventListener("visibilitychange", update);
-    motion.addEventListener("change", update);
+    motion.addEventListener("change", onMotionChange);
     return () => {
       stop();
+      unsubscribeActivity();
       unobserveResize();
       intersectionObserver.disconnect();
-      document.removeEventListener("visibilitychange", update);
-      motion.removeEventListener("change", update);
+      motion.removeEventListener("change", onMotionChange);
     };
   }, [appearance, duration]);
 

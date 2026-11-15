@@ -8,6 +8,7 @@ import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
+import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as TestClock from "effect/testing/TestClock";
@@ -66,16 +67,15 @@ const environmentInput = {
 function makeFakeBrowserWindow() {
   const windowListeners = new Map<string, (...args: readonly unknown[]) => void>();
   const webContentsListeners = new Map<string, (...args: readonly unknown[]) => void>();
-  let zoomLevel = 0;
+  let zoomFactor = 1;
   const webContents = {
     copyImageAt: vi.fn(),
     focus: vi.fn(),
     isDestroyed: vi.fn(() => false),
     getURL: vi.fn(() => "t3code-dev://app/"),
-    getZoomLevel: vi.fn(() => zoomLevel),
-    getZoomFactor: vi.fn(() => 1.2 ** zoomLevel),
-    setZoomLevel: vi.fn((level: number) => {
-      zoomLevel = level;
+    getZoomFactor: vi.fn(() => zoomFactor),
+    setZoomFactor: vi.fn((factor: number) => {
+      zoomFactor = factor;
     }),
     isLoadingMainFrame: vi.fn(() => false),
     navigationHistory: {
@@ -146,7 +146,7 @@ function makeFakeBrowserWindow() {
     navigationHistory: webContents.navigationHistory,
     setIgnoreMenuShortcuts: webContents.setIgnoreMenuShortcuts,
     send: webContents.send,
-    setZoomLevel: webContents.setZoomLevel,
+    setZoomFactor: webContents.setZoomFactor,
     setWindowButtonPosition: window.setWindowButtonPosition,
     setBackgroundThrottling: webContents.setBackgroundThrottling,
     setAutoHideCursor: window.setAutoHideCursor,
@@ -235,7 +235,7 @@ function layerTest(input: {
   readonly openedExternalUrls?: unknown[];
   readonly onCopyText?: (text: string) => Effect.Effect<void>;
   readonly onPopupTemplate?: (input: ElectronMenu.ElectronMenuTemplateInput) => Effect.Effect<void>;
-  readonly previewZoomReapplies?: number[];
+  readonly onPreviewZoomReapply?: (factor: number) => Effect.Effect<void>;
   readonly onReveal?: (window: Electron.BrowserWindow) => void;
   readonly focusedWindow?: Electron.BrowserWindow;
 }) {
@@ -264,6 +264,12 @@ function layerTest(input: {
         return { settings: desktopSettings, changed };
       }),
     setServerExposureMode: () => Effect.die("unexpected server exposure update"),
+    setMainWindowScale: (factor) =>
+      Effect.sync(() => {
+        const changed = desktopSettings.mainWindowScale !== factor;
+        desktopSettings = { ...desktopSettings, mainWindowScale: factor };
+        return { settings: desktopSettings, changed };
+      }),
     setTailscaleServe: () => Effect.die("unexpected Tailscale Serve update"),
     setUpdateChannel: () => Effect.die("unexpected update channel change"),
     setWslBackendEnabled: () => Effect.die("unexpected WSL backend toggle"),
@@ -341,9 +347,7 @@ function layerTest(input: {
           isBrowserPartition: (partition) => partition.startsWith("persist:t3code-preview-"),
           getBrowserPartition: () => Effect.succeed("persist:t3code-preview-test"),
           reapplyZoom: () =>
-            Effect.sync(() => {
-              input.previewZoomReapplies?.push(input.window.webContents.getZoomLevel());
-            }),
+            input.onPreviewZoomReapply?.(input.window.webContents.getZoomFactor()) ?? Effect.void,
         }),
       ),
     ),
@@ -756,29 +760,38 @@ describe("DesktopWindow", () => {
       const createCount = yield* Ref.make(0);
       const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
       const previewZoomReapplies: number[] = [];
+      const createdWindowOptions: Electron.BrowserWindowConstructorOptions[] = [];
       const layer = layerTest({
         window: fakeWindow.window,
         createCount,
         mainWindow,
-        previewZoomReapplies,
+        createdWindowOptions,
+        desktopSettings: { ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS, mainWindowScale: 1.5 },
+        onPreviewZoomReapply: (factor) => Effect.sync(() => void previewZoomReapplies.push(factor)),
         focusedWindow: popup.window,
       });
 
       yield* Effect.gen(function* () {
         const desktopWindow = yield* DesktopWindow.DesktopWindow;
         yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
+        assert.equal(createdWindowOptions[0]?.webPreferences?.zoomFactor, 1.5);
 
+        yield* desktopWindow.setMainWindowScale(1.25);
         yield* desktopWindow.zoomMain("out");
         yield* desktopWindow.zoomMain("out");
         yield* desktopWindow.zoomMain("in");
         yield* desktopWindow.zoomMain("reset");
 
+        const row = (factor: number) => Math.round(factor * 10_000);
         assert.deepEqual(
-          fakeWindow.setZoomLevel.mock.calls.map(([level]) => level),
-          [-0.5, -1, -0.5, 0],
+          fakeWindow.setZoomFactor.mock.calls.map(([factor]) => row(factor)),
+          [12500, 11411, 10417, 11411, 10000],
         );
-        assert.deepEqual(previewZoomReapplies, [-0.5, -1, -0.5, 0]);
-        assert.equal(popup.setZoomLevel.mock.calls.length, 0);
+        assert.deepEqual(
+          previewZoomReapplies,
+          fakeWindow.setZoomFactor.mock.calls.map(([factor]) => factor),
+        );
+        assert.equal(popup.setZoomFactor.mock.calls.length, 0);
       }).pipe(Effect.provide(layer));
     }),
   );
@@ -788,12 +801,12 @@ describe("DesktopWindow", () => {
       const fakeWindow = makeFakeBrowserWindow();
       const createCount = yield* Ref.make(0);
       const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
-      const previewZoomReapplies: number[] = [];
+      const appliedScales = yield* Queue.unbounded<number>();
       const layer = layerTest({
         window: fakeWindow.window,
         createCount,
         mainWindow,
-        previewZoomReapplies,
+        onPreviewZoomReapply: (factor) => Queue.offer(appliedScales, factor).pipe(Effect.asVoid),
       });
 
       yield* Effect.gen(function* () {
@@ -806,11 +819,11 @@ describe("DesktopWindow", () => {
         zoomChanged({}, "out");
         zoomChanged({}, "out");
 
+        const scales = yield* Effect.forEach([0, 1, 2], () => Queue.take(appliedScales));
         assert.deepEqual(
-          fakeWindow.setZoomLevel.mock.calls.map(([level]) => level),
-          [0.5, 0, -0.5],
+          scales.map((factor) => Math.round(factor * 10_000)),
+          [10954, 10000, 9129],
         );
-        assert.deepEqual(previewZoomReapplies, [0.5, 0, -0.5]);
       }).pipe(Effect.provide(layer));
     }),
   );

@@ -2,6 +2,7 @@ import {
   ContextMenuItemSchema,
   DesktopAppBrandingSchema,
   DesktopEnvironmentBootstrapSchema,
+  DesktopInterfaceScaleSchema,
   DesktopMediaReadSchema,
   DesktopThemeSchema,
   EDITORS,
@@ -31,6 +32,7 @@ import * as DesktopLocalEnvironmentAuth from "../../backend/DesktopLocalEnvironm
 import * as DesktopEnvironment from "../../app/DesktopEnvironment.ts";
 import * as DesktopManagedPolicy from "../../app/DesktopManagedPolicy.ts";
 import * as DesktopAppSettings from "../../settings/DesktopAppSettings.ts";
+import * as DesktopWindow from "../../window/DesktopWindow.ts";
 import * as DesktopWslBackend from "../../wsl/DesktopWslBackend.ts";
 import * as DesktopWslEnvironment from "../../wsl/DesktopWslEnvironment.ts";
 import * as ElectronApp from "../../electron/ElectronApp.ts";
@@ -123,6 +125,30 @@ export const getWindowFullscreenState = DesktopIpc.makeSyncIpcMethod({
     const electronWindow = yield* ElectronWindow.ElectronWindow;
     const window = yield* electronWindow.currentMainOrFirst;
     return Option.isSome(window) && window.value.isFullScreen();
+  }),
+});
+
+class DesktopInterfaceScaleSenderError extends Schema.TaggedError<DesktopInterfaceScaleSenderError>()(
+  "DesktopInterfaceScaleSenderError",
+  {},
+) {
+  override get message(): string {
+    return "Interface scale can only be changed from the main window.";
+  }
+}
+
+export const setWindowZoomFactor = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.SET_WINDOW_ZOOM_FACTOR_CHANNEL,
+  payload: DesktopInterfaceScaleSchema,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.window.setWindowZoomFactor")(function* (factor, event) {
+    const electronWindow = yield* ElectronWindow.ElectronWindow;
+    const owner = yield* electronWindow.main;
+    if (Option.isNone(owner) || event?.sender.id !== owner.value.webContents.id) {
+      return yield* new DesktopInterfaceScaleSenderError();
+    }
+    const desktopWindow = yield* DesktopWindow.DesktopWindow;
+    yield* desktopWindow.setMainWindowScale(factor);
   }),
 });
 

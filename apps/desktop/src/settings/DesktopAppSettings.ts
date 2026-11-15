@@ -1,4 +1,6 @@
 import {
+  DEFAULT_DESKTOP_INTERFACE_SCALE,
+  DesktopInterfaceScaleSchema,
   DesktopServerExposureModeSchema,
   DesktopUpdateChannelSchema,
   type DesktopServerExposureMode,
@@ -30,6 +32,7 @@ export interface DesktopSettings {
   readonly linuxPasswordStore: LinuxPasswordStorePreference;
   readonly mainWindowBounds: DesktopWindowBounds | null;
   readonly mainWindowMaximized: boolean;
+  readonly mainWindowScale: number;
   readonly serverExposureMode: DesktopServerExposureMode;
   readonly tailscaleServeEnabled: boolean;
   readonly tailscaleServePort: number;
@@ -71,6 +74,7 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   linuxPasswordStore: DEFAULT_LINUX_PASSWORD_STORE,
   mainWindowBounds: null,
   mainWindowMaximized: false,
+  mainWindowScale: DEFAULT_DESKTOP_INTERFACE_SCALE,
   serverExposureMode: "local-only",
   tailscaleServeEnabled: false,
   tailscaleServePort: DEFAULT_TAILSCALE_SERVE_PORT,
@@ -93,6 +97,7 @@ const DesktopSettingsDocument = Schema.Struct({
   linuxPasswordStore: Schema.optionalKey(Schema.Unknown),
   mainWindowBounds: Schema.optionalKey(Schema.NullOr(DesktopWindowBoundsDocument)),
   mainWindowMaximized: Schema.optionalKey(Schema.Boolean),
+  mainWindowScale: Schema.optionalKey(Schema.Unknown),
   serverExposureMode: Schema.optionalKey(DesktopServerExposureModeSchema),
   tailscaleServeEnabled: Schema.optionalKey(Schema.Boolean),
   tailscaleServePort: Schema.optionalKey(Schema.Number),
@@ -111,6 +116,7 @@ const DesktopSettingsJson = fromLenientJson(DesktopSettingsDocument);
 const decodeDesktopSettingsJson = Schema.decodeEffect(DesktopSettingsJson);
 const encodeDesktopSettingsJson = Schema.encodeEffect(DesktopSettingsJson);
 const decodeDesktopWindowBounds = Schema.decodeUnknownOption(DesktopWindowBoundsSchema);
+const decodeDesktopInterfaceScale = Schema.decodeUnknownOption(DesktopInterfaceScaleSchema);
 const desktopWindowBoundsEquivalence = Schema.toEquivalence(DesktopWindowBoundsSchema);
 
 const settingsChange = (settings: DesktopSettings, changed: boolean): DesktopSettingsChange => ({
@@ -152,6 +158,9 @@ export class DesktopAppSettings extends Context.Service<
     readonly setMainWindowBounds: (
       bounds: DesktopWindowBounds,
       isMaximized: boolean,
+    ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
+    readonly setMainWindowScale: (
+      factor: number,
     ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
     readonly setServerExposureMode: (
       mode: DesktopServerExposureMode,
@@ -222,6 +231,10 @@ function normalizeDesktopSettingsDocument(
     linuxPasswordStore: normalizeLinuxPasswordStorePreference(parsed.linuxPasswordStore),
     mainWindowBounds,
     mainWindowMaximized: mainWindowBounds !== null && parsed.mainWindowMaximized === true,
+    mainWindowScale: Option.getOrElse(
+      decodeDesktopInterfaceScale(parsed.mainWindowScale),
+      () => defaultSettings.mainWindowScale,
+    ),
     serverExposureMode:
       parsed.serverExposureMode === "network-accessible" ? "network-accessible" : "local-only",
     tailscaleServeEnabled: parsed.tailscaleServeEnabled === true,
@@ -254,6 +267,9 @@ function toDesktopSettingsDocument(
   }
   if (settings.mainWindowMaximized) {
     document.mainWindowMaximized = true;
+  }
+  if (settings.mainWindowScale !== defaults.mainWindowScale) {
+    document.mainWindowScale = settings.mainWindowScale;
   }
   if (settings.serverExposureMode !== defaults.serverExposureMode) {
     document.serverExposureMode = settings.serverExposureMode;
@@ -309,6 +325,14 @@ function setMainWindowBounds(
         mainWindowBounds: bounds,
         mainWindowMaximized: isMaximized,
       };
+}
+
+function setMainWindowScale(settings: DesktopSettings, factor: number): DesktopSettings {
+  const scale = Option.getOrElse(
+    decodeDesktopInterfaceScale(factor),
+    () => settings.mainWindowScale,
+  );
+  return settings.mainWindowScale === scale ? settings : { ...settings, mainWindowScale: scale };
 }
 
 function setTailscaleServe(
@@ -536,6 +560,9 @@ export const make = Effect.gen(function* () {
 
       return yield* persist((settings) => setServerExposureMode(settings, mode));
     }),
+    setMainWindowScale: Effect.fn("desktop.settings.setMainWindowScale")((factor) =>
+      persist((settings) => setMainWindowScale(settings, factor)),
+    ),
     setTailscaleServe: Effect.fn("desktop.settings.setTailscaleServe")(function* (input) {
       yield* Effect.annotateCurrentSpan(input);
 
@@ -608,6 +635,9 @@ export const layerTest = (initialSettings: DesktopSettings = DEFAULT_DESKTOP_SET
           function (mode) {
             return update((settings) => setServerExposureMode(settings, mode));
           },
+        ),
+        setMainWindowScale: Effect.fn("DesktopAppSettings.setMainWindowScale")((factor) =>
+          update((settings) => setMainWindowScale(settings, factor)),
         ),
         setTailscaleServe: Effect.fn("DesktopAppSettings.setTailscaleServe")(function (input) {
           return update((settings) => setTailscaleServe(settings, input));

@@ -7,6 +7,7 @@ import { ManagedPolicyFileError } from "@t3tools/shared/managedPolicyFile";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { vi } from "vite-plus/test";
@@ -29,6 +30,7 @@ import * as DesktopBackendConfiguration from "../../backend/DesktopBackendConfig
 import * as DesktopBackendManager from "../../backend/DesktopBackendManager.ts";
 import * as DesktopBackendPool from "../../backend/DesktopBackendPool.ts";
 import * as DesktopAppSettings from "../../settings/DesktopAppSettings.ts";
+import * as DesktopWindow from "../../window/DesktopWindow.ts";
 import * as DesktopManagedPolicy from "../../app/DesktopManagedPolicy.ts";
 import * as ElectronDialog from "../../electron/ElectronDialog.ts";
 import * as ElectronWindow from "../../electron/ElectronWindow.ts";
@@ -43,6 +45,7 @@ import {
   pickProjectFavicon,
   probeRemoteEditors,
   readMedia,
+  setWindowZoomFactor,
   syncHtmlFullscreen,
 } from "./window.ts";
 
@@ -97,6 +100,30 @@ const backendConfigurationLayer = Layer.succeed(
 
 const bootstrapsLayer = (instances: ReadonlyArray<DesktopBackendManager.DesktopBackendInstance>) =>
   Layer.merge(DesktopBackendPool.layerTest([...instances]), backendConfigurationLayer);
+
+it.effect("applies a valid interface scale only from the main window", () =>
+  Effect.gen(function* () {
+    const applied: number[] = [];
+    const window = { webContents: { id: 1 } } as Electron.BrowserWindow;
+    const layers = Layer.mergeAll(
+      Layer.mock(ElectronWindow.ElectronWindow)({ main: Effect.succeedSome(window) }),
+      Layer.mock(DesktopWindow.DesktopWindow)({
+        setMainWindowScale: (factor) => Effect.sync(() => void applied.push(factor)),
+      }),
+    );
+
+    yield* Effect.gen(function* () {
+      const mainSender = { sender: { id: 1 } };
+      const guestSender = { sender: { id: 2 } };
+      assert.isTrue(
+        Exit.isFailure(yield* Effect.exit(setWindowZoomFactor.handler(1.25, guestSender))),
+      );
+      assert.isTrue(Exit.isFailure(yield* Effect.exit(setWindowZoomFactor.handler(6, mainSender))));
+      yield* setWindowZoomFactor.handler(1.25, mainSender);
+      assert.deepEqual(applied, [1.25]);
+    }).pipe(Effect.provide(layers));
+  }),
+);
 
 describe("getLocalEnvironmentBootstraps", () => {
   it.effect("hands out the current window's token to a backend launched with the secret", () =>

@@ -740,7 +740,7 @@ export function ComposerAttachButton({
           render={
             <Button
               type="button"
-              variant="ghost"
+              variant="glass-pill"
               size="icon-sm"
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => inputRef.current?.click()}

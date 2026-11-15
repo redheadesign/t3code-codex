@@ -7,9 +7,18 @@ import { cn } from "~/lib/utils";
 
 export type ComposerControlSize = "sm" | "xs";
 
-function composerControlClassName(size: ComposerControlSize, className?: string) {
+type ComposerControlVariant = "default" | "glass";
+
+function composerControlClassName(
+  size: ComposerControlSize,
+  variant: ComposerControlVariant,
+  className?: string,
+) {
   return cn(
-    "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-(--control-radius) border border-transparent text-base outline-none hover:bg-interactive-row-hover data-pressed:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64 pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 [&:active:not([aria-haspopup])]:scale-[0.97] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:-mx-0.5 [&_svg[data-composer-control-icon]]:mx-0",
+    "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap border text-base outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64 pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 [&:active:not([aria-haspopup])]:scale-[0.97] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:-mx-0.5 [&_svg[data-composer-control-icon]]:mx-0",
+    variant === "glass"
+      ? "glass-control rounded-full transition-[background-color,box-shadow]"
+      : "rounded-(--control-radius) border-transparent hover:bg-interactive-row-hover data-pressed:bg-accent",
     "[&_:is([data-composer-control-label],[data-chat-provider-model-picker-label])]:[text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:[&_:is([data-composer-control-label],[data-chat-provider-model-picker-label])]:py-1.5",
     size === "xs"
       ? "h-7 gap-1 has-[[data-composer-label]]:gap-1.5 px-1.75 font-normal text-foreground/70 text-sm hover:text-foreground dark:text-muted-foreground sm:h-6 sm:text-xs [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:mx-0 [&_svg[data-composer-control-chevron]]:ms-0 [&_svg[data-composer-control-chevron]]:-me-1"
@@ -21,16 +30,18 @@ function composerControlClassName(size: ComposerControlSize, className?: string)
 
 type ComposerControlProps = useRender.ComponentProps<"button"> & {
   size?: ComposerControlSize;
+  variant?: ComposerControlVariant;
 };
 
 export function ComposerControl({
   className,
   size = "sm",
+  variant = "default",
   render,
   ...props
 }: ComposerControlProps) {
   const defaultProps = {
-    className: composerControlClassName(size, className),
+    className: composerControlClassName(size, variant, className),
     type: render ? undefined : ("button" as const),
   };
   return useRender({
@@ -74,7 +85,10 @@ export function ComposerSelectControl({
   size?: ComposerControlSize;
 }) {
   return (
-    <SelectPrimitive.Trigger className={composerControlClassName(size, className)} {...props}>
+    <SelectPrimitive.Trigger
+      className={composerControlClassName(size, "default", className)}
+      {...props}
+    >
       {children}
     </SelectPrimitive.Trigger>
   );

@@ -10,7 +10,13 @@ import * as Semaphore from "effect/Semaphore";
 
 import * as Electron from "electron";
 
-import { type DesktopSnapShotEvent, DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts";
+import {
+  DEFAULT_CLIENT_SETTINGS,
+  DEFAULT_DESKTOP_INTERFACE_SCALE,
+  MAX_DESKTOP_INTERFACE_SCALE,
+  MIN_DESKTOP_INTERFACE_SCALE,
+  type DesktopSnapShotEvent,
+} from "@t3tools/contracts";
 import {
   T3_CODE_DARK_THEME_COLORS,
   T3_CODE_LIGHT_THEME_COLORS,
@@ -87,6 +93,7 @@ const TITLEBAR_COLOR = "#01000000"; // #00000000 does not work correctly on Linu
 const TITLEBAR_LIGHT_SYMBOL_COLOR = "#1f2937";
 const TITLEBAR_DARK_SYMBOL_COLOR = "#f8fafc";
 const MAIN_WINDOW_BOUNDS_PERSIST_DEBOUNCE_MS = 500;
+const MAIN_WINDOW_ZOOM_STEP = Math.sqrt(1.2);
 const DEVELOPMENT_LOAD_RETRY_DELAYS_MS = [100, 250, 500, 1_000, 2_000] as const;
 const RENDERER_RECOVERY_RELOAD_DELAY_MS = 500;
 const RENDERER_RECOVERY_MAX_ATTEMPTS = 3;
@@ -141,6 +148,9 @@ export class DesktopWindow extends Context.Service<
     ) => Effect.Effect<void, DesktopWindowError>;
     // Electron zoom roles target focused guests; zoomMain must always target the app.
     readonly zoomMain: (direction: MainWindowZoomDirection) => Effect.Effect<void>;
+    readonly setMainWindowScale: (
+      factor: number,
+    ) => Effect.Effect<void, DesktopAppSettings.DesktopSettingsWriteError>;
     readonly runMainContentsCommand: (command: MainWindowContentsCommand) => Effect.Effect<void>;
     readonly syncAppearance: Effect.Effect<void>;
   }
@@ -347,6 +357,7 @@ export const make = Effect.gen(function* () {
   const runFork = Effect.runForkWith(context);
   const runPromise = Effect.runPromiseWith(context);
   const mainWindowMutex = yield* Semaphore.make(1);
+  const windowScaleMutex = yield* Semaphore.make(1);
   const pendingMainReveals = new WeakMap<Electron.BrowserWindow, Effect.Effect<void>>();
   const revealMain = Effect.fn("desktop.window.revealMain")((window: Electron.BrowserWindow) =>
     Effect.suspend(() => pendingMainReveals.get(window) ?? electronWindow.reveal(window)),
@@ -373,18 +384,37 @@ export const make = Effect.gen(function* () {
   const currentMainWindow = electronWindow.currentMainOrFirst.pipe(Effect.flatMap(withoutSplash));
   const focusedMainWindow = electronWindow.focusedMainOrFirst.pipe(Effect.flatMap(withoutSplash));
 
-  const zoomWindow = Effect.fn("desktop.window.zoomWindow")(function* (
+  const scaleWindow = Effect.fn("desktop.window.scaleWindow")(function* (
     window: Electron.BrowserWindow,
-    direction: MainWindowZoomDirection,
+    scale: number | MainWindowZoomDirection,
   ) {
-    const webContents = window.webContents;
-    webContents.setZoomLevel(
-      direction === "reset" ? 0 : webContents.getZoomLevel() + (direction === "in" ? 0.5 : -0.5),
-    );
+    if (window.isDestroyed()) return;
+    const current = window.webContents.getZoomFactor();
+    const factor =
+      typeof scale === "number"
+        ? scale
+        : scale === "reset"
+          ? DEFAULT_DESKTOP_INTERFACE_SCALE
+          : Math.min(
+              MAX_DESKTOP_INTERFACE_SCALE,
+              Math.max(
+                MIN_DESKTOP_INTERFACE_SCALE,
+                scale === "in" ? current * MAIN_WINDOW_ZOOM_STEP : current / MAIN_WINDOW_ZOOM_STEP,
+              ),
+            );
+    const { settings } = yield* desktopSettings.setMainWindowScale(factor);
+    if (window.isDestroyed()) return;
+    window.webContents.setZoomFactor(settings.mainWindowScale);
     if (environment.platform === "darwin") syncMacosWindowButtons(window);
     // App zoom propagates to guests; restore each preview's own zoom.
     yield* previewManager.reapplyZoom();
-  });
+  }, windowScaleMutex.withPermits(1));
+  const zoomWindow = (window: Electron.BrowserWindow, direction: MainWindowZoomDirection) =>
+    scaleWindow(window, direction).pipe(
+      Effect.catch((error) =>
+        logWindowWarning("failed to save interface scale", { message: error.message }),
+      ),
+    );
 
   const createWindow = Effect.fn("desktop.window.createWindow")(function* (): Effect.fn.Return<
     Option.Option<Electron.BrowserWindow>,
@@ -433,6 +463,7 @@ export const make = Effect.gen(function* () {
       ...getWindowTitleBarOptions(shouldUseDarkColors, environment.platform),
       webPreferences: {
         preload: environment.preloadPath,
+        zoomFactor: persistedSettings.mainWindowScale,
         // Hidden-renderer throttling stalls first paint; re-enable it after the first reveal.
         backgroundThrottling: false,
         contextIsolation: true,
@@ -1110,6 +1141,10 @@ export const make = Effect.gen(function* () {
         return;
       }
       yield* zoomWindow(window.value, direction);
+    }),
+    setMainWindowScale: Effect.fn("desktop.window.setMainWindowScale")(function* (factor) {
+      const window = yield* electronWindow.main;
+      if (Option.isSome(window)) yield* scaleWindow(window.value, factor);
     }),
     runMainContentsCommand: Effect.fn("desktop.window.runMainContentsCommand")(function* (command) {
       yield* Effect.annotateCurrentSpan({ command });

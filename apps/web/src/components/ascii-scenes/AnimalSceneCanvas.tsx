@@ -11,7 +11,6 @@ export default function AnimalSceneCanvas({
 }) {
   const canvasRef = useCanvasMotion(
     (context, frame) => paintAnimalScene(context, { ...frame, sceneId }),
-    20,
     appearance,
   );
   return <canvas ref={canvasRef} data-ascii-scene-canvas aria-hidden="true" />;

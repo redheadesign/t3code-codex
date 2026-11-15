@@ -22,12 +22,6 @@
   pointer-events: none;
 }
 
-[data-ascii-composer] {
-  --glass-blur: 7px;
-  --chat-composer-outline: var(--glass-edge);
-  --chat-composer-highlight: var(--glass-sheen);
-}
-
 [data-ascii-composer] [data-composer-submit]:disabled {
   background: var(--muted);
   color: var(--muted-foreground);

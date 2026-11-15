@@ -103,6 +103,7 @@ function layerDesktopWindow(
     dispatchMenuAction: () => Effect.void,
     dispatchSnapShotEvent: () => Effect.void,
     zoomMain: () => Effect.void,
+    setMainWindowScale: () => Effect.die("unexpected interface scale update"),
     runMainContentsCommand: () => Effect.void,
     syncAppearance: Effect.void,
   });

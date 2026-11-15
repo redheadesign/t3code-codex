@@ -4,6 +4,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
 
@@ -26,6 +27,7 @@ const DesktopSettingsPatch = Schema.Struct({
     ),
   ),
   mainWindowMaximized: Schema.optionalKey(Schema.Boolean),
+  mainWindowScale: Schema.optionalKey(Schema.Unknown),
   serverExposureMode: Schema.optionalKey(Schema.Literals(["local-only", "network-accessible"])),
   tailscaleServeEnabled: Schema.optionalKey(Schema.Boolean),
   tailscaleServePort: Schema.optionalKey(Schema.Number),
@@ -183,6 +185,7 @@ describe("DesktopSettings", () => {
           localEnvironmentEnabled: true,
           mainWindowBounds: { x: 120, y: 80, width: 1280, height: 900 },
           mainWindowMaximized: false,
+          mainWindowScale: 1,
           serverExposureMode: "network-accessible",
           tailscaleServeEnabled: true,
           tailscaleServePort: 8443,
@@ -196,7 +199,7 @@ describe("DesktopSettings", () => {
     ),
   );
 
-  it.effect("rejects window bounds that do not satisfy the domain schema", () =>
+  it.effect("rejects invalid window bounds and scale without discarding other settings", () =>
     withSettings(
       Effect.gen(function* () {
         const settings = yield* DesktopAppSettings.DesktopAppSettings;
@@ -208,12 +211,14 @@ describe("DesktopSettings", () => {
           yield* writeSettingsPatch({
             mainWindowBounds: bounds,
             mainWindowMaximized: true,
+            mainWindowScale: 6,
             serverExposureMode: "network-accessible",
           });
 
           const loaded = yield* settings.load;
           assert.isNull(loaded.mainWindowBounds);
           assert.isFalse(loaded.mainWindowMaximized);
+          assert.equal(loaded.mainWindowScale, 1);
           assert.equal(loaded.serverExposureMode, "network-accessible");
         }
       }),
@@ -228,6 +233,7 @@ describe("DesktopSettings", () => {
         const settings = yield* DesktopAppSettings.DesktopAppSettings;
 
         yield* settings.setMainWindowBounds({ x: -1200, y: 40, width: 400, height: 360 }, true);
+        yield* settings.setMainWindowScale(1.25);
         yield* settings.setServerExposureMode("network-accessible");
 
         const persisted = yield* decodeDesktopSettingsPatch(
@@ -236,6 +242,7 @@ describe("DesktopSettings", () => {
         assert.deepEqual(persisted, {
           mainWindowBounds: { x: -1200, y: 40, width: 400, height: 360 },
           mainWindowMaximized: true,
+          mainWindowScale: 1.25,
           serverExposureMode: "network-accessible",
         } satisfies typeof DesktopSettingsPatch.Type);
 
@@ -245,6 +252,14 @@ describe("DesktopSettings", () => {
         }).pipe(Effect.provide(DesktopAppSettings.layer));
         assert.deepEqual(restored.mainWindowBounds, persisted.mainWindowBounds);
         assert.isTrue(restored.mainWindowMaximized);
+        assert.equal(restored.mainWindowScale, 1.25);
+        yield* settings.setMainWindowScale(1);
+        assert.notProperty(
+          yield* decodeDesktopSettingsPatch(
+            yield* fileSystem.readFileString(environment.desktopSettingsPath),
+          ),
+          "mainWindowScale",
+        );
       }),
     ),
   );
@@ -258,7 +273,7 @@ describe("DesktopSettings", () => {
         const dotfiles = yield* fileSystem.makeTempDirectoryScoped({
           prefix: "t3-desktop-settings-dotfiles-",
         });
-        const linkedSettingsPath = `${dotfiles}/desktop-settings.json`;
+        const linkedSettingsPath = (yield* Path.Path).join(dotfiles, "desktop-settings.json");
         yield* fileSystem.writeFileString(linkedSettingsPath, "{}\n");
         yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
         yield* fileSystem.symlink(linkedSettingsPath, environment.desktopSettingsPath);
@@ -314,6 +329,7 @@ describe("DesktopSettings", () => {
           localEnvironmentEnabled: true,
           mainWindowBounds: null,
           mainWindowMaximized: false,
+          mainWindowScale: 1,
           serverExposureMode: "local-only",
           tailscaleServeEnabled: false,
           tailscaleServePort: 443,
@@ -343,6 +359,7 @@ describe("DesktopSettings", () => {
           localEnvironmentEnabled: true,
           mainWindowBounds: null,
           mainWindowMaximized: false,
+          mainWindowScale: 1,
           serverExposureMode: "local-only",
           tailscaleServeEnabled: false,
           tailscaleServePort: 443,

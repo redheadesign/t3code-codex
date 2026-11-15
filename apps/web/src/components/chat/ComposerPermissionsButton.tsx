@@ -36,10 +36,11 @@ export function ComposerPermissionsButton(props: {
                 <ComposerControl
                   ref={triggerRef}
                   size={size}
+                  variant="glass"
                   data-composer-shortcut="composer.mode"
                   aria-label={`Permissions: ${label}`}
                   className={cn(
-                    "min-w-7 max-w-[calc(100cqi-13rem)] data-popup-open:bg-accent",
+                    "min-w-7 max-w-[calc(100cqi-13rem)]",
                     props.runtimeMode === "full-access" &&
                       "text-permission-full-access hover:text-permission-full-access dark:text-permission-full-access",
                   )}

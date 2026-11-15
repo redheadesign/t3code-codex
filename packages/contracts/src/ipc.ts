@@ -1060,6 +1060,14 @@ export type DesktopMediaRead = typeof DesktopMediaReadSchema.Type;
 export const SystemSettingsPaneSchema = Schema.Literals(["full-disk-access"]);
 export type SystemSettingsPane = typeof SystemSettingsPaneSchema.Type;
 
+export const DEFAULT_DESKTOP_INTERFACE_SCALE = 1;
+export const MIN_DESKTOP_INTERFACE_SCALE = 0.25;
+export const MAX_DESKTOP_INTERFACE_SCALE = 5;
+export const DESKTOP_INTERFACE_SCALE_PRESETS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as const;
+export const DesktopInterfaceScaleSchema = Schema.Number.check(
+  Schema.isBetween({ minimum: MIN_DESKTOP_INTERFACE_SCALE, maximum: MAX_DESKTOP_INTERFACE_SCALE }),
+);
+
 export interface DesktopBridge {
   getAppBranding: () => DesktopAppBranding | null;
   getRelayTelemetryEnabled: () => boolean;
@@ -1162,6 +1170,7 @@ export interface DesktopBridge {
   getWindowFullscreenState: () => boolean;
   onWindowFullscreenStateChange: (listener: (fullscreen: boolean) => void) => () => void;
   getWindowZoomFactor: () => number;
+  setWindowZoomFactor: (factor: number) => Promise<void>;
   getUpdateState: () => Promise<DesktopUpdateState>;
   /** `minimumVersion` is a track switch's checked release; nothing older is offered after. */
   setUpdateChannel: (

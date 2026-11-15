@@ -521,6 +521,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
               .filter(Boolean)
               .join(", ")}
             size={size}
+            variant={props.isComposerOwned ? "glass" : "default"}
             data-chat-provider-model-picker="true"
             data-composer-shortcut={props.triggerShortcuts}
             onClick={(event) => {

@@ -1,4 +1,5 @@
 import { useUiText } from "~/i18n";
+import { useWindowZoomFactor } from "~/browser/useBrowserLayoutZoomFactor";
 import {
   animalScenes,
   russianAnimalSceneLabels,
@@ -7,6 +8,10 @@ import {
 import { useHomeArtwork } from "~/components/ascii-scenes/HomeArtwork";
 import type { CSSProperties } from "react";
 import { useState } from "react";
+import {
+  DEFAULT_DESKTOP_INTERFACE_SCALE,
+  DESKTOP_INTERFACE_SCALE_PRESETS,
+} from "@t3tools/contracts";
 import {
   DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
   DEFAULT_UNIFIED_SETTINGS,
@@ -31,6 +36,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
+import { toastManager } from "../ui/toast";
 import { ThemeLibrary } from "./ThemeSettings";
 import {
   SettingResetButton,
@@ -90,6 +96,74 @@ const EFFORT_DISPLAY_LABELS: Record<EffortDisplay, string> = {
   label: "Word",
   bars: "Bars",
 };
+
+function InterfaceScaleSetting() {
+  const ui = useUiText();
+  const zoomFactor = useWindowZoomFactor();
+  const setting = searchableSetting("interface-scale");
+  const title = settingsRowTitle(setting.id, setting.title, ui);
+  const preset = DESKTOP_INTERFACE_SCALE_PRESETS.find(
+    (value) => Math.abs(value - zoomFactor) < 1e-6,
+  );
+  const selectedFactor = preset ?? zoomFactor;
+  const factors =
+    preset === undefined
+      ? [...DESKTOP_INTERFACE_SCALE_PRESETS, selectedFactor].toSorted((a, b) => a - b)
+      : DESKTOP_INTERFACE_SCALE_PRESETS;
+  const format = new Intl.NumberFormat(ui("en", "ru"), {
+    style: "percent",
+    maximumFractionDigits: 1,
+  });
+  const options = factors.map((value) => ({ value, label: format.format(value) }));
+  const setScale = (value: number) => {
+    void window.desktopBridge?.setWindowZoomFactor(value).catch(() =>
+      toastManager.add({
+        type: "error",
+        title: ui("Could not save the interface scale", "Не удалось сохранить масштаб интерфейса"),
+      }),
+    );
+  };
+
+  return (
+    <SettingsRow
+      {...setting}
+      description={ui(
+        "Resize text, icons, and panels together. At 100%, the app follows your display’s system scale.",
+        "Меняет размер текста, значков и панелей. При 100 % приложение использует системный масштаб экрана.",
+      )}
+      resetAction={
+        selectedFactor !== DEFAULT_DESKTOP_INTERFACE_SCALE ? (
+          <SettingResetButton
+            label={ui("interface scale", "масштаб интерфейса")}
+            onClick={() => setScale(DEFAULT_DESKTOP_INTERFACE_SCALE)}
+          />
+        ) : null
+      }
+      control={
+        <div className="w-full sm:w-40">
+          <Select<number>
+            items={options}
+            value={selectedFactor}
+            onValueChange={(value) => {
+              if (value !== null) setScale(value);
+            }}
+          >
+            <SelectTrigger size="sm" width="fluid" aria-label={title}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              {options.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </div>
+      }
+    />
+  );
+}
 
 function HomeArtworkSetting() {
   const ui = useUiText();
@@ -222,6 +296,7 @@ export function AppearanceSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="appearance-interface" title={ui("Interface", "Интерфейс")}>
+        {window.desktopBridge?.setWindowZoomFactor ? <InterfaceScaleSetting /> : null}
         <HomeArtworkSetting />
         <SettingsRow
           {...searchableSetting("setting-appearance-contrast")}

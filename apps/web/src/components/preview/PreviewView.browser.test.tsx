@@ -449,13 +449,14 @@ describe("PreviewView", () => {
     const listeners = new Set<(action: string) => void>();
     window.desktopBridge = {
       getWindowZoomFactor: () => 1,
+      setWindowZoomFactor: async () => undefined,
       onMenuAction: (listener: (action: string) => void) => {
         listeners.add(listener);
         return () => {
           listeners.delete(listener);
         };
       },
-    } as NonNullable<typeof window.desktopBridge>;
+    } as unknown as NonNullable<typeof window.desktopBridge>;
     await using screen = await render(view());
     const address = page.getByRole("textbox");
     const input = address.element() as HTMLInputElement;

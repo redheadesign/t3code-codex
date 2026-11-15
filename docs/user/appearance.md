@@ -8,6 +8,10 @@ appearance or stay in light or dark mode. To use different themes for light and 
 the corresponding preview within each theme. Appearance preferences are saved separately on each
 device or browser.
 
+In the desktop app, use **Settings → Appearance → Interface scale** to resize text, icons, and
+panels together. At 100%, the app follows your display’s system scale. The choice is saved on this
+device. Use **Ctrl+0** on Windows and Linux or **Cmd+0** on macOS to reset it.
+
 On web and desktop, use **Change theme** in the command palette to select a theme without leaving chat.
 Press **Cmd+Option+A** on macOS or **Ctrl+Alt+A** on Windows/Linux to open the theme picker directly.
 Use **Change appearance** in the command palette to choose System, Light, or Dark independently of

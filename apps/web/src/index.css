@@ -133,6 +133,13 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --glass-sheen: linear-gradient(165deg, rgb(255 255 255 / 58%), transparent 52%);
   --glass-rim-shadow: inset 0 1px rgb(255 255 255 / 90%);
   --glass-elevation: 0 14px 38px -14px rgb(38 47 71 / 30%);
+  --glass-frost-opacity: clamp(24%, calc(2 * var(--glass-opacity) - 100%), 100%);
+  --glass-frost-sheen: linear-gradient(180deg, rgb(255 255 255 / 35%), transparent 48%);
+  --glass-frost-bright-edge: rgb(255 255 255 / 78%);
+  --glass-frost-dim-edge: rgb(255 255 255 / 32%);
+  --glass-frost-inner-tone: rgb(255 255 255 / 19%);
+  --glass-control-fill: rgb(255 255 255 / 24%);
+  --glass-control-hover: rgb(255 255 255 / 60%);
   --desktop-window-right-resize-inset: 0px;
   --workspace-topbar-height: 44px;
   /* The window row above the shell card. Its controls center on it, as do the macOS traffic
@@ -175,6 +182,12 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --glass-sheen: linear-gradient(165deg, rgb(228 235 255 / 8%), transparent 48%);
     --glass-rim-shadow: inset 0 1px rgb(233 240 255 / 12%);
     --glass-elevation: 0 18px 42px -14px rgb(0 0 0 / 72%);
+    --glass-frost-sheen: linear-gradient(180deg, rgb(255 255 255 / 4%), transparent 48%);
+    --glass-frost-bright-edge: rgb(237 243 255 / 15%);
+    --glass-frost-dim-edge: rgb(237 243 255 / 5%);
+    --glass-frost-inner-tone: rgb(140 170 255 / 7%);
+    --glass-control-fill: rgb(235 242 255 / 4%);
+    --glass-control-hover: rgb(235 242 255 / 12%);
   }
 }
 
@@ -425,6 +438,54 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   background-image: var(--glass-sheen);
   border-color: var(--glass-edge);
   box-shadow: var(--glass-rim-shadow);
+}
+
+@utility frosted-glass-fill {
+  background-color: color-mix(
+    in srgb,
+    var(--frosted-glass-fill, var(--card)) var(--frosted-glass-opacity, var(--glass-frost-opacity)),
+    transparent
+  );
+  background-image: var(--glass-frost-sheen);
+  -webkit-backdrop-filter: blur(min(var(--glass-blur), var(--frosted-glass-blur, 1rem)))
+    saturate(1.8);
+  backdrop-filter: blur(min(var(--glass-blur), var(--frosted-glass-blur, 1rem))) saturate(1.8);
+
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    background-color: var(--frosted-glass-fill, var(--card));
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@utility frosted-glass-rim {
+  border-color: var(--frosted-glass-edge, var(--glass-edge));
+  box-shadow:
+    inset 1px 1px var(--glass-frost-bright-edge),
+    inset -1px -1px var(--glass-frost-dim-edge),
+    inset 0 0 24px var(--glass-frost-inner-tone),
+    0 0 0 2px var(--frosted-glass-focus, transparent),
+    var(--frosted-glass-shadow, 0 0 transparent);
+}
+
+@utility glass-control {
+  border-color: var(--glass-edge);
+  background-color: var(--glass-control-fill);
+  box-shadow: inset 0 1px var(--glass-frost-bright-edge);
+
+  @media (hover: hover) {
+    &:not(:disabled):not([data-disabled]):hover {
+      background-color: var(--glass-control-hover);
+    }
+  }
+
+  &[data-popup-open],
+  &[data-pressed] {
+    background-color: var(--glass-control-hover);
+  }
 }
 
 @utility alert-glass {
@@ -1694,12 +1755,6 @@ html[data-theme-id="silver-glass"] [data-app-sidebar] [data-slot="sidebar-rail"]
 html[data-theme-id="silver-glass"] [data-chat-header] {
   background-color: var(--app-theme-chrome);
   border-bottom: 1px solid color-mix(in srgb, var(--app-theme-toolbar-border) 72%, transparent);
-}
-
-html[data-theme-id="silver-glass"] [data-thread-details-card].dropdown-glass {
-  box-shadow:
-    inset 0 1px rgb(255 255 255 / 5%),
-    0 4px 16px -12px rgb(0 0 0 / 42%);
 }
 
 @media (prefers-reduced-transparency: reduce) {

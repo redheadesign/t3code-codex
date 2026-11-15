@@ -59,6 +59,8 @@ const buttonVariants = cva(
           "rounded-full border-transparent bg-muted/70 text-foreground shadow-none before:rounded-full [:hover,[data-pressed]]:bg-muted",
         glass:
           "surface-glass [--control-icon-color:var(--contrast-muted-foreground)] rounded-full text-foreground before:rounded-full [:hover,[data-pressed]]:bg-accent/65",
+        "glass-pill":
+          "glass-control [--control-icon-color:var(--contrast-muted-foreground)] rounded-full text-foreground before:rounded-full transition-[background-color,box-shadow,scale]",
         link: "border-transparent underline-offset-4 [:hover,[data-pressed]]:underline",
         "media-close":
           "[--control-icon-color:currentColor] border-transparent bg-black/65 text-white shadow-sm ring-1 ring-white/20 [:hover,[data-pressed]]:bg-black/80 focus-visible:ring-white",
