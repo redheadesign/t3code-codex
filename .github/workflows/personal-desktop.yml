@@ -224,8 +224,12 @@ jobs:
 
           copy_asset() {
             local target="$1" filename="$2"
-            test -s "installers/installers-$target/$filename"
-            cp -- "installers/installers-$target/$filename" "release/$filename"
+            local source="installers/installers-$target/$filename"
+            if [[ ! -s "$source" ]]; then
+              printf 'Missing release asset %s\n' "$source" >&2
+              return 1
+            fi
+            cp -- "$source" "release/$filename"
           }
 
           for arch in x64 arm64; do
@@ -234,11 +238,13 @@ jobs:
             copy_asset "mac-$arch" "$name.zip"
             copy_asset "win-$arch" "$name.exe"
             copy_asset "win-$arch" "$name.exe.blockmap"
-            copy_asset "linux-$arch" "$name.AppImage"
+            appimage_arch="$arch"
             deb_arch="$arch"
             if [[ "$arch" == x64 ]]; then
+              appimage_arch=x86_64
               deb_arch=amd64
             fi
+            copy_asset "linux-$arch" "T3-Code-$VERSION-$appimage_arch.AppImage"
             copy_asset "linux-$arch" "T3-Code-$VERSION-$deb_arch.deb"
           done
 
@@ -254,7 +260,7 @@ jobs:
           done
           grep -F "T3-Code-$VERSION-x64.exe" release/latest.yml
           grep -F "T3-Code-$VERSION-arm64.exe" release/latest.yml
-          grep -F "T3-Code-$VERSION-x64.AppImage" release/latest-linux.yml
+          grep -F "T3-Code-$VERSION-x86_64.AppImage" release/latest-linux.yml
           grep -F "T3-Code-$VERSION-amd64.deb" release/latest-linux.yml
           grep -F "T3-Code-$VERSION-arm64.AppImage" release/latest-linux-arm64.yml
           grep -F "T3-Code-$VERSION-arm64.deb" release/latest-linux-arm64.yml
@@ -277,7 +283,7 @@ jobs:
           | --- | --- | --- |
           | macOS | [Intel DMG]($downloads/T3-Code-$VERSION-x64.dmg) | [Apple Silicon DMG]($downloads/T3-Code-$VERSION-arm64.dmg) |
           | Windows | [x64 installer]($downloads/T3-Code-$VERSION-x64.exe) | [ARM64 installer]($downloads/T3-Code-$VERSION-arm64.exe) |
-          | Linux | [AppImage]($downloads/T3-Code-$VERSION-x64.AppImage) · [DEB]($downloads/T3-Code-$VERSION-amd64.deb) | [AppImage]($downloads/T3-Code-$VERSION-arm64.AppImage) · [DEB]($downloads/T3-Code-$VERSION-arm64.deb) |
+          | Linux | [AppImage]($downloads/T3-Code-$VERSION-x86_64.AppImage) · [DEB]($downloads/T3-Code-$VERSION-amd64.deb) | [AppImage]($downloads/T3-Code-$VERSION-arm64.AppImage) · [DEB]($downloads/T3-Code-$VERSION-arm64.deb) |
 
           This release brings the fork’s glass workspace, interactive ASCII animals, and appearance controls to all six desktop targets.
 
