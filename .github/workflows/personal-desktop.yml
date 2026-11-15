@@ -313,6 +313,12 @@ jobs:
 
           (cd release && sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS" && sha256sum -c "$RUNNER_TEMP/SHA256SUMS")
           cp -- "$RUNNER_TEMP/SHA256SUMS" release/SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-release-bundle
+          path: release/*
+          if-no-files-found: error
+          compression-level: 0
       - name: Publish installers and release notes
         shell: bash
         env:
@@ -340,8 +346,19 @@ jobs:
           [SHA-256 checksums]($downloads/SHA256SUMS) · [Build and launch checks]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN)
           EOF
 
-          gh release create "v$VERSION" release/* \
-            --target "$BUILD_SHA" \
-            --title "T3 Code by redheadesign $VERSION" \
-            --notes-file "$RUNNER_TEMP/release-notes.md" \
-            --latest
+          tag="v$VERSION"
+          if draft=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null); then
+            tag_commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
+            if [[ "$draft" != true || "$tag_commit" != "$BUILD_SHA" ]]; then
+              printf 'Release %s must be a draft for commit %s\n' "$tag" "$BUILD_SHA" >&2
+              exit 1
+            fi
+            gh release upload "$tag" release/* --clobber
+            gh release edit "$tag" --draft=false --latest
+          else
+            gh release create "$tag" release/* \
+              --target "$BUILD_SHA" \
+              --title "T3 Code by redheadesign $VERSION" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --latest
+          fi
